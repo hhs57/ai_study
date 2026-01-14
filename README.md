@@ -1,257 +1,70 @@
-# LangChain 和 LangGraph 学习教程
+# AI 学习平台 (AI Study Platform)
 
-这是一套循序渐进的 LangChain 和 LangGraph 学习教程，每个文件只讲解一个核心知识点，包含详细的中文注释。
+欢迎来到 **AI 学习平台**！这是一个开源的、系统化的 AI 技术学习知识库，旨在帮助开发者从理论到实践全面掌握现代人工智能技术栈。
 
-## 📚 学习路径
+本项目不仅仅是代码仓库，更是一套交互式的学习课程。
 
-### LangChain 基础（01-05）
+## 🌟 核心学习路径
 
-| 文件 | 主题 | 知识点 |
-|------|------|--------|
-| [01-basic-chain.py](01-basic-chain.py) | 基础链概念 | LLM 调用、LLMChain、链的基本概念 |
-| [02-prompt-template.py](02-prompt-template.py) | 提示词模板 | PromptTemplate、ChatPromptTemplate、输出解析器 |
-| [03-chains-sequentials.py](03-chains-sequentials.py) | 链的组合 | SimpleSequentialChain、并行执行、LCEL |
-| [04-memory-conversation.py](04-memory-conversation.py) | 对话记忆 | BufferMemory、WindowMemory、SummaryMemory |
-| [05-agents-basic.py](05-agents-basic.py) | 基础代理 | Tools、ReAct Agent、多步推理 |
+本项目包含以下核心学习主题：
 
-### LangChain 进阶（11-15）
+### 1. 🦜⛓️ [LangChain & LangGraph 应用开发](./langchain/index.html)
+从基础概念到企业级 Agent 开发，系统掌握 LLM 应用框架。
 
-| 文件 | 主题 | 知识点 |
-|------|------|--------|
-| [11-document-loading.py](11-document-loading.py) | 文档加载与处理 | Document Loaders、Text Splitters、文档分割 |
-| [12-vector-storage-rag.py](12-vector-storage-rag.py) | 向量存储与 RAG | Embeddings、Vector Stores、Retrievers、RAG 系统 |
-| [13-output-parsers-advanced.py](13-output-parsers-advanced.py) | 高级输出解析器 | PydanticOutputParser、结构化数据提取 |
-| [14-callbacks-streaming.py](14-callbacks-streaming.py) | 回调和流式输出 | Callbacks、Token 计数、流式输出 |
-| [15-complete-rag-app.py](15-complete-rag-app.py) | 完整的 RAG 应用 | RAG 最佳实践、生产级实现 |
+- **内容**: Prompt Engineering, Chains, RAG, Agents, Multi-Agent Systems, State Management.
+- **形式**: Python 源代码教程 + 详细注释。
+- **状态**: ✅ 已上线 (Modules 01-20)
+- **目录**: [`langchain/`](./langchain) 和 [`langgraph/`](./langgraph)
 
-### LangGraph 进阶（06-10）
+### 2. ⚡ [Transformer 架构深度解析](./transformer/index.html)
+从零开始理解大模型的基石，通过**交互式可视化**深入学习底层原理。
 
-| 文件 | 主题 | 知识点 |
-|------|------|--------|
-| [06-langgraph-intro.py](06-langgraph-intro.py) | LangGraph 入门 | 图的基本概念、节点、边、StateGraph |
-| [07-langgraph-state.py](07-langgraph-state.py) | 状态管理 | Annotated、operator.add、检查点 |
-| [08-langgraph-conditional.py](08-langgraph-conditional.py) | 条件边 | 条件路由、多分支、决策树 |
-| [09-langgraph-loops.py](09-langgraph-loops.py) | 循环 | ReAct 循环、迭代优化、防止无限循环 |
-| [10-langgraph-agent.py](10-langgraph-agent.py) | 智能体 | 构建 Agent、工具集成、多步推理 |
+- **内容**: Self-Attention, Multi-Head Attention, Encoder/Decoder, BERT, GPT, ViT.
+- **形式**: 交互式 HTML/JS 可视化 (无需 Python 环境即可体验)。
+- **状态**: 🚀 进行中 (Phase 1 & 2 Completed)
+- **入口**: [`transformer/index.html`](./transformer/index.html)
 
-### LangGraph 高级（16-20）
-
-| 文件 | 主题 | 知识点 |
-|------|------|--------|
-| [16-human-in-loop.py](16-human-in-loop.py) | 人机交互 | interrupt()、人工批准、多级审批 |
-| [17-state-persistence.py](17-state-persistence.py) | 状态持久化 | 数据库持久化、跨会话管理、版本控制 |
-| [18-multi-agent.py](18-multi-agent.py) | 多 Agent 系统 | 协作式 Agent、竞争式 Agent、层级式系统 |
-| [19-visualization-debug.py](19-visualization-debug.py) | 可视化与调试 | 图可视化、执行追踪、性能分析 |
-| [20-error-handling.py](20-error-handling.py) | 错误处理与容错 | 重试机制、降级处理、断路器模式 |
-
-## 🚀 快速开始
-
-### 1. 安装依赖
-
-```bash
-# 基础依赖
-pip install langchain langchain-openai langgraph python-dotenv
-
-# 文档处理和向量存储（11-12 课需要）
-pip install langchain-community langchain-text-splitters chromadb
-
-# 输出解析（13 课需要）
-pip install pydantic
-
-# 可选：其他向量数据库
-pip install faiss-cpu  # 或 faiss-gpu
-```
-
-### 2. 配置环境变量
-
-创建 `.env` 文件：
-
-```env
-OPENAI_API_KEY=your_api_key_here
-```
-
-### 3. 运行示例
-
-```bash
-# 运行任意示例文件
-python 01-basic-chain.py
-```
-
-## 📖 学习建议
-
-### 循序渐进
-- 按照顺序学习，每个文件都建立在前面的知识基础上
-- 先掌握 LangChain 基础，再学习 LangGraph
-
-### 动手实践
-- 不要只看代码，要运行每个示例
-- 修改参数，观察效果变化
-- 尝试组合不同的概念
-
-### 理解核心概念
-- **链（Chain）**：预定义的执行流程
-- **图（Graph）**：可以表达复杂的有向图结构
-- **状态（State）**：在节点间共享的数据
-- **节点（Node）**：执行操作的函数
-- **边（Edge）**：定义节点之间的连接
-- **代理（Agent）**：可以自主决策的智能系统
-
-## 🎯 学习重点
-
-### LangChain 核心概念
-1. **提示词模板**：复用和管理提示词
-2. **链的组合**：串联多个操作
-3. **对话记忆**：维护上下文
-4. **工具和代理**：扩展 LLM 能力
-5. **文档处理**：加载、分割、向量化
-6. **RAG 系统**：检索增强生成
-7. **输出解析**：结构化数据提取
-8. **回调机制**：追踪和流式输出
-
-### LangGraph 核心概念
-1. **状态管理**：如何定义和更新状态
-2. **条件边**：动态决定执行流程
-3. **循环**：实现迭代和重试
-4. **智能体**：构建自主决策系统
-5. **人机交互**：中断和人工干预
-6. **状态持久化**：检查点和恢复
-7. **多 Agent 系统**：协作和竞争
-8. **可视化调试**：性能分析和监控
-9. **错误处理**：重试和容错
-
-## 💡 关键区别
-
-### LangChain vs LangGraph
-
-| 特性 | LangChain Chains | LangGraph |
-|------|------------------|-----------|
-| 适用场景 | 简单的线性流程 | 复杂的非线性流程 |
-| 流程控制 | 固定的顺序 | 动态的决策 |
-| 状态管理 | 有限 | 灵活强大 |
-| 循环 | 难以实现 | 原生支持 |
-| 适用示例 | 简单的数据处理 | Agent、对话机器人 |
-
-## 🔧 常见问题
-
-### Q: 为什么要分这么多文件？
-A: 每个文件只讲一个知识点，更容易理解和消化。你可以一次学一个，不需要一次理解所有内容。
-
-### Q: 需要什么基础？
-A: 基本的 Python 知识即可。熟悉函数、类、类型注解会有帮助。
-
-### Q: 如何调试代码？
-A: 每个示例都包含详细的打印语句，可以看到执行过程。设置 `verbose=True` 可以看到更多细节。
-
-### Q: 可以跳过某些文件吗？
-A: 可以，但不建议。LangGraph 的内容依赖 LangChain 的基础。
-
-### Q: 学习路径建议？
-A: 初学者按顺序学习（01-20），有基础者可选择性学习进阶内容（11-20）。
-
-## 📈 完整学习路线
-
-### 第一阶段：LangChain 基础（01-05）
-**目标**：掌握 LangChain 的核心概念
-- 理解链的概念和 LCEL 语法
-- 学会使用提示词模板
-- 掌握链的组合方式
-- 了解对话记忆机制
-- 认识基础 Agent
-
-### 第二阶段：LangGraph 基础（06-10）
-**目标**：学会构建复杂的工作流
-- 理解图的基本结构
-- 掌握状态管理
-- 学会使用条件边和循环
-- 构建简单的 Agent
-
-### 第三阶段：LangChain 进阶（11-15）
-**目标**：构建生产级 RAG 应用
-- 文档加载和处理
-- 向量存储和检索
-- 完整的 RAG 系统实现
-- 高级输出解析
-- 回调和流式输出
-
-### 第四阶段：LangGraph 高级（16-20）
-**目标**：掌握企业级应用开发
-- 人机交互设计
-- 状态持久化
-- 多 Agent 系统
-- 可视化和调试
-- 错误处理和容错
-
-## 💼 实践项目建议
-
-### 初级项目
-1. **简单问答机器人**（使用 01-05）
-2. **文档摘要工具**（使用 11-12）
-3. **聊天机器人**（使用 04-07）
-
-### 中级项目
-4. **RAG 问答系统**（使用 11-15）
-5. **客服 Agent**（使用 05-10）
-6. **多轮对话系统**（使用 06-09）
-
-### 高级项目
-7. **多 Agent 协作系统**（使用 16-18）
-8. **内容审核平台**（使用 16, 19-20）
-9. **企业知识库系统**（使用 11-20）
-
-## 📊 知识图谱
-
-```
-LangChain 生态系统
-├── 基础组件
-│   ├── Prompts (提示词)
-│   ├── LLMs (模型)
-│   ├── Chains (链)
-│   └── Tools (工具)
-│
-├── 高级功能
-│   ├── Memory (记忆)
-│   ├── Agents (代理)
-│   ├── Retrievers (检索器)
-│   └── Callbacks (回调)
-│
-└── 应用场景
-    ├── RAG (检索增强)
-    ├── Chatbots (聊天机器人)
-    ├── Summarization (摘要)
-    └── Agents (智能体)
-
-LangGraph 核心概念
-├── 图结构
-│   ├── Nodes (节点)
-│   ├── Edges (边)
-│   └── State (状态)
-│
-├── 控制流
-│   ├── Sequential (顺序)
-│   ├── Conditional (条件)
-│   └── Loop (循环)
-│
-└── 高级特性
-    ├── Checkpoints (检查点)
-    ├── Persistence (持久化)
-    ├── Multi-Agent (多智能体)
-    └── Human-in-the-Loop (人机交互)
-```
-
-## 📚 进阶资源
-
-- [LangChain 官方文档](https://python.langchain.com/)
-- [LangGraph 官方文档](https://langchain-ai.github.io/langgraph/)
-- [OpenAI API 文档](https://platform.openai.com/docs)
-
-## 🤝 贡献
-
-欢迎提出建议和改进！
-
-## 📄 许可
-
-本教程仅供学习使用。
+### 3. 🕸️ 知识图谱 (Knowledge Graph)
+*（筹备中）*
+结合 LLM 与结构化数据，构建更精准的 RAG 系统。
 
 ---
 
-**祝学习愉快！如有问题，随时询问。** 🎉
+## 🚀 快速开始
+
+### 环境依赖
+本项目主要使用 Python 进行开发 (LangChain 部分) 和 HTML/JS (Transformer 可视化部分)。
+
+```bash
+# 克隆仓库
+git clone https://github.com/hhs57/ai_study.git
+cd ai_study
+
+# 安装 Python 依赖 (用于 LangChain/LangGraph 部分)
+pip install -r requirements.txt
+```
+
+### 运行可视化课程
+Transformer 课程为纯静态 HTML 文件，无需后端服务器。
+直接用浏览器打开 `transformer/index.html` 即可开始学习。
+
+## 📂 项目结构
+
+```
+ai_study/
+├── langchain/          # LangChain 基础与进阶示例
+├── langgraph/          # LangGraph 工作流与 Agent 示例
+├── knowledge-graph/    # (筹备中) 知识图谱相关代码
+├── transformer/        # Transformer 架构可视化互动课程
+│   ├── index.html      # 课程主页
+│   └── ...             # 各章节 HTML 文件
+├── CLAUDE.md           # 开发规范与最佳实践
+├── ANTIGRAVITY_RULES.md # 智能体行为准则
+└── index.html          # 项目总导航页
+```
+
+## 🤝 贡献与反馈
+欢迎提交 Issue 或 Pull Request 来改进课程内容。
+
+## 📄 许可证
+MIT License
