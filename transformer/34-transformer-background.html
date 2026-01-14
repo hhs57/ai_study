@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>34 - Transformer 诞生背景 | Transformer 架构学习</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        },
+                        accent: {
+                            50: '#fefce8',
+                            100: '#fef9c3',
+                            200: '#fef08a',
+                            300: '#fde047',
+                            400: '#facc15',
+                            500: '#eab308',
+                            600: '#ca8a04',
+                            700: '#a16207',
+                            800: '#854d0e',
+                            900: '#713f12',
+                        },
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        }
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 8s ease-in-out infinite;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body class="overflow-x-hidden">
+    <!-- Background Orbs -->
+    <div class="bg-orb w-96 h-96 bg-primary-600 top-0 -left-20"></div>
+    <div class="bg-orb w-80 h-80 bg-accent-600 bottom-0 -right-20 animation-delay-2000"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-50">
+        <div class="glass-card rounded-2xl px-6 py-4 max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
+                        <span class="font-bold text-white">34</span>
+                    </div>
+                    <span class="text-lg font-bold">Transformer 背景</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="index.html" class="text-gray-300 hover:text-white transition-colors">返回目录</a>
+                <a href="35-self-attention.html" class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm font-medium">
+                    下一章: Self-Attention
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-4xl mx-auto pt-32 pb-20 px-4">
+        
+        <!-- Header -->
+        <header class="mb-16 text-center">
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-6 bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
+                Transformer 诞生之前
+            </h1>
+            <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+                了解 RNN 和 Seq2Seq 模型的局限性，以及为什么我们需要通过 Transformer 来实现并行计算和长距离依赖捕捉。
+            </p>
+        </header>
+
+        <!-- Section 1: RNN Limitations -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8 mb-8">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span class="w-8 h-8 rounded-lg bg-red-500/20 text-red-400 flex items-center justify-center text-sm">1</span>
+                    RNN 的顺序处理瓶颈
+                </h2>
+                
+                <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div class="space-y-4 text-gray-300">
+                        <p>
+                            在 Transformer 出现之前，循环神经网络 (RNN) 是处理序列数据的主流架构。
+                        </p>
+                        <p>
+                            <strong class="text-red-400">问题：</strong> RNN 必须按顺序通过时间步处理数据。要计算第 4 个单词的状态，它必须先计算第 1, 2, 3 个单词。
+                        </p>
+                        <ul class="list-disc list-inside space-y-2 text-sm text-gray-400">
+                            <li>无法并行计算 (慢)</li>
+                            <li>长距离依赖容易丢失 (遗忘)</li>
+                            <li>梯度消失/爆炸问题</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 rounded-xl p-6 h-64 flex items-center justify-center relative overflow-hidden text-center" id="rnn-viz">
+                        <!-- RNN Visualization will check here -->
+                        <div class="text-gray-500">点击下方按钮开始演示</div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex justify-center">
+                    <button id="start-rnn-btn" class="px-6 py-2 bg-red-600/80 hover:bg-red-600 rounded-lg text-white font-medium transition-colors">
+                        演示 RNN 顺序处理
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Seq2Seq & Information Bottleneck -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8 mb-8">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span class="w-8 h-8 rounded-lg bg-yellow-500/20 text-yellow-400 flex items-center justify-center text-sm">2</span>
+                    Seq2Seq 与信息瓶颈
+                </h2>
+
+                <div class="space-y-6 text-gray-300">
+                    <p>
+                        Seq2Seq 模型（Encoder-Decoder）试图解决翻译问题。Encoder 将整个输入句子压缩成一个固定长度的 Context Vector。
+                    </p>
+                    <p>
+                        <strong class="text-yellow-400">瓶颈：</strong> 无论句子多长，所有信息都必须塞进这个固定的向量中。就像试图把整本书的内容压缩成一句话，必然会丢失细节。
+                    </p>
+                    
+                    <div class="bg-black/30 rounded-xl p-8 relative h-40 flex items-center justify-between gap-4">
+                        <!-- Visualization of Bottleneck -->
+                         <div class="flex-1 flex gap-2 justify-center opacity-50" id="encoder-words">
+                            <span class="px-2 py-1 bg-gray-700 rounded text-xs">The</span>
+                            <span class="px-2 py-1 bg-gray-700 rounded text-xs">quick</span>
+                            <span class="px-2 py-1 bg-gray-700 rounded text-xs">brown</span>
+                            <span class="px-2 py-1 bg-gray-700 rounded text-xs">fox...</span>
+                         </div>
+                         <div class="flex flex-col items-center">
+                             <div class="text-xs text-gray-400 mb-1">Context Vector</div>
+                             <div class="w-16 h-8 bg-gradient-to-r from-red-500 to-yellow-500 rounded animate-pulse flex items-center justify-center text-xs font-mono border border-yellow-300/50 shadow-[0_0_15px_rgba(234,179,8,0.5)]">
+                                 [0.1, ...]
+                             </div>
+                         </div>
+                         <div class="flex-1 text-center text-gray-500 text-sm">
+                             Decoder (只能看到这个向量)
+                         </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Transformer Solution -->
+        <section class="mb-12">
+             <div class="glass-card rounded-3xl p-8 mb-8 border-primary-500/30">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span class="w-8 h-8 rounded-lg bg-primary-500/20 text-primary-400 flex items-center justify-center text-sm">3</span>
+                    Transformer 的革命：并行与注意力
+                </h2>
+                
+                <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div class="space-y-4 text-gray-300">
+                        <p>
+                            Transformer 抛弃了循环，拥抱了<strong>Attention（注意力）</strong>。
+                        </p>
+                        <p>
+                            <strong class="text-primary-400">并行计算：</strong> 它可以同时处理输入的所有单词，利用 GPU 的并行能力。
+                        </p>
+                         <p>
+                            <strong class="text-primary-400">全连接视野：</strong> 每个单词都能直接"看到"句子中的其他所有单词，距离不再是问题。
+                        </p>
+                    </div>
+                    <div class="bg-black/30 rounded-xl p-6 h-64 flex items-center justify-center relative overflow-hidden" id="transformer-viz">
+                        <div class="text-gray-500">点击下方按钮开始演示</div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-center">
+                    <button id="start-transformer-btn" class="px-6 py-2 bg-primary-600/80 hover:bg-primary-600 rounded-lg text-white font-medium transition-colors">
+                        演示 Transformer 并行处理
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // RNN Visualization Logic
+        const rnnBtn = document.getElementById('start-rnn-btn');
+        const rnnViz = document.getElementById('rnn-viz');
+        
+        rnnBtn.addEventListener('click', () => {
+            rnnViz.innerHTML = ''; // Clear
+            const words = ['我', '爱', '学习', 'AI'];
+            const container = document.createElement('div');
+            container.className = 'flex gap-4 items-center overflow-x-auto p-4';
+            rnnViz.appendChild(container);
+
+            words.forEach((word, index) => {
+                setTimeout(() => {
+                    // Create Input
+                    const inputNode = document.createElement('div');
+                    inputNode.className = 'flex flex-col items-center gap-2 animate-[float_0.5s_ease-out]';
+                    inputNode.innerHTML = `
+                        <div class="w-12 h-12 rounded-full border-2 border-red-500 flex items-center justify-center bg-red-900/30 text-white font-bold transition-all duration-300 transform scale-0" id="rnn-node-${index}">
+                            Hidden
+                        </div>
+                        <div class="text-sm text-gray-400">${word}</div>
+                    `;
+                    container.appendChild(inputNode);
+                    
+                    // Animate appearance
+                    requestAnimationFrame(() => {
+                        const node = document.getElementById(`rnn-node-${index}`);
+                        node.classList.remove('scale-0');
+                        node.classList.add('scale-100');
+                        node.classList.add('shadow-[0_0_20px_rgba(239,68,68,0.5)]');
+                    });
+
+                    // Draw arrow from previous if not first
+                    if (index > 0) {
+                        const prevNode = document.getElementById(`rnn-node-${index-1}`);
+                        if (prevNode) {
+                            // Visual indication of passing state
+                            prevNode.classList.remove('shadow-[0_0_20px_rgba(239,68,68,0.5)]');
+                            prevNode.style.opacity = '0.5';
+                        }
+                    }
+
+                }, index * 800);
+            });
+            
+            // Finished state
+            setTimeout(() => {
+                const finishText = document.createElement('div');
+                finishText.textContent = '完成! 耗时: 4 steps';
+                finishText.className = 'absolute top-2 right-2 text-xs text-red-400 font-mono';
+                rnnViz.appendChild(finishText);
+            }, words.length * 800 + 500);
+        });
+
+        // Transformer Visualization Logic
+        const transBtn = document.getElementById('start-transformer-btn');
+        const transViz = document.getElementById('transformer-viz');
+
+        transBtn.addEventListener('click', () => {
+            transViz.innerHTML = '';
+            const words = ['我', '爱', '学习', 'AI'];
+            const container = document.createElement('div');
+            container.className = 'flex gap-4 items-center justify-center w-full';
+            transViz.appendChild(container);
+
+            // Step 1: Show all inputs at once
+            words.forEach((word, index) => {
+                const node = document.createElement('div');
+                node.className = 'flex flex-col items-center gap-2 opacity-0 transition-opacity duration-500';
+                node.id = `trans-node-${index}`;
+                node.innerHTML = `
+                     <div class="relative">
+                        <div class="w-12 h-12 rounded-lg border-2 border-primary-500 flex items-center justify-center bg-primary-900/30 text-white font-bold z-10 relative">
+                            Enc
+                        </div>
+                        <!-- Connection lines will be drawn here -->
+                     </div>
+                    <div class="text-sm text-gray-400">${word}</div>
+                `;
+                container.appendChild(node);
+                
+                // Appear instantly (simulating parallel)
+                requestAnimationFrame(() => {
+                    node.classList.remove('opacity-0');
+                    node.classList.add('opacity-100');
+                });
+            });
+
+            // Step 2: Show connections (Self-Attention)
+            setTimeout(() => {
+                words.forEach((_, i) => {
+                    const node = document.getElementById(`trans-node-${i}`).querySelector('.w-12');
+                    node.classList.add('shadow-[0_0_15px_rgba(249,115,22,0.6)]');
+                    node.classList.add('scale-110');
+                });
+                
+                const connectionText = document.createElement('div');
+                connectionText.textContent = '所有单词同时互相关注 (Self-Attention)';
+                connectionText.className = 'absolute top-2 left-0 right-0 text-center text-xs text-primary-400 font-mono animate-pulse';
+                transViz.appendChild(connectionText);
+                
+                 // Draw some SVG lines to simulate attention
+                 const svgOverlay = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                 svgOverlay.setAttribute("class", "absolute inset-0 w-full h-full pointer-events-none z-0");
+                 container.parentElement.appendChild(svgOverlay);
+
+                 // Simple "all-to-all" visualization (simplified)
+                 // Just drawing a curve from first to last to show range
+                 const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                 path.setAttribute("d", "M 60 100 Q 150 40 240 100"); // Approx coords
+                 path.setAttribute("fill", "transparent");
+                 path.setAttribute("stroke", "rgba(249,115,22,0.3)");
+                 path.setAttribute("stroke-width", "2");
+                 // In a real elaborate viz, we'd calculate coords, but this conveys the idea
+                 // For now, let's just make the nodes pulse
+                 
+                 const finishText = document.createElement('div');
+                finishText.textContent = '完成! 耗时: 1 step';
+                finishText.className = 'absolute top-2 right-2 text-xs text-primary-400 font-mono';
+                transViz.appendChild(finishText);
+
+            }, 800);
+        });
+    </script>
+</body>
+</html>

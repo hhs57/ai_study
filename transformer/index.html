@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformer 架构学习平台 - 从理论到实践</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        },
+                        accent: {
+                            50: '#fefce8',
+                            100: '#fef9c3',
+                            200: '#fef08a',
+                            300: '#fde047',
+                            400: '#facc15',
+                            500: '#eab308',
+                            600: '#ca8a04',
+                            700: '#a16207',
+                            800: '#854d0e',
+                            900: '#713f12',
+                        },
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'shimmer': 'shimmer 2s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-1000px 0' },
+                            '100%': { backgroundPosition: '1000px 0' },
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Animated background orbs */
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: linear-gradient(135deg, #f97316, #eab308);
+            top: -200px;
+            left: -200px;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: linear-gradient(135deg, #eab308, #f97316);
+            bottom: -150px;
+            right: -150px;
+            animation-delay: 2s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: linear-gradient(135deg, #f97316, #ef4444);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: 4s;
+        }
+
+        /* Glassmorphism card */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Module card gradient borders */
+        .module-card {
+            position: relative;
+            background: linear-gradient(135deg, rgba(249, 115, 22, 0.1), rgba(234, 179, 8, 0.1));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .module-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, #f97316, #eab308, #ef4444);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .module-card:hover::before {
+            opacity: 1;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Text glow effect */
+        .text-glow {
+            text-shadow: 0 0 40px rgba(249, 115, 22, 0.5);
+        }
+
+        /* Badge styles */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-beginner {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .badge-intermediate {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
+
+        .badge-advanced {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .badge-completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .module-locked {
+            opacity: 0.6;
+            filter: grayscale(0.8);
+            pointer-events: none;
+            border-style: dashed;
+        }
+    </style>
+</head>
+
+<body class="text-white">
+    <!-- Animated background -->
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-50">
+        <div class="glass-card rounded-2xl px-6 py-4 max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="../index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <span class="text-xl font-bold">Transformer 架构学习平台</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-6">
+                <a href="#modules" class="text-gray-300 hover:text-white transition-colors font-medium">课程模块</a>
+                <a href="#roadmap" class="text-gray-300 hover:text-white transition-colors font-medium">学习路径</a>
+                <a href="../index.html" class="text-gray-300 hover:text-white transition-colors">返回首页</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="min-h-screen flex items-center justify-center px-4 pt-24 pb-16">
+        <div class="max-w-6xl mx-auto text-center">
+            <div class="inline-flex items-center gap-2 glass-card px-4 py-2 rounded-full mb-8">
+                <span class="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
+                <span class="text-sm font-medium text-gray-300">13 个系统化学习模块</span>
+            </div>
+
+            <h1 class="text-5xl md:text-7xl font-extrabold mb-6 text-glow">
+                深入理解
+                <span
+                    class="bg-gradient-to-r from-primary-400 via-accent-400 to-primary-400 bg-clip-text text-transparent">
+                    Transformer
+                </span>
+                <br>架构原理
+            </h1>
+
+            <p class="text-xl text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
+                从 Self-Attention 到 BERT/GPT，通过 13 个交互式可视化课程模块，
+                深入理解现代大语言模型的核心架构。无需编程基础。
+            </p>
+
+            <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+                <a href="#modules"
+                    class="group px-8 py-4 bg-gradient-to-r from-primary-600 to-accent-600 rounded-xl font-semibold text-lg transition-all hover:shadow-lg hover:shadow-primary-500/25 hover:scale-105">
+                    开始学习
+                    <svg class="inline-block w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none"
+                        stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                </a>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="text-4xl font-bold text-primary-400 mb-2">13</div>
+                    <div class="text-sm text-gray-400">课程模块</div>
+                </div>
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="text-4xl font-bold text-accent-400 mb-2">50+</div>
+                    <div class="text-sm text-gray-400">交互式可视化</div>
+                </div>
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="text-4xl font-bold text-orange-400 mb-2">100%</div>
+                    <div class="text-sm text-gray-400">免费开源</div>
+                </div>
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="text-4xl font-bold text-yellow-400 mb-2">∞</div>
+                    <div class="text-sm text-gray-400">学习可能性</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Course Modules -->
+    <section id="modules" class="py-20 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold mb-4">课程模块</h2>
+                <p class="text-xl text-gray-400">理论基础 → 架构组件 → 模型变体 → 高级应用</p>
+            </div>
+
+            <!-- Theory Fundamentals -->
+            <div class="mb-12">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="h-px flex-1 bg-gradient-to-r from-transparent to-primary-500"></div>
+                    <h3 class="text-2xl font-bold text-primary-400">理论基础 (34-36)</h3>
+                    <div class="h-px flex-1 bg-gradient-to-l from-transparent to-primary-500"></div>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Module 34 -->
+                    <a href="34-transformer-background.html"
+                        class="module-card glass-card rounded-2xl p-6 cursor-pointer group block">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-xl font-bold">
+                                34
+                            </div>
+                            <span class="badge badge-beginner">入门</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-primary-400 transition-colors">Transformer
+                            诞生背景</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            RNN 的局限性、Seq2Seq 模型、注意力机制的起源、为什么需要 Transformer。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~50 分钟
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                交互式可视化
+                            </span>
+                        </div>
+                    </a>
+
+                    <!-- Module 35 -->
+                    <a href="35-self-attention.html"
+                        class="module-card glass-card rounded-2xl p-6 cursor-pointer group block">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-xl font-bold">
+                                35
+                            </div>
+                            <span class="badge badge-beginner">入门</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-primary-400 transition-colors">Self-Attention
+                            详解</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            Query、Key、Value 概念，Attention Score 计算，Scaled Dot-Product Attention，交互式 Attention Map。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~60 分钟
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                交互式可视化
+                            </span>
+                        </div>
+                    </a>
+
+                    <!-- Module 36 -->
+                    <a href="36-multi-head-attention.html"
+                        class="module-card glass-card rounded-2xl p-6 cursor-pointer group block">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-accent-600 flex items-center justify-center text-xl font-bold">
+                                36
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-primary-400 transition-colors">Multi-Head
+                            Attention</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            为什么需要多头、多头并行处理、位置编码、Sinusoidal vs Learned 位置编码。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~60 分钟
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                交互式可视化
+                            </span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Architecture Components -->
+            <div class="mb-12">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="h-px flex-1 bg-gradient-to-r from-transparent to-orange-500"></div>
+                    <h3 class="text-2xl font-bold text-orange-400">架构组件 (37-40)</h3>
+                    <div class="h-px flex-1 bg-gradient-to-l from-transparent to-orange-500"></div>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <!-- Module 37-40 placeholders -->
+                    <a href="37-feedforward-addnorm.html"
+                        class="module-card glass-card rounded-2xl p-6 cursor-pointer group block">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-orange-700 flex items-center justify-center text-xl font-bold">
+                                37
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-orange-400 transition-colors">Feed-Forward &
+                            Add&Norm</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            Position-wise FFN、激活函数、残差连接、LayerNorm vs BatchNorm。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~55 分钟
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                交互式可视化
+                            </span>
+                        </div>
+                    </a>
+
+                    <a href="38-encoder-architecture.html"
+                        class="module-card glass-card rounded-2xl p-6 cursor-pointer group block">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-red-700 flex items-center justify-center text-xl font-bold">
+                                38
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-orange-400 transition-colors">Encoder 架构深度解析
+                        </h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            Encoder Layer 结构、BERT 架构、预训练任务、注意力模式分析。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~65 分钟
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                交互式可视化
+                            </span>
+                        </div>
+                    </a>
+
+                    <a href="39-decoder-architecture.html"
+                        class="module-card glass-card rounded-2xl p-6 cursor-pointer group block">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-pink-700 flex items-center justify-center text-xl font-bold">
+                                39
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-red-400 transition-colors">Decoder 架构深度解析
+                        </h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            Masked Attention、Cross-Attention、GPT 架构、KV Cache 优化。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~65 分钟
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                交互式可视化
+                            </span>
+                        </div>
+                    </a>
+
+                    <a href="40-complete-transformer.html"
+                        class="module-card glass-card rounded-2xl p-6 cursor-pointer group block">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-purple-700 flex items-center justify-center text-xl font-bold">
+                                40
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-pink-400 transition-colors">完整 Transformer 模型
+                        </h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            端到端架构、训练流程、推理流程、Embedding、参数量统计。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~70 分钟
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                                交互式可视化
+                            </span>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Model Variants -->
+            <div class="mb-12">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="h-px flex-1 bg-gradient-to-r from-transparent to-accent-500"></div>
+                    <h3 class="text-2xl font-bold text-accent-400">模型变体 (41-43)</h3>
+                    <div class="h-px flex-1 bg-gradient-to-l from-transparent to-accent-500"></div>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-6">
+                    <!-- Module 41 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-500 to-yellow-700 flex items-center justify-center text-xl font-bold">
+                                41
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-accent-400 transition-colors">BERT 系列模型</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            BERT 架构详解、预训练任务、微调应用、RoBERTa、DistilBERT。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~65 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 42 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-500 to-orange-700 flex items-center justify-center text-xl font-bold">
+                                42
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-yellow-400 transition-colors">GPT 系列模型</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            GPT 架构、自回归生成、GPT-2/3/4 演进、生成策略、Prompt Engineering。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~65 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 43 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-red-700 flex items-center justify-center text-xl font-bold">
+                                43
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-orange-400 transition-colors">其他重要变体</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            T5、BART、ViT、Whisper、多模态模型对比。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~60 分钟
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Topics -->
+            <div class="mb-12">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="h-px flex-1 bg-gradient-to-r from-transparent to-red-500"></div>
+                    <h3 class="text-2xl font-bold text-red-400">高级主题 (44-46)</h3>
+                    <div class="h-px flex-1 bg-gradient-to-l from-transparent to-red-500"></div>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-6">
+                    <!-- Module 44 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-pink-700 flex items-center justify-center text-xl font-bold">
+                                44
+                            </div>
+                            <span class="badge badge-advanced">高级</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-red-400 transition-colors">训练技巧与优化</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            学习率调度、混合精度训练、梯度累积、分布式训练。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~70 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 45 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-purple-700 flex items-center justify-center text-xl font-bold">
+                                45
+                            </div>
+                            <span class="badge badge-advanced">高级</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-pink-400 transition-colors">高效 Transformer 变体
+                        </h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            Linformer、Performer、Longformer、Flash Attention。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~65 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 46 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group">
+                        <div class="flex items-start justify-between mb-4">
+                            <div
+                                class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-700 flex items-center justify-center text-xl font-bold">
+                                46
+                            </div>
+                            <span class="badge badge-advanced">高级</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-purple-400 transition-colors">Transformer
+                            应用实战</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            文本分类、NER、机器翻译、摘要、RAG 问答、多任务学习。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                ~75 分钟
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section id="roadmap" class="py-20 px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="glass-card rounded-3xl p-12">
+                <h2 class="text-4xl md:text-5xl font-bold mb-6">准备好开始了吗?</h2>
+                <p class="text-xl text-gray-400 mb-8 leading-relaxed">
+                    通过交互式可视化,深入理解 Transformer 架构。
+                    所有课程完全免费,无需编程基础,随时学习。
+                </p>
+                <a href="#modules"
+                    class="inline-block px-10 py-5 bg-gradient-to-r from-primary-600 to-accent-600 rounded-xl font-bold text-xl transition-all hover:shadow-lg hover:shadow-primary-500/25 hover:scale-105">
+                    立即开始学习
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-4 border-t border-white/10">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="flex items-center gap-3">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <span class="text-lg font-bold">Transformer 架构学习平台</span>
+                </div>
+                <p class="text-gray-500 text-sm">
+                    开源项目 · MIT License · 2026
+                </p>
+                <a href="../index.html" class="text-gray-400 hover:text-white transition-colors">返回首页</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Intersection Observer for scroll animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Observe all cards
+        document.querySelectorAll('.module-card, .glass-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+            observer.observe(card);
+        });
+    </script>
+</body>
+
+</html>

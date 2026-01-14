@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>36 - Multi-Head Attention | Transformer 架构学习</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        },
+                        accent: {
+                            50: '#fefce8',
+                            100: '#fef9c3',
+                            200: '#fef08a',
+                            300: '#fde047',
+                            400: '#facc15',
+                            500: '#eab308',
+                            600: '#ca8a04',
+                            700: '#a16207',
+                            800: '#854d0e',
+                            900: '#713f12',
+                        },
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        }
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 8s ease-in-out infinite;
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body class="overflow-x-hidden">
+    <!-- Background Orbs -->
+    <div class="bg-orb w-96 h-96 bg-primary-600 top-0 -left-20"></div>
+    <div class="bg-orb w-80 h-80 bg-accent-600 bottom-0 -right-20 animation-delay-2000"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-50">
+        <div class="glass-card rounded-2xl px-6 py-4 max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-600 flex items-center justify-center">
+                        <span class="font-bold text-white">36</span>
+                    </div>
+                    <span class="text-lg font-bold">Multi-Head Attention</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="35-self-attention.html"
+                    class="text-gray-300 hover:text-white transition-colors text-sm">上一章</a>
+                <a href="index.html" class="text-gray-300 hover:text-white transition-colors">目录</a>
+                <!-- Future link to 37 -->
+                <span class="px-4 py-2 bg-white/5 rounded-lg text-gray-500 text-sm cursor-not-allowed">
+                    下一章: Feed-Forward
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl mx-auto pt-32 pb-20 px-4">
+
+        <!-- Header -->
+        <header class="mb-16 text-center">
+            <h1
+                class="text-4xl md:text-5xl font-extrabold mb-6 bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
+                多头注意力与位置编码
+            </h1>
+            <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+                为什么一个头不够？位置编码如何让模型知道"顺序"？
+            </p>
+        </header>
+
+        <!-- Section 1: Multi-Head Logic -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8 mb-8">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span
+                        class="w-8 h-8 rounded-lg bg-green-500/20 text-green-400 flex items-center justify-center text-sm">1</span>
+                    为什么要 Multi-Head (多头)?
+                </h2>
+
+                <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div class="space-y-4 text-gray-300">
+                        <p>
+                            如果只有一组 Attention，模型可能只能关注到一个方面的特征（比如词性）。
+                        </p>
+                        <p>
+                            <strong>多头注意力 (Multi-Head Attention)</strong> 允许模型同时关注不同的语义空间。
+                        </p>
+                        <ul class="list-disc list-inside space-y-2 text-sm text-gray-400">
+                            <li><strong>Head 1:</strong> 关注语法结构 (主谓关系)</li>
+                            <li><strong>Head 2:</strong> 关注指代关系 (it 指什么)</li>
+                            <li><strong>Head 3:</strong> 关注上下文语义 (Apple 是水果还是公司?)</li>
+                        </ul>
+                    </div>
+
+                    <!-- Interactive Multi-Head Viz -->
+                    <div class="bg-black/30 rounded-xl p-6 border border-white/10">
+                        <div class="mb-4 text-center text-sm text-gray-400">点击按钮切换不同的注意力头</div>
+
+                        <div class="flex justify-center gap-2 mb-6">
+                            <button onclick="showHead(1)"
+                                class="px-3 py-1 rounded bg-red-500/20 hover:bg-red-500/40 text-red-300 text-sm border border-red-500/30 transition-colors"
+                                id="btn-head-1">Head 1 (语法)</button>
+                            <button onclick="showHead(2)"
+                                class="px-3 py-1 rounded bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 text-sm border border-blue-500/30 transition-colors"
+                                id="btn-head-2">Head 2 (指代)</button>
+                            <button onclick="showHead(3)"
+                                class="px-3 py-1 rounded bg-green-500/20 hover:bg-green-500/40 text-green-300 text-sm border border-green-500/30 transition-colors"
+                                id="btn-head-3">Head 3 (语义)</button>
+                        </div>
+
+                        <div
+                            class="sentence-container bg-white/5 p-4 rounded-lg text-center relative h-32 flex flex-col justify-center">
+                            <div class="flex justify-center gap-2 mb-8 relative z-10" id="word-row">
+                                <span class="px-2 py-1 bg-gray-700 rounded text-sm w-16 text-center" id="w0">The</span>
+                                <span class="px-2 py-1 bg-gray-700 rounded text-sm w-16 text-center"
+                                    id="w1">animal</span>
+                                <span class="px-2 py-1 bg-gray-700 rounded text-sm w-16 text-center"
+                                    id="w2">didn't</span>
+                                <span class="px-2 py-1 bg-gray-700 rounded text-sm w-16 text-center" id="w3">eat</span>
+                                <span class="px-2 py-1 bg-gray-700 rounded text-sm w-16 text-center" id="w4">it</span>
+                            </div>
+
+                            <!-- SVG for lines -->
+                            <svg class="absolute inset-0 w-full h-full pointer-events-none" id="attention-lines">
+                                <!-- Lines will be drawn here -->
+                            </svg>
+
+                            <div class="text-xs text-gray-400 mt-2" id="head-desc">请选择上方的一个 Head 查看关注点</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Positional Encoding -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8 mb-8">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span
+                        class="w-8 h-8 rounded-lg bg-pink-500/20 text-pink-400 flex items-center justify-center text-sm">2</span>
+                    Positional Encoding (位置编码)
+                </h2>
+
+                <div class="space-y-6">
+                    <div class="text-gray-300">
+                        <p class="mb-2">
+                            由于 Transformer 是并行处理所有单词的，如果没有额外的位置信息，它无法区分 "Tom chased Jerry" 和 "Jerry chased Tom"。
+                        </p>
+                        <p>
+                            解决方案是给每个输入向量加一个独特的<strong>位置向量</strong>。原始论文使用正弦和余弦函数。
+                        </p>
+                    </div>
+
+                    <!-- Visualizing Sine Waves -->
+                    <div class="bg-black/30 rounded-xl p-6 border border-white/10 overflow-hidden relative">
+                        <h3 class="text-sm font-bold text-gray-400 mb-4">位置编码可视化 (Sin/Cos Waves)</h3>
+
+                        <!-- Canvas for waves -->
+                        <canvas id="pos-canvas" width="800" height="200"
+                            class="w-full h-40 bg-gray-900 rounded"></canvas>
+
+                        <div class="flex justify-between text-xs text-gray-500 mt-2 font-mono">
+                            <span>Position 0</span>
+                            <span>Position -></span>
+                            <span>Position 100</span>
+                        </div>
+
+                        <div class="mt-4 flex gap-4 text-xs text-gray-400">
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 bg-red-500 rounded-full"></span> 维度 0 (High Freq)
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 bg-blue-500 rounded-full"></span> 维度 4 (Mid Freq)
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-3 h-3 bg-green-500 rounded-full"></span> 维度 8 (Low Freq)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 bg-white/5 rounded-xl border border-white/10">
+                        <p class="text-sm text-gray-300 font-mono">
+                            PE(pos, 2i) = sin(pos / 10000<sup>2i/d</sup>)<br>
+                            PE(pos, 2i+1) = cos(pos / 10000<sup>2i/d</sup>)
+                        </p>
+                        <p class="text-xs text-gray-500 mt-2">
+                            不同维度的波长不同，这为每个位置创建了独特的指纹。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- Multi-Head Logic ---
+        const words = ['The', 'animal', 'didn\'t', 'eat', 'it'];
+        // Indices: 0, 1, 2, 3, 4
+
+        const heads = {
+            1: { // Grammar (Subject-Verb)
+                connections: [[1, 3]], // animal -> eat
+                color: 'rgba(239, 68, 68, 0.6)',
+                desc: "Head 1 关注主谓关系: 'animal' 是 'eat' 的主语。"
+            },
+            2: { // Reference (it -> animal/eat)
+                connections: [[4, 1], [4, 3]], // it -> animal, it -> eat
+                color: 'rgba(59, 130, 246, 0.6)',
+                desc: "Head 2 关注指代: 'it' 指代 'animal'，并且是 'eat' 的对象。"
+            },
+            3: { // Semantic (Context)
+                connections: [[3, 0], [3, 1], [3, 2], [3, 4]], // eat looks at everything
+                color: 'rgba(34, 197, 94, 0.4)',
+                desc: "Head 3 关注全局上下文: 'eat' 试图从周围词汇获取更多背景信息。"
+            }
+        };
+
+        function showHead(headId) {
+            const svg = document.getElementById('attention-lines');
+            svg.innerHTML = '';
+            const desc = document.getElementById('head-desc');
+            const data = heads[headId];
+
+            // Reset active states
+            document.querySelectorAll('button[id^="btn-head"]').forEach(b => b.classList.remove('bg-opacity-50', 'ring-2'));
+            document.getElementById(`btn-head-${headId}`).classList.add('bg-opacity-50', 'ring-2');
+
+            desc.textContent = data.desc;
+            desc.style.color = data.color.replace('0.6', '1').replace('0.4', '1'); // simpler hack for solid color
+
+            // Helper to get center of word spans
+            const getCoord = (idx) => {
+                const el = document.getElementById(`w${idx}`);
+                const rect = el.getBoundingClientRect();
+                const containerRect = el.parentElement.parentElement.getBoundingClientRect();
+                return {
+                    x: rect.left + rect.width / 2 - containerRect.left,
+                    y: rect.top + rect.height / 2 - containerRect.top
+                };
+            };
+
+            const yOffset = 20; // curve interactions
+
+            data.connections.forEach(([from, to]) => {
+                const start = getCoord(from);
+                const end = getCoord(to);
+
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+
+                // Draw Arc
+                // M startX startY Q controlX controlY endX endY
+                const controlY = start.y - 40 - Math.abs(start.x - end.x) / 5;
+                const d = `M ${start.x} ${start.y - 10} Q ${(start.x + end.x) / 2} ${controlY} ${end.x} ${end.y - 10}`;
+
+                path.setAttribute("d", d);
+                path.setAttribute("fill", "transparent");
+                path.setAttribute("stroke", data.color);
+                path.setAttribute("stroke-width", "3");
+                path.setAttribute("stroke-linecap", "round");
+
+                // Animate
+                path.style.strokeDasharray = "1000";
+                path.style.strokeDashoffset = "1000";
+                path.style.animation = "dash 1s ease-out forwards";
+
+                // Arrowhead logic omitted for simplicity, curves show direction implicitly usually or by thickness
+
+                svg.appendChild(path);
+            });
+        }
+
+        // Add CSS for dash animation
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes dash {
+                to { stroke-dashoffset: 0; }
+            }
+        `;
+        document.head.appendChild(style);
+
+
+        // --- Positional Encoding Viz ---
+        const canvas = document.getElementById('pos-canvas');
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        function drawWaves() {
+            ctx.clearRect(0, 0, width, height);
+
+            // Dims to draw
+            const dims = [
+                { i: 0, color: 'rgb(239, 68, 68)' },
+                { i: 4, color: 'rgb(59, 130, 246)' },
+                { i: 8, color: 'rgb(34, 197, 94)' }
+            ];
+
+            const positions = 100; // x axis 0..100
+            const scaleX = width / positions;
+
+            dims.forEach(d => {
+                ctx.beginPath();
+                ctx.strokeStyle = d.color;
+                ctx.lineWidth = 2;
+
+                for (let pos = 0; pos < positions; pos++) {
+                    // PE formula: pos / 10000^(2i/d_model)
+                    // Simplified for viz
+                    // We want varying frequencies.
+                    // Dim 0 = high freq, Dim 8 = low freq
+                    const freq = 1 / Math.pow(10000, (2 * d.i) / 20); // d_model=20 for demo
+                    const y = Math.sin(pos * freq) * (height / 4) + (height / 2);
+
+                    if (pos === 0) ctx.moveTo(pos * scaleX, y);
+                    else ctx.lineTo(pos * scaleX, y);
+                }
+                ctx.stroke();
+            });
+        }
+
+        // Initial draw
+        drawWaves();
+        // Animate phase shift slightly for fun effect
+        let time = 0;
+        function animateWaves() {
+            time += 0.05;
+            ctx.clearRect(0, 0, width, height);
+
+            const dims = [
+                { i: 0, color: 'rgb(239, 68, 68)' },
+                { i: 4, color: 'rgb(59, 130, 246)' },
+                { i: 8, color: 'rgb(34, 197, 94)' }
+            ];
+            const positions = 100;
+            const scaleX = width / positions;
+
+            dims.forEach(d => {
+                ctx.beginPath();
+                ctx.strokeStyle = d.color;
+                ctx.lineWidth = 2;
+                const freq = 0.5 / (d.i + 1); // Mock freq for smoother visual
+
+                for (let pos = 0; pos < positions; pos++) {
+                    const y = Math.sin(pos * freq + time) * (height / 4) + (height / 2);
+                    if (pos === 0) ctx.moveTo(pos * scaleX, y);
+                    else ctx.lineTo(pos * scaleX, y);
+                }
+                ctx.stroke();
+            });
+            requestAnimationFrame(animateWaves);
+        }
+
+        // Replaced static draw with animation for better "alive" feel
+        animateWaves();
+
+    </script>
+</body>
+
+</html>

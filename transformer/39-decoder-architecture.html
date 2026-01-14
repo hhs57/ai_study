@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>39 - Decoder 架构 | Transformer 架构学习</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            z-index: -1;
+        }
+
+        .mask-cell {
+            background-color: #374151;
+            /* gray-700 */
+        }
+
+        .mask-cell.masked {
+            background-color: #111827;
+            /* gray-900 */
+            opacity: 0.3;
+            background-image: linear-gradient(45deg, #1f2937 25%, transparent 25%, transparent 50%, #1f2937 50%, #1f2937 75%, transparent 75%, transparent);
+            background-size: 10px 10px;
+        }
+    </style>
+</head>
+
+<body class="overflow-x-hidden">
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10">
+        <div class="bg-orb w-96 h-96 bg-pink-600 top-0 left-1/3"></div>
+        <div class="bg-orb w-80 h-80 bg-purple-600 bottom-0 right-1/4"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-50">
+        <div class="glass-card rounded-2xl px-6 py-4 max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-600 flex items-center justify-center font-bold text-white">
+                        39</div>
+                    <span class="text-lg font-bold">Decoder 架构</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="38-encoder-architecture.html"
+                    class="text-gray-300 hover:text-white transition-colors text-sm">上一章</a>
+                <a href="index.html" class="text-gray-300 hover:text-white transition-colors">目录</a>
+                <a href="40-complete-transformer.html"
+                    class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm font-medium">下一章:
+                    完整架构</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto pt-32 pb-20 px-4">
+        <header class="mb-16 text-center">
+            <h1
+                class="text-4xl md:text-5xl font-extrabold mb-6 bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent">
+                The Decoder Stack</h1>
+            <p class="text-xl text-gray-400">Decoder 负责生成序列。它比 Encoder 更复杂，拥有两把"秘密武器"。</p>
+        </header>
+
+        <div class="grid lg:grid-cols-2 gap-12">
+            <!-- 1. Masked Attention -->
+            <section>
+                <div class="glass-card rounded-3xl p-8 h-full">
+                    <h2 class="text-2xl font-bold mb-6 text-pink-300">1. Masked Self-Attention</h2>
+                    <p class="text-gray-300 mb-4">
+                        在训练时，Decoder 可以一次性看到整个标准答案（Ground Truth）。但为了防止模型"作弊"（看到未来的单词），我们需要使用 Mask。
+                    </p>
+
+                    <!-- Interactive Matrix -->
+                    <div class="bg-black/30 rounded-xl p-6 flex flex-col items-center">
+                        <div class="mb-4 text-sm text-gray-400">Mask Matrix (下三角矩阵)</div>
+
+                        <div class="relative">
+                            <!-- Matrix Labels -->
+                            <div class="flex ml-8 mb-2 gap-1">
+                                <div class="w-8 text-center text-xs text-gray-500">I</div>
+                                <div class="w-8 text-center text-xs text-gray-500">am</div>
+                                <div class="w-8 text-center text-xs text-gray-500">Home</div>
+                                <div class="w-8 text-center text-xs text-gray-500">&lt;EOS&gt;</div>
+                            </div>
+
+                            <div class="flex">
+                                <div class="flex flex-col mr-2 gap-1 justify-center">
+                                    <div class="h-8 flex items-center text-xs text-gray-500">I</div>
+                                    <div class="h-8 flex items-center text-xs text-gray-500">am</div>
+                                    <div class="h-8 flex items-center text-xs text-gray-500">Home</div>
+                                    <div class="h-8 flex items-center text-xs text-gray-500">&lt;EOS&gt;</div>
+                                </div>
+
+                                <div class="grid grid-cols-4 gap-1" id="mask-grid">
+                                    <!-- JS generates cells -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-6 p-4 bg-white/5 rounded text-sm text-center">
+                            <span class="text-red-400 font-bold">黑色区域</span> (-inf) 表示"未来"。<br>
+                            单词只能关注它<strong>之前</strong>的单词。
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Cross Attention -->
+            <section>
+                <div class="glass-card rounded-3xl p-8 h-full">
+                    <h2 class="text-2xl font-bold mb-6 text-purple-300">2. Cross-Attention (交叉注意力)</h2>
+                    <p class="text-gray-300 mb-4">
+                        这是连接 Encoder 和 Decoder 的桥梁。Decoder 使用它来"查询" Encoder 的输出。
+                    </p>
+
+                    <!-- Cross Attention Viz -->
+                    <div
+                        class="bg-black/30 rounded-xl p-6 relative flex flex-col items-center justify-center min-h-[300px]">
+
+                        <!-- Encoder Side -->
+                        <div class="absolute left-6 top-1/2 -translate-y-1/2 text-center">
+                            <div
+                                class="w-24 h-32 bg-orange-900/40 border border-orange-500/50 rounded-lg flex items-center justify-center text-orange-200 font-bold mb-2">
+                                Encoder Output
+                            </div>
+                            <div class="flex gap-2 justify-center">
+                                <span
+                                    class="px-2 py-1 bg-blue-900/50 border border-blue-500 rounded text-xs text-blue-300">Key</span>
+                                <span
+                                    class="px-2 py-1 bg-green-900/50 border border-green-500 rounded text-xs text-green-300">Value</span>
+                            </div>
+                        </div>
+
+                        <!-- Decoder Side -->
+                        <div class="absolute right-6 top-1/2 -translate-y-1/2 text-center">
+                            <div
+                                class="w-24 h-32 bg-pink-900/40 border border-pink-500/50 rounded-lg flex items-center justify-center text-pink-200 font-bold mb-2">
+                                Decoder Layer
+                            </div>
+                            <div class="flex gap-2 justify-center">
+                                <span
+                                    class="px-2 py-1 bg-red-900/50 border border-red-500 rounded text-xs text-red-300">Query</span>
+                            </div>
+                        </div>
+
+                        <!-- Animated Lines -->
+                        <svg class="absolute inset-0 w-full h-full pointer-events-none">
+                            <!-- K to Attention -->
+                            <path d="M 140 180 Q 250 180, 250 150" fill="none" stroke="#60a5fa" stroke-width="2"
+                                stroke-dasharray="5,5" class="animate-[dash_1s_infinite_linear]" />
+                            <!-- V to Attention -->
+                            <path d="M 140 180 Q 250 180, 250 150" fill="none" stroke="#4ade80" stroke-width="2"
+                                stroke-dasharray="5,5" class="animate-[dash_1s_infinite_linear] delay-75" />
+
+                            <!-- Q to Attention -->
+                            <path d="M 380 180 Q 270 180, 270 150" fill="none" stroke="#f87171" stroke-width="2"
+                                stroke-dasharray="5,5" class="animate-[dash_1s_infinite_reverse_linear]" />
+
+                            <!-- Mixing Circle -->
+                            <circle cx="260" cy="150" r="20" fill="rgba(255,255,255,0.1)" stroke="white"
+                                stroke-width="1" class="animate-pulse" />
+                        </svg>
+
+                        <div
+                            class="absolute top-[120px] left-[235px] text-xs font-bold text-white bg-gray-900 px-2 rounded">
+                            Interaction
+                        </div>
+
+                    </div>
+
+                    <div class="mt-6 p-4 bg-white/5 rounded text-sm">
+                        <h3 class="font-bold text-gray-200 mb-1">Q, K, V 来源</h3>
+                        <ul class="list-disc list-inside text-gray-400">
+                            <li><strong class="text-red-400">Query (Q)</strong>: 来自 Decoder 上一层 (我想要什么?)</li>
+                            <li><strong class="text-blue-400">Key (K)</strong>: 来自 Encoder 输出 (源句子有什么?)</li>
+                            <li><strong class="text-green-400">Value (V)</strong>: 来自 Encoder 输出 (源句子的内容)</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="mt-12 text-center p-8 glass-card rounded-3xl">
+            <h2 class="text-2xl font-bold mb-4 text-pink-300">GPT = Decoder Stack</h2>
+            <p class="text-gray-400 max-w-2xl mx-auto">
+                GPT (Generative Pre-trained Transformer) 通过堆叠 Decoder 层（通常去掉 Cross-Attention，只保留 Masked
+                Self-Attention）来进行文本生成。
+            </p>
+        </div>
+
+    </main>
+
+    <script>
+        // --- Mask Grid Gen ---
+        const grid = document.getElementById('mask-grid');
+        const size = 4;
+
+        for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+                const cell = document.createElement('div');
+                // Lower triangle logic: i >= j means visible
+                const isMasked = j > i;
+
+                cell.className = `w-8 h-8 rounded border border-gray-600 flex items-center justify-center text-[10px] ${isMasked ? 'mask-cell masked' : 'bg-green-500/30'}`;
+
+                if (isMasked) {
+                    cell.innerHTML = '-&infin;';
+                    cell.title = 'Masked (Future)';
+                } else {
+                    cell.innerHTML = '&bull;';
+                    cell.title = 'Visible';
+                }
+
+                grid.appendChild(cell);
+            }
+        }
+
+        // Add CSS for dash animation
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes dash {
+                to { stroke-dashoffset: -10; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+
+</html>

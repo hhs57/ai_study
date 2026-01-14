@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>38 - Encoder 架构 | Transformer 架构学习</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        },
+                        red: {
+                            400: '#f87171',
+                            500: '#ef4444',
+                        }
+                    },
+                    animation: {
+                        'flow-up': 'flowUp 2s infinite linear',
+                    },
+                    keyframes: {
+                        flowUp: {
+                            '0%': { transform: 'translateY(100%)', opacity: 0 },
+                            '50%': { opacity: 1 },
+                            '100%': { transform: 'translateY(-100%)', opacity: 0 },
+                        }
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body class="overflow-x-hidden">
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10">
+        <div class="bg-orb w-96 h-96 bg-red-600 top-20 left-20"></div>
+        <div class="bg-orb w-80 h-80 bg-orange-600 bottom-20 right-20"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-50">
+        <div class="glass-card rounded-2xl px-6 py-4 max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center font-bold text-white">
+                        38</div>
+                    <span class="text-lg font-bold">Encoder 架构</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="37-feedforward-addnorm.html"
+                    class="text-gray-300 hover:text-white transition-colors text-sm">上一章</a>
+                <a href="index.html" class="text-gray-300 hover:text-white transition-colors">目录</a>
+                <a href="39-decoder-architecture.html"
+                    class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm font-medium">下一章:
+                    Decoder</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto pt-32 pb-20 px-4">
+        <header class="mb-16 text-center">
+            <h1
+                class="text-4xl md:text-5xl font-extrabold mb-6 bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
+                The Encoder Stack</h1>
+            <p class="text-xl text-gray-400">Encoder 是一堆堆叠的层，负责深入理解输入语义。</p>
+        </header>
+
+        <div class="grid lg:grid-cols-2 gap-12">
+            <!-- Left: The Stack View -->
+            <section>
+                <div class="glass-card rounded-3xl p-8 h-full">
+                    <h2 class="text-2xl font-bold mb-6 text-orange-300">1. 堆叠 N=6 层</h2>
+                    <p class="text-gray-300 mb-6">
+                        Transformer 的 Encoder 由多个相同的层堆叠而成（原始论文 N=6，BERT-Base N=12）。
+                    </p>
+                    <p class="text-gray-400 text-sm mb-6">
+                        数据从底部流入，每一层都对信息进行抽象与精炼，但保持向量维度 d_model 不变。
+                    </p>
+
+                    <!-- Interactive Stack Viz -->
+                    <div
+                        class="bg-black/30 rounded-xl p-8 flex flex-col items-center relative overflow-hidden min-h-[400px]">
+
+                        <!-- Animation of data flow -->
+                        <div class="absolute inset-0 flex justify-center gap-8 pointer-events-none opacity-20">
+                            <div class="w-1 h-full bg-gradient-to-t from-orange-500 to-transparent animate-flow-up">
+                            </div>
+                            <div class="w-1 h-full bg-gradient-to-t from-orange-500 to-transparent animate-flow-up"
+                                style="animation-delay: 0.5s"></div>
+                            <div class="w-1 h-full bg-gradient-to-t from-orange-500 to-transparent animate-flow-up"
+                                style="animation-delay: 1s"></div>
+                        </div>
+
+                        <!-- Layers -->
+                        <div id="layer-stack" class="flex flex-col-reverse gap-2 w-full max-w-xs z-10">
+                            <!-- JS will generate layers -->
+                        </div>
+
+                        <div class="mt-8 flex gap-4">
+                            <button onclick="addLayer()"
+                                class="px-3 py-1 bg-green-600/50 hover:bg-green-600 rounded text-sm text-white">+
+                                添加层</button>
+                            <button onclick="removeLayer()"
+                                class="px-3 py-1 bg-red-600/50 hover:bg-red-600 rounded text-sm text-white">-
+                                移除层</button>
+                            <button onclick="resetLayers()"
+                                class="px-3 py-1 bg-gray-600/50 hover:bg-gray-600 rounded text-sm text-white">重置
+                                (N=6)</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right: Single Layer Detail -->
+            <section>
+                <div class="glass-card rounded-3xl p-8 h-full border border-orange-500/30">
+                    <h2 class="text-2xl font-bold mb-6 text-red-300">2. 单层内部结构</h2>
+                    <p class="text-gray-300 mb-6">
+                        把左边的任意一层放大，我们就会看到两个主要的子层结构。
+                    </p>
+
+                    <!-- Detail Viz -->
+                    <div class="bg-black/30 rounded-xl p-6 flex flex-col gap-4 relative">
+                        <!-- Output -->
+                        <div class="bg-gray-800 p-2 rounded text-center text-xs text-gray-500">Output Z</div>
+
+                        <div class="flex flex-col gap-1 border-l-2 border-dashed border-gray-600 pl-4 relative">
+                            <div
+                                class="absolute -left-3 top-1/2 w-6 h-6 rounded-full bg-gray-700 text-[10px] flex items-center justify-center border border-gray-500">
+                                +</div>
+
+                            <!-- Sublayer 2: FFN -->
+                            <div
+                                class="bg-orange-900/40 border border-orange-500/50 p-4 rounded-lg text-center hover:bg-orange-900/60 transition-colors cursor-help group">
+                                <div class="font-bold text-orange-300 mb-1">Feed Forward</div>
+                                <div
+                                    class="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    Linear -> ReLU -> Linear</div>
+                            </div>
+
+                            <!-- Norm -->
+                            <div
+                                class="bg-yellow-900/20 border border-yellow-500/30 p-1 rounded text-center text-[10px] text-yellow-500 mx-8">
+                                Add & Norm</div>
+                        </div>
+
+                        <div class="h-4"></div>
+
+                        <div class="flex flex-col gap-1 border-l-2 border-dashed border-gray-600 pl-4 relative">
+                            <div
+                                class="absolute -left-3 top-1/2 w-6 h-6 rounded-full bg-gray-700 text-[10px] flex items-center justify-center border border-gray-500">
+                                +</div>
+
+                            <!-- Sublayer 1: Self-Attention -->
+                            <div
+                                class="bg-red-900/40 border border-red-500/50 p-4 rounded-lg text-center hover:bg-red-900/60 transition-colors cursor-help group">
+                                <div class="font-bold text-red-300 mb-1">Multi-Head Attention</div>
+                                <div
+                                    class="text-[10px] text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    Self-Attention 机制</div>
+                            </div>
+
+                            <!-- Norm -->
+                            <div
+                                class="bg-yellow-900/20 border border-yellow-500/30 p-1 rounded text-center text-[10px] text-yellow-500 mx-8">
+                                Add & Norm</div>
+                        </div>
+
+                        <!-- Input -->
+                        <div class="bg-gray-800 p-2 rounded text-center text-xs text-gray-500">Input Embeddings + Pos
+                            Encoding</div>
+                    </div>
+
+                    <div class="mt-8 p-4 bg-white/5 rounded-xl text-sm">
+                        <h3 class="font-bold text-gray-200 mb-2">BERT = Encoder Stack</h3>
+                        <p class="text-gray-400">
+                            著名的 BERT 模型其实就是 Transformer 的 Encoder 部分（没有 Decoder）。它非常擅长理解上下文，用于分类、实体识别等任务。
+                        </p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        const stackContainer = document.getElementById('layer-stack');
+        let layerCount = 6;
+
+        function renderLayers() {
+            stackContainer.innerHTML = '';
+            for (let i = 0; i < layerCount; i++) {
+                const layer = document.createElement('div');
+                layer.className = 'w-full p-3 rounded bg-gradient-to-r from-orange-900/50 to-red-900/50 border border-white/10 text-center text-xs font-mono text-gray-300 transition-all hover:scale-105 hover:border-orange-500/50 cursor-pointer';
+                layer.textContent = `Encoder Layer #${i + 1}`;
+                layer.style.animation = `fadeIn 0.3s ease-out ${i * 0.05}s backwards`;
+                stackContainer.appendChild(layer);
+            }
+        }
+
+        // Add fake css for animation
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
+
+        function addLayer() {
+            if (layerCount < 12) {
+                layerCount++;
+                renderLayers();
+            }
+        }
+
+        function removeLayer() {
+            if (layerCount > 1) {
+                layerCount--;
+                renderLayers();
+            }
+        }
+
+        function resetLayers() {
+            layerCount = 6;
+            renderLayers();
+        }
+
+        renderLayers();
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>35 - Self-Attention 详解 | Transformer 架构学习</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        },
+                        accent: {
+                            50: '#fefce8',
+                            100: '#fef9c3',
+                            200: '#fef08a',
+                            300: '#fde047',
+                            400: '#facc15',
+                            500: '#eab308',
+                            600: '#ca8a04',
+                            700: '#a16207',
+                            800: '#854d0e',
+                            900: '#713f12',
+                        },
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        }
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 8s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            visibility: hidden;
+            position: absolute;
+            z-index: 10;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        .has-tooltip:hover .tooltip {
+            visibility: visible;
+        }
+    </style>
+</head>
+
+<body class="overflow-x-hidden">
+    <!-- Background Orbs -->
+    <div class="bg-orb w-96 h-96 bg-primary-600 top-0 -left-20"></div>
+    <div class="bg-orb w-80 h-80 bg-accent-600 bottom-0 -right-20 animation-delay-2000"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-50">
+        <div class="glass-card rounded-2xl px-6 py-4 max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
+                        <span class="font-bold text-white">35</span>
+                    </div>
+                    <span class="text-lg font-bold">Self-Attention 详解</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="34-transformer-background.html"
+                    class="text-gray-300 hover:text-white transition-colors text-sm">上一章</a>
+                <a href="index.html" class="text-gray-300 hover:text-white transition-colors">目录</a>
+                <a href="36-multi-head-attention.html"
+                    class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm font-medium">
+                    下一章: Multi-Head
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-5xl mx-auto pt-32 pb-20 px-4">
+
+        <!-- Header -->
+        <header class="mb-16 text-center">
+            <h1
+                class="text-4xl md:text-5xl font-extrabold mb-6 bg-gradient-to-r from-primary-400 to-accent-400 bg-clip-text text-transparent">
+                Transformer 的核心: Self-Attention
+            </h1>
+            <p class="text-xl text-gray-400 max-w-2xl mx-auto">
+                深入理解 Query、Key、Value，以及模型如何计算注意力分数。
+            </p>
+        </header>
+
+        <!-- Section 1: Q, K, V Concept -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8 mb-8">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span
+                        class="w-8 h-8 rounded-lg bg-orange-500/20 text-orange-400 flex items-center justify-center text-sm">1</span>
+                    Q, K, V 的直观理解
+                </h2>
+
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="space-y-4 text-gray-300">
+                        <p>想象你在图书馆找书：</p>
+                        <div class="flex flex-col gap-4">
+                            <div class="p-4 bg-orange-500/10 border border-orange-500/30 rounded-xl">
+                                <h3 class="font-bold text-orange-400 mb-1">Query (Q)</h3>
+                                <p class="text-sm">你的查询：<span class="italic text-gray-300">"人工智能的各种算法"</span></p>
+                            </div>
+                            <div class="p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+                                <h3 class="font-bold text-blue-400 mb-1">Key (K)</h3>
+                                <p class="text-sm">书籍标签：<span class="italic text-gray-300">"计算机科学", "机器学习", "烹饪"</span>
+                                </p>
+                            </div>
+                            <div class="p-4 bg-green-500/10 border border-green-500/30 rounded-xl">
+                                <h3 class="font-bold text-green-400 mb-1">Value (V)</h3>
+                                <p class="text-sm">书籍内容：<span class="italic text-gray-300">实际上书里的知识</span></p>
+                            </div>
+                        </div>
+                        <p class="text-sm text-gray-400 mt-4">
+                            注意力机制就是计算 <strong>Query</strong> 和 <strong>Key</strong> 的匹配度（点积），然后根据匹配度加权获取
+                            <strong>Value</strong>。
+                        </p>
+                    </div>
+
+                    <!-- Interactive QKV Viz -->
+                    <div class="bg-black/30 rounded-xl p-6 flex flex-col items-center justify-center gap-6">
+                        <div class="text-center">
+                            <label class="block text-sm text-gray-400 mb-2">输入单词 Input Embed (X)</label>
+                            <div
+                                class="w-24 h-8 bg-gray-700 rounded flex items-center justify-center text-white font-mono text-sm border border-gray-500">
+                                [0.1, 0.8]
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2 text-2xl text-gray-500">↓ × Weights (Wq, Wk, Wv)</div>
+
+                        <div class="flex gap-4 w-full justify-between">
+                            <div class="flex flex-col items-center gap-2 flex-1">
+                                <div class="text-orange-400 font-bold">Query</div>
+                                <div
+                                    class="w-full h-8 bg-orange-900/30 border border-orange-500/50 rounded flex items-center justify-center text-xs font-mono animate-pulse">
+                                    [1.2, 0.5]
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-center gap-2 flex-1">
+                                <div class="text-blue-400 font-bold">Key</div>
+                                <div class="w-full h-8 bg-blue-900/30 border border-blue-500/50 rounded flex items-center justify-center text-xs font-mono animate-pulse"
+                                    style="animation-delay: 0.2s">
+                                    [0.8, 0.1]
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-center gap-2 flex-1">
+                                <div class="text-green-400 font-bold">Value</div>
+                                <div class="w-full h-8 bg-green-900/30 border border-green-500/50 rounded flex items-center justify-center text-xs font-mono animate-pulse"
+                                    style="animation-delay: 0.4s">
+                                    [0.9, 0.9]
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Calculation Steps -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8 mb-8">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span
+                        class="w-8 h-8 rounded-lg bg-primary-500/20 text-primary-400 flex items-center justify-center text-sm">2</span>
+                    注意力计算流程
+                </h2>
+
+                <div class="flex flex-col md:flex-row gap-8">
+                    <!-- Interactive Visualization Area -->
+                    <div class="flex-1 bg-black/20 rounded-xl p-6 border border-white/5">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="font-bold text-gray-300">计算步骤演示</h3>
+                            <div class="flex gap-2">
+                                <button onclick="prevStep()"
+                                    class="p-2 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50" id="prev-btn"
+                                    disabled>←</button>
+                                <span id="step-count" class="px-3 py-2 font-mono text-primary-400">1/4</span>
+                                <button onclick="nextStep()"
+                                    class="p-2 rounded bg-primary-600 hover:bg-primary-500 disabled:opacity-50"
+                                    id="next-btn">→</button>
+                            </div>
+                        </div>
+
+                        <!-- Step Content -->
+                        <div class="h-64 relative flex items-center justify-center" id="step-container">
+                            <!-- Step 1: Dot Product -->
+                            <div id="step-1"
+                                class="step-content absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300">
+                                <div class="text-sm text-gray-400 mb-4">Step 1: Q · K^T (MatMul)</div>
+                                <div class="flex items-center gap-4">
+                                    <div class="flex flex-col gap-1">
+                                        <div class="text-xs text-orange-400 text-center">Q</div>
+                                        <div
+                                            class="w-16 h-8 bg-orange-900/40 border border-orange-500 rounded flex items-center justify-center font-mono text-xs">
+                                            [2, 1]</div>
+                                    </div>
+                                    <div class="text-xl">×</div>
+                                    <div class="flex flex-col gap-1">
+                                        <div class="text-xs text-blue-400 text-center">K^T</div>
+                                        <div
+                                            class="w-8 h-16 bg-blue-900/40 border border-blue-500 rounded flex items-center justify-center font-mono text-xs flex-col leading-tight">
+                                            <span>[2]</span><span>[1]</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-xl">=</div>
+                                    <div
+                                        class="w-16 h-16 bg-purple-900/40 border border-purple-500 rounded flex items-center justify-center font-bold text-purple-200">
+                                        5
+                                    </div>
+                                </div>
+                                <p class="mt-4 text-xs text-center text-gray-500">计算相似度: (2*2) + (1*1) = 5</p>
+                            </div>
+
+                            <!-- Step 2: Scale -->
+                            <div id="step-2"
+                                class="step-content absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 opacity-0 pointer-events-none">
+                                <div class="text-sm text-gray-400 mb-4">Step 2: Scale (除以 √d_k)</div>
+                                <div class="flex items-center gap-4">
+                                    <div
+                                        class="w-16 h-16 bg-purple-900/40 border border-purple-500 rounded flex items-center justify-center font-bold text-purple-200 text-gray-500 opacity-50">
+                                        5
+                                    </div>
+                                    <div class="text-xl">÷</div>
+                                    <div class="font-mono text-yellow-400">√2 ≈ 1.414</div>
+                                    <div class="text-xl">=</div>
+                                    <div
+                                        class="w-16 h-16 bg-purple-600/40 border border-purple-400 rounded flex items-center justify-center font-bold text-white shadow-[0_0_15px_rgba(147,51,234,0.5)]">
+                                        3.5
+                                    </div>
+                                </div>
+                                <p class="mt-4 text-xs text-center text-gray-500">缩放防止数值过大导致梯度消失</p>
+                            </div>
+
+                            <!-- Step 3: Softmax -->
+                            <div id="step-3"
+                                class="step-content absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 opacity-0 pointer-events-none">
+                                <div class="text-sm text-gray-400 mb-4">Step 3: Softmax (归一化)</div>
+                                <div class="flex flex-col gap-2 w-full max-w-xs">
+                                    <div class="flex justify-between text-xs text-gray-400">
+                                        <span>Score 1: 3.5</span>
+                                        <span>Score 2: 0.1</span>
+                                    </div>
+                                    <div class="w-full bg-gray-700 h-4 rounded-full overflow-hidden flex">
+                                        <div class="bg-primary-500 h-full flex items-center justify-center text-[10px] text-white"
+                                            style="width: 96%">96%</div>
+                                        <div class="bg-gray-500 h-full flex items-center justify-center text-[10px] text-white"
+                                            style="width: 4%">4%</div>
+                                    </div>
+                                    <div class="text-xs text-center mt-2 text-primary-400 font-bold">Attention Weights
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Step 4: Multiply V -->
+                            <div id="step-4"
+                                class="step-content absolute inset-0 flex flex-col items-center justify-center transition-opacity duration-300 opacity-0 pointer-events-none">
+                                <div class="text-sm text-gray-400 mb-4">Step 4: MatMul V (加权求和)</div>
+                                <div class="flex items-center gap-2">
+                                    <div class="flex flex-col items-center">
+                                        <div class="text-xs text-primary-400 mb-1">Weights</div>
+                                        <div
+                                            class="w-12 h-12 bg-primary-900/40 border border-primary-500 rounded flex items-center justify-center text-xs">
+                                            0.96</div>
+                                    </div>
+                                    <span>×</span>
+                                    <div class="flex flex-col items-center">
+                                        <div class="text-xs text-green-400 mb-1">V1</div>
+                                        <div
+                                            class="w-12 h-12 bg-green-900/40 border border-green-500 rounded flex items-center justify-center text-xs text-green-200">
+                                            [Feature]</div>
+                                    </div>
+                                    <span>+</span>
+                                    <div class="flex flex-col items-center opacity-50">
+                                        <div class="text-xs text-primary-400 mb-1">Weights</div>
+                                        <div
+                                            class="w-12 h-12 bg-primary-900/40 border border-primary-500 rounded flex items-center justify-center text-xs">
+                                            0.04</div>
+                                    </div>
+                                    <span>×</span>
+                                    <div class="flex flex-col items-center opacity-50">
+                                        <div class="text-xs text-green-400 mb-1">V2</div>
+                                        <div
+                                            class="w-12 h-12 bg-green-900/40 border border-green-500 rounded flex items-center justify-center text-xs text-green-200">
+                                            [Feature]</div>
+                                    </div>
+                                </div>
+                                <div class="text-xl my-2">=</div>
+                                <div
+                                    class="px-4 py-2 bg-gradient-to-r from-primary-600 to-accent-600 rounded-lg font-bold shadow-lg">
+                                    Z (Output)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 space-y-4">
+                        <div class="p-4 bg-white/5 rounded-xl border border-white/10">
+                            <h4 class="font-bold text-primary-400 mb-2">步骤详解</h4>
+                            <p id="step-desc" class="text-sm text-gray-300 leading-relaxed">
+                                首先，我们计算 Query 和 Key 的点积。这告诉我们两个向量有多相似。点积越大，相似度越高。
+                            </p>
+                        </div>
+                        <div class="p-4 bg-white/5 rounded-xl border border-white/10">
+                            <h4 class="font-bold text-gray-400 mb-2">公式</h4>
+                            <div class="font-mono text-sm" id="step-formula">
+                                Attention(Q, K, V) = softmax(QK<sup>T</sup> / √d<sub>k</sub>)V
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Attention Map -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <span
+                        class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-sm">3</span>
+                    Attention Map 可视化
+                </h2>
+
+                <p class="text-gray-400 mb-6">
+                    这是一个交互式的 Attention Map。将鼠标悬停在方块上，查看单词之间的关注程度。
+                </p>
+
+                <div class="flex flex-col md:flex-row gap-8 items-start">
+                    <div class="bg-black/40 p-4 rounded-xl border border-white/10 inline-block mx-auto md:mx-0">
+                        <!-- Grid Labels -->
+                        <div class="flex">
+                            <div class="w-20"></div> <!-- Corner spacing -->
+                            <!-- Top Labels -->
+                            <div class="flex" id="col-labels">
+                                <!-- JS will populate -->
+                            </div>
+                        </div>
+                        <div class="flex">
+                            <!-- Left Labels -->
+                            <div class="flex flex-col" id="row-labels">
+                                <!-- JS will populate -->
+                            </div>
+                            <!-- Grid -->
+                            <div class="grid grid-cols-4 gap-1 p-1 bg-gray-900 rounded" id="heatmap-grid">
+                                <!-- JS will populate -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex-1">
+                        <h4 class="font-bold text-white mb-4">观察结果:</h4>
+                        <div id="heatmap-info" class="p-4 bg-white/5 rounded-xl min-h-[100px] border border-white/5">
+                            <p class="text-gray-400">请悬停在左侧的热力图上...</p>
+                        </div>
+                        <div class="mt-4 text-sm text-gray-500">
+                            <p>颜色越<span class="text-primary-400 font-bold">亮</span>，表示关注度越高。</p>
+                            <p>Example: "The animal didn't cross the street because <span
+                                    class="text-primary-400 font-bold">it</span> was too tired."</p>
+                            <p>注意 'it' 对于 'animal' 的高强关注。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- Step Logic ---
+        let currentStep = 1;
+        const totalSteps = 4;
+        const stepDesc = [
+            "首先，我们计算 Query 和 Key 的点积。这告诉我们两个向量有多相似。点积越大，相似度越高。",
+            "然后，我们将分数除以维度的平方根。这是为了防止数值过大，导致 Softmax 梯度在训练中消失。",
+            "接着，使用 Softmax 函数将分数归一化为概率分布。所有分数的总和为 1 (100%)。",
+            "最后，我们将这些权重概率与 Value 向量相乘并求和。这给了我们最终的加权 Context Vector。"
+        ];
+
+        function updateStepUI() {
+            document.getElementById('step-count').textContent = `${currentStep}/${totalSteps}`;
+            document.getElementById('prev-btn').disabled = currentStep === 1;
+            document.getElementById('next-btn').disabled = currentStep === totalSteps;
+
+            // Hide all steps
+            document.querySelectorAll('.step-content').forEach(el => {
+                el.classList.add('opacity-0', 'pointer-events-none');
+            });
+            // Show current
+            const currentEl = document.getElementById(`step-${currentStep}`);
+            currentEl.classList.remove('opacity-0', 'pointer-events-none');
+
+            // Update Text
+            const descEl = document.getElementById('step-desc');
+            descEl.style.opacity = 0;
+            setTimeout(() => {
+                descEl.textContent = stepDesc[currentStep - 1];
+                descEl.style.opacity = 1;
+            }, 200);
+        }
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                currentStep++;
+                updateStepUI();
+            }
+        }
+
+        function prevStep() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateStepUI();
+            }
+        }
+
+        // --- Heatmap Logic ---
+        const words = ["The", "animal", "didn't", "cross"];
+        // Fake attention weights (0-1)
+        const weights = [
+            [0.8, 0.1, 0.05, 0.05], // The
+            [0.1, 0.8, 0.1, 0.0],   // animal
+            [0.05, 0.1, 0.7, 0.15], // didn't
+            [0.1, 0.2, 0.1, 0.6],   // cross
+        ];
+
+        const grid = document.getElementById('heatmap-grid');
+        const colLabels = document.getElementById('col-labels');
+        const rowLabels = document.getElementById('row-labels');
+        const infoBox = document.getElementById('heatmap-info');
+
+        // Init Labels
+        words.forEach(word => {
+            const col = document.createElement('div');
+            col.className = 'w-16 h-8 flex items-center justify-center text-xs text-gray-400 rotate-0';
+            col.textContent = word;
+            colLabels.appendChild(col);
+
+            const row = document.createElement('div');
+            row.className = 'w-20 h-16 flex items-center justify-end pr-2 text-xs text-gray-400';
+            row.textContent = word;
+            rowLabels.appendChild(row);
+        });
+
+        // Init Grid
+        for (let i = 0; i < words.length; i++) {
+            for (let j = 0; j < words.length; j++) {
+                const w = weights[i][j];
+                const cell = document.createElement('div');
+                cell.className = 'w-16 h-16 rounded cursor-pointer transition-transform hover:scale-105 hover:z-10 relative group border border-transparent hover:border-white/50';
+
+                // Color calculation (orange)
+                // Low transparency for low weight, high opacity for high weight
+                cell.style.backgroundColor = `rgba(249, 115, 22, ${w})`;
+
+                // Tooltip logic
+                cell.addEventListener('mouseenter', () => {
+                    const percentage = Math.round(w * 100) + '%';
+                    infoBox.innerHTML = `
+                        <div class="flex items-center gap-2 mb-2">
+                             <span class="px-2 py-1 bg-gray-700 rounded text-xs text-gray-300">Target: ${words[i]}</span>
+                             <span class="text-gray-500">←</span>
+                             <span class="px-2 py-1 bg-gray-700 rounded text-xs text-gray-300">Source: ${words[j]}</span>
+                        </div>
+                        <div class="text-2xl font-bold text-primary-400">${percentage}</div>
+                        <div class="text-sm text-gray-400">Attention Weight</div>
+                   `;
+                });
+
+                // Add value text inside cell
+                const text = document.createElement('span');
+                text.className = 'absolute inset-0 flex items-center justify-center text-xs font-mono text-white/80 pointer-events-none';
+                text.textContent = w.toFixed(2);
+                cell.appendChild(text);
+
+                grid.appendChild(cell);
+            }
+        }
+
+        // Initialize Step UI
+        updateStepUI();
+
+    </script>
+</body>
+
+</html>

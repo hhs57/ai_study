@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>40 - 完整 Transformer | Transformer 架构学习</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            z-index: -1;
+        }
+
+        .flow-line {
+            stroke-dasharray: 10;
+            animation: flow 1s linear infinite;
+        }
+
+        @keyframes flow {
+            to {
+                stroke-dashoffset: -20;
+            }
+        }
+    </style>
+</head>
+
+<body class="overflow-x-hidden">
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10">
+        <div
+            class="bg-orb w-[600px] h-[600px] bg-indigo-600 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20">
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-50">
+        <div class="glass-card rounded-2xl px-6 py-4 max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center font-bold text-white">
+                        40</div>
+                    <span class="text-lg font-bold">完整架构</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="39-decoder-architecture.html"
+                    class="text-gray-300 hover:text-white transition-colors text-sm">上一章</a>
+                <a href="index.html" class="text-gray-300 hover:text-white transition-colors">目录</a>
+                <!-- Phase 3 -->
+                <span class="px-4 py-2 bg-white/5 rounded-lg text-gray-500 text-sm cursor-not-allowed">
+                    下一章: BERT
+                </span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto pt-32 pb-20 px-4">
+        <header class="mb-16 text-center">
+            <h1
+                class="text-4xl md:text-5xl font-extrabold mb-6 bg-gradient-to-r from-purple-400 to-indigo-400 bg-clip-text text-transparent">
+                The Transformer</h1>
+            <p class="text-xl text-gray-400">将所有组件拼装起来：基于 Attention 的机器翻译模型。</p>
+        </header>
+
+        <!-- Full Architecture Diagram -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8 overflow-x-auto">
+                <div class="min-w-[800px] flex justify-center gap-16 relative p-8">
+
+                    <!-- Left: Encoder Stack -->
+                    <div
+                        class="flex flex-col items-center gap-4 w-64 group hover:scale-105 transition-transform duration-500">
+                        <div class="font-bold text-orange-400">ENCODER</div>
+
+                        <!-- Stack -->
+                        <div
+                            class="w-full bg-orange-900/20 border-2 border-orange-500/50 rounded-xl p-4 flex flex-col gap-2 relative">
+                            <div
+                                class="absolute -left-4 top-1/2 -translate-y-1/2 text-4xl text-orange-500/50 font-bold">
+                                ×N</div>
+
+                            <div
+                                class="h-16 bg-orange-800/40 rounded border border-orange-600/50 flex items-center justify-center text-sm">
+                                FFN</div>
+                            <div
+                                class="h-16 bg-red-800/40 rounded border border-red-600/50 flex items-center justify-center text-sm">
+                                Self-Attention</div>
+                        </div>
+
+                        <!-- Embedding -->
+                        <div
+                            class="w-full h-10 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-400">
+                            Positional Encoding</div>
+                        <div
+                            class="w-full h-10 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-400">
+                            Input Embedding</div>
+
+                        <!-- Inputs -->
+                        <div class="flex gap-2">
+                            <div class="px-3 py-1 bg-gray-700 rounded text-sm">I</div>
+                            <div class="px-3 py-1 bg-gray-700 rounded text-sm">Love</div>
+                            <div class="px-3 py-1 bg-gray-700 rounded text-sm">AI</div>
+                        </div>
+                    </div>
+
+                    <!-- Flow Arrows (SVG) -->
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none z-10">
+                        <!-- Cross Attention Flow -->
+                        <!-- From Encoder Output to Decoder Middle -->
+                        <path d="M 350 200 C 450 200, 450 200, 550 200" fill="none" stroke="#a78bfa" stroke-width="4"
+                            class="flow-line" opacity="0.6" />
+                    </svg>
+
+                    <!-- Right: Decoder Stack -->
+                    <div
+                        class="flex flex-col items-center gap-4 w-64 group hover:scale-105 transition-transform duration-500">
+                        <div class="font-bold text-pink-400">DECODER</div>
+
+                        <!-- Output Probabilities -->
+                        <div
+                            class="w-full h-10 bg-purple-600/80 rounded flex items-center justify-center text-sm font-bold shadow-[0_0_20px_rgba(124,58,237,0.5)]">
+                            Softmax / Linear</div>
+
+                        <!-- Stack -->
+                        <div
+                            class="w-full bg-pink-900/20 border-2 border-pink-500/50 rounded-xl p-4 flex flex-col gap-2 relative">
+                            <div class="absolute -right-8 top-1/2 -translate-y-1/2 text-4xl text-pink-500/50 font-bold">
+                                ×N</div>
+
+                            <div
+                                class="h-12 bg-pink-800/40 rounded border border-pink-600/50 flex items-center justify-center text-sm">
+                                FFN</div>
+                            <div
+                                class="h-12 bg-purple-800/40 rounded border border-purple-500/80 flex items-center justify-center text-sm font-bold shadow-[0_0_10px_rgba(168,85,247,0.4)]">
+                                Cross-Attention</div>
+                            <div
+                                class="h-12 bg-pink-800/40 rounded border border-pink-600/50 flex items-center justify-center text-sm">
+                                Masked Self-Attn</div>
+                        </div>
+
+                        <!-- Embedding -->
+                        <div
+                            class="w-full h-10 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-400">
+                            Positional Encoding</div>
+                        <div
+                            class="w-full h-10 bg-gray-800 rounded flex items-center justify-center text-xs text-gray-400">
+                            Output Embedding</div>
+
+                        <!-- Shifted Outputs -->
+                        <div class="flex gap-2 opacity-50">
+                            <div class="px-3 py-1 bg-gray-700 rounded text-sm">&lt;S&gt;</div>
+                            <div class="px-3 py-1 bg-gray-700 rounded text-sm">我</div>
+                            <div class="px-3 py-1 bg-gray-700 rounded text-sm">...</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- Animation Demo -->
+        <section class="max-w-2xl mx-auto text-center">
+            <h2 class="text-2xl font-bold mb-6">端到端演示</h2>
+            <div class="glass-card rounded-2xl p-8">
+                <div class="flex items-center justify-between gap-4 mb-8">
+                    <div class="flex-1 p-4 bg-gray-800 rounded-lg text-left">
+                        <div class="text-xs text-gray-500 mb-1">Source (English)</div>
+                        <div class="text-lg">The transformer is powerful.</div>
+                    </div>
+                    <div class="text-2xl text-gray-500">→</div>
+                    <div class="flex-1 p-4 bg-gray-800 rounded-lg text-left relative overflow-hidden">
+                        <div class="text-xs text-gray-500 mb-1">Target (Chinese)</div>
+                        <div class="text-lg text-primary-400" id="typewriter"></div>
+                    </div>
+                </div>
+
+                <button onclick="animateTranslation()"
+                    class="px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-bold hover:shadow-lg hover:scale-105 transition-all">
+                    开始推理 (Inference)
+                </button>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        const targetText = "Transformer 很强大。";
+        const outputEl = document.getElementById('typewriter');
+
+        function animateTranslation() {
+            outputEl.textContent = "";
+            let i = 0;
+            const speed = 300; // ms per char
+
+            function type() {
+                if (i < targetText.length) {
+                    outputEl.textContent += targetText.charAt(i);
+                    i++;
+                    setTimeout(type, speed);
+                }
+            }
+            type();
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>37 - FFN & Add&Norm | Transformer 架构学习</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            200: '#fed7aa',
+                            300: '#fdba74',
+                            400: '#fb923c',
+                            500: '#f97316',
+                            600: '#ea580c',
+                            700: '#c2410c',
+                            800: '#9a3412',
+                            900: '#7c2d12',
+                        },
+                        orange: {
+                            400: '#fb923c',
+                            500: '#f97316',
+                        }
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            z-index: -1;
+        }
+    </style>
+</head>
+
+<body class="overflow-x-hidden">
+    <div class="fixed top-0 left-0 w-full h-full overflow-hidden -z-10">
+        <div class="bg-orb w-96 h-96 bg-orange-600 top-0 left-0"></div>
+        <div class="bg-orb w-80 h-80 bg-red-600 bottom-0 right-0"></div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-50">
+        <div class="glass-card rounded-2xl px-6 py-4 max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div
+                        class="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center font-bold text-white">
+                        37</div>
+                    <span class="text-lg font-bold">FFN & Add&Norm</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-4">
+                <a href="36-multi-head-attention.html"
+                    class="text-gray-300 hover:text-white transition-colors text-sm">上一章</a>
+                <a href="index.html" class="text-gray-300 hover:text-white transition-colors">目录</a>
+                <a href="38-encoder-architecture.html"
+                    class="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors text-sm font-medium">下一章:
+                    Encoder</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-4xl mx-auto pt-32 pb-20 px-4">
+        <header class="mb-16 text-center">
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-6 text-orange-400">组件详解</h1>
+            <p class="text-xl text-gray-400">深入了解 Feed-Forward Networks 和对于深层网络至关重要的 Add & Norm。</p>
+        </header>
+
+        <!-- Section 1: Feed-Forward -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8">
+                <h2 class="text-2xl font-bold mb-6 text-orange-300">1. Position-wise Feed-Forward Networks (FFN)</h2>
+                <div class="grid md:grid-cols-2 gap-8 items-center">
+                    <div class="space-y-4 text-gray-300">
+                        <p>
+                            Attention 层负责提取不同位置之间的关系，而 FFN 层则负责处理<strong>每个位置的信息</strong>，增加模型的非线性能力。
+                        </p>
+                        <p>
+                            它是一个简单的两层全连接网络，对每个 Token <strong>独立且相同</strong>地应用。
+                        </p>
+                        <div class="bg-white/5 p-4 rounded-lg font-mono text-xs md:text-sm">
+                            FFN(x) = max(0, xW1 + b1)W2 + b2
+                        </div>
+                    </div>
+
+                    <!-- FFN Visualization -->
+                    <div class="bg-black/30 rounded-xl p-6 flex flex-col items-center justify-center relative h-64">
+                        <!-- Input -->
+                        <div class="flex gap-2 mb-8">
+                            <div class="w-8 h-8 rounded bg-gray-600 flex items-center justify-center text-xs">x1</div>
+                            <div class="w-8 h-8 rounded bg-gray-600 flex items-center justify-center text-xs">x2</div>
+                            <div class="w-8 h-8 rounded bg-gray-600 flex items-center justify-center text-xs">x3</div>
+                        </div>
+
+                        <!-- Linear 1 -->
+                        <div
+                            class="w-full h-8 bg-blue-500/30 border border-blue-500 rounded flex items-center justify-center text-xs mb-2">
+                            Linear 1 (Expand)</div>
+                        <!-- ReLU -->
+                        <div
+                            class="w-full h-8 bg-green-500/30 border border-green-500 rounded flex items-center justify-center text-xs mb-2">
+                            ReLU (Activate)</div>
+                        <!-- Linear 2 -->
+                        <div
+                            class="w-full h-8 bg-blue-500/30 border border-blue-500 rounded flex items-center justify-center text-xs">
+                            Linear 2 (Project)</div>
+
+                        <div class="absolute top-1/2 -right-4 text-xs text-gray-500 rotate-90">Token 独立处理</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 2: Add & Norm -->
+        <section class="mb-12">
+            <div class="glass-card rounded-3xl p-8">
+                <h2 class="text-2xl font-bold mb-6 text-red-300">2. Add & Norm (残差连接与归一化)</h2>
+
+                <div class="space-y-6">
+                    <p class="text-gray-300">
+                        这是让 Transformer 能够堆叠这一深的关键。
+                    </p>
+
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- Add (Residual) Viz -->
+                        <div class="bg-black/30 rounded-xl p-6 border border-white/10">
+                            <h3 class="font-bold text-gray-200 mb-4">Add: Residual Connection</h3>
+                            <div class="relative h-40 flex items-center justify-center">
+                                <!-- Main Path -->
+                                <div class="flex flex-col items-center gap-2 z-10">
+                                    <div class="w-20 h-10 bg-gray-700 rounded flex items-center justify-center text-xs">
+                                        Input x</div>
+                                    <div
+                                        class="w-20 h-12 bg-orange-600/50 border border-orange-500 rounded flex items-center justify-center text-xs">
+                                        Sublayer</div>
+                                    <div
+                                        class="w-8 h-8 rounded-full bg-white text-black font-bold flex items-center justify-center text-xs shadow-lg ring ring-white/20">
+                                        +</div>
+                                </div>
+                                <!-- Skip Connection -->
+                                <svg class="absolute inset-0 w-full h-full pointer-events-none">
+                                    <path d="M 140 30 C 220 30, 220 130, 160 130" fill="none" stroke="#4ade80"
+                                        stroke-width="2" stroke-dasharray="5,5" class="animate-pulse" />
+                                </svg>
+                                <div class="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-green-400 w-24">
+                                    梯度高速公路! 信息可以直接流过。
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Norm Viz -->
+                        <div class="bg-black/30 rounded-xl p-6 border border-white/10">
+                            <h3 class="font-bold text-gray-200 mb-4">Norm: Layer Normalization</h3>
+                            <div class="h-40 flex items-end justify-center gap-1 relative" id="histogram">
+                                <!-- JS will draw bars -->
+                            </div>
+                            <div class="flex justify-center mt-2 gap-2">
+                                <button onclick="randomizeData()"
+                                    class="px-3 py-1 bg-gray-700 rounded text-xs hover:bg-gray-600">随机输入</button>
+                                <button onclick="normalizeData()"
+                                    class="px-3 py-1 bg-blue-600 rounded text-xs hover:bg-blue-500">执行 Norm</button>
+                            </div>
+                            <p class="text-xs text-center text-gray-400 mt-2">将数据重新分布为均值0，方差1</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // --- LayerNorm Visualization ---
+        const histoContainer = document.getElementById('histogram');
+        let data = [];
+
+        function generateData() {
+            // Generate random data with random offset/scale
+            const mean = Math.random() * 20 - 10; // -10 to 10
+            const scale = Math.random() * 5 + 0.5;
+            data = Array.from({ length: 20 }, () => Math.random() * scale + mean);
+        }
+
+        function drawBars(dataset, colorClass = 'bg-gray-500') {
+            histoContainer.innerHTML = '';
+            // Find min/max for scaling visual
+            const min = Math.min(...dataset, -2);
+            const max = Math.max(...dataset, 2);
+            const range = max - min;
+
+            dataset.forEach(val => {
+                const heightPercent = Math.max(5, ((val - min) / range) * 80 + 10);
+                const bar = document.createElement('div');
+                bar.className = `w-3 rounded-t transition-all duration-500 ${colorClass}`;
+                bar.style.height = `${heightPercent}%`;
+                histoContainer.appendChild(bar);
+            });
+
+            // Draw axis line
+            const axis = document.createElement('div');
+            axis.className = 'absolute w-full h-px bg-white/30 bottom-2';
+            histoContainer.appendChild(axis);
+        }
+
+        function randomizeData() {
+            generateData();
+            drawBars(data, 'bg-red-400/60');
+        }
+
+        function normalizeData() {
+            // Calculate Mean
+            const mean = data.reduce((a, b) => a + b, 0) / data.length;
+            // Calculate Variance
+            const variance = data.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / data.length;
+            const std = Math.sqrt(variance + 1e-6);
+
+            // Normalize
+            const normalized = data.map(x => (x - mean) / std);
+
+            drawBars(normalized, 'bg-green-400');
+        }
+
+        // Init
+        randomizeData();
+
+    </script>
+</body>
+
+</html>
