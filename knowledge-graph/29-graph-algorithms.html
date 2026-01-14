@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块29: 图算法与分析 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subsection-title {
+            font-size: 1.8em;
+            margin: 30px 0 20px 0;
+            color: #60a5fa;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .animation-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            line-height: 1.6;
+            color: #e2e8f0;
+        }
+
+        .code-keyword { color: #c084fc; }
+        .code-function { color: #60a5fa; }
+        .code-string { color: #4ade80; }
+        .code-comment { color: #9ca3af; }
+        .code-number { color: #fbbf24; }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2em;
+            }
+            .glass-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <a href="28-knowledge-extraction.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一模块
+                </a>
+                <a href="30-kg-visualization.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 29 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 29: 图算法与分析
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">掌握知识图谱中的核心算法：路径查找、中心性分析、社区发现</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">中高级别</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~90 分钟</span>
+                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">6 个交互动画</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: 路径查找算法 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. 路径查找算法 (Path Finding)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">为什么需要路径查找?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    在知识图谱中,路径查找用于<strong>发现实体之间的关系</strong>。例如:
+                </p>
+                <ul class="text-gray-400 space-y-2">
+                    <li>• "埃隆·马斯克" 和 "电动汽车" 之间有什么关系?</li>
+                    <li>• 两个公司之间通过多少层投资关系连接?</li>
+                    <li>• 从A点到B点的最短路径是什么?</li>
+                </ul>
+            </div>
+
+            <!-- BFS Animation -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    动画 1: BFS广度优先搜索
+                </div>
+                <div id="bfs-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playBFS()">▶ 播放BFS</button>
+                    <button class="btn btn-secondary" onclick="resetBFS()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="stepBFS()">→ 单步执行</button>
+                </div>
+                <div id="bfs-info" class="info-panel">
+                    <div class="text-blue-400 font-bold mb-2">BFS算法特点:</div>
+                    <ul class="text-gray-300 text-sm space-y-1">
+                        <li>✅ 按层级逐层访问节点</li>
+                        <li>✅ 保证找到最短路径(无权图)</li>
+                        <li>✅ 使用队列实现先进先出</li>
+                        <li>✅ 适用于查找"最近的"关系</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- DFS Animation -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    动画 2: DFS深度优先搜索
+                </div>
+                <div id="dfs-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playDFS()">▶ 播放DFS</button>
+                    <button class="btn btn-secondary" onclick="resetDFS()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="stepDFS()">→ 单步执行</button>
+                </div>
+                <div id="dfs-info" class="info-panel">
+                    <div class="text-purple-400 font-bold mb-2">DFS算法特点:</div>
+                    <ul class="text-gray-300 text-sm space-y-1">
+                        <li>✅ 沿着一条路径一直深入</li>
+                        <li>✅ 使用栈(或递归)实现后进先出</li>
+                        <li>✅ 不保证最短路径</li>
+                        <li>✅ 适用于路径枚举和拓扑排序</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Dijkstra Animation -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
+                    </svg>
+                    动画 3: Dijkstra最短路径算法
+                </div>
+                <div id="dijkstra-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playDijkstra()">▶ 播放Dijkstra</button>
+                    <button class="btn btn-secondary" onclick="resetDijkstra()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="stepDijkstra()">→ 单步执行</button>
+                </div>
+                <div id="dijkstra-info" class="info-panel">
+                    <div class="text-green-400 font-bold mb-2">Dijkstra算法特点:</div>
+                    <ul class="text-gray-300 text-sm space-y-1">
+                        <li>✅ 处理带权重的边</li>
+                        <li>✅ 找到从起点到所有其他点的最短路径</li>
+                        <li>✅ 使用优先队列(最小堆)</li>
+                        <li>✅ 时间复杂度: O((V+E)logV)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">三种算法对比</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-600">
+                                <th class="text-left py-3 px-4 text-blue-400">算法</th>
+                                <th class="text-left py-3 px-4 text-green-400">数据结构</th>
+                                <th class="text-left py-3 px-4 text-purple-400">最短路径</th>
+                                <th class="text-left py-3 px-4 text-yellow-400">应用场景</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr class="border-b border-gray-700">
+                                <td class="py-3 px-4 font-bold">BFS</td>
+                                <td class="py-3 px-4">队列(FIFO)</td>
+                                <td class="py-3 px-4">✅ 无权图</td>
+                                <td class="py-3 px-4">社交网络、推荐系统</td>
+                            </tr>
+                            <tr class="border-b border-gray-700">
+                                <td class="py-3 px-4 font-bold">DFS</td>
+                                <td class="py-3 px-4">栈/递归</td>
+                                <td class="py-3 px-4">❌ 不保证</td>
+                                <td class="py-3 px-4">路径枚举、拓扑排序</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 px-4 font-bold">Dijkstra</td>
+                                <td class="py-3 px-4">优先队列</td>
+                                <td class="py-3 px-4">✅ 带权图</td>
+                                <td class="py-3 px-4">路由、导航、资源分配</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: 中心性算法 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. 中心性算法 (Centrality)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是中心性?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>中心性</strong>衡量节点在图中的<strong>重要性</strong>。不同的中心性指标反映不同类型的重要性。
+                </p>
+                <p class="text-gray-400">
+                    在知识图谱中,中心性算法可用于识别<strong>关键人物</strong>、<strong>重要概念</strong>或<strong>核心组织</strong>。
+                </p>
+            </div>
+
+            <!-- Centrality Animation -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/>
+                    </svg>
+                    动画 4: 中心性指标对比
+                </div>
+                <div id="centrality-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playCentrality()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="resetCentrality()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="cycleCentrality()">↻ 切换指标</button>
+                </div>
+                <div id="centrality-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">度中心性:</div>
+                    <div id="centrality-description" class="text-gray-300 text-sm">
+                        节点的度中心性 = 直接连接的节点数量。连接越多的节点越重要。
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">四种中心性指标</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="font-bold text-blue-400 mb-2">度中心性 (Degree)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 直接连接数</li>
+                            <li>• 计算简单,速度快</li>
+                            <li>• 适用于: 识别受欢迎节点</li>
+                            <li>• 例: 微信好友数最多的用户</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2">接近中心性 (Closeness)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 到其他所有节点的平均距离</li>
+                            <li>• 越小越中心</li>
+                            <li>• 适用于: 传播效率</li>
+                            <li>• 例: 新闻传播最快的源头</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2">中介中心性 (Betweenness)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 位于其他节点最短路径上的次数</li>
+                            <li>• 衡量"桥梁"作用</li>
+                            <li>• 适用于: 控制信息流</li>
+                            <li>• 例: 连接两个社区的中间人</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-pink-500">
+                        <div class="font-bold text-pink-400 mb-2">PageRank</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 考虑邻居节点的重要性</li>
+                            <li>• Google搜索的核心算法</li>
+                            <li>• 适用于: 影响力评估</li>
+                            <li>• 例: 学术论文的引用影响力</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 3: 社区发现算法 -->
+        <div class="glass-card">
+            <h2 class="section-title">3. 社区发现 (Community Detection)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是社区?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>社区</strong>是图中<strong>内部连接紧密</strong>、<strong>外部连接稀疏</strong>的节点集合。
+                </p>
+                <p class="text-gray-400">
+                    在知识图谱中,社区发现可用于<strong>聚类相似实体</strong>、<strong>发现隐藏结构</strong>、<strong>推荐系统</strong>等。
+                </p>
+            </div>
+
+            <!-- Louvain Animation -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                    动画 5: Louvain社区发现算法
+                </div>
+                <div id="louvain-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playLouvain()">▶ 播放算法</button>
+                    <button class="btn btn-secondary" onclick="resetLouvain()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="modularityStep()">+ 模块度优化</button>
+                </div>
+                <div id="louvain-info" class="info-panel">
+                    <div class="text-purple-400 font-bold mb-2">Louvain算法特点:</div>
+                    <ul class="text-gray-300 text-sm space-y-1">
+                        <li>✅ 基于模块度(Modularity)优化</li>
+                        <li>✅ 两阶段迭代: 移动节点 → 聚合社区</li>
+                        <li>✅ 时间复杂度接近线性</li>
+                        <li>✅ 适用于大规模网络</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Label Propagation Animation -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                    </svg>
+                    动画 6: 标签传播算法 (Label Propagation)
+                </div>
+                <div id="label-prop-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playLabelProp()">▶ 播放传播</button>
+                    <button class="btn btn-secondary" onclick="resetLabelProp()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="propagateStep()">→ 传播一步</button>
+                </div>
+                <div id="label-prop-info" class="info-panel">
+                    <div class="text-cyan-400 font-bold mb-2">标签传播算法特点:</div>
+                    <ul class="text-gray-300 text-sm space-y-1">
+                        <li>✅ 节点采用邻居中最多的标签</li>
+                        <li>✅ 简单、快速、无需参数</li>
+                        <li>✅ 结果有一定随机性</li>
+                        <li>✅ 适用于快速社区划分</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">社区发现算法对比</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-600">
+                                <th class="text-left py-3 px-4 text-blue-400">算法</th>
+                                <th class="text-left py-3 px-4 text-green-400">原理</th>
+                                <th class="text-left py-3 px-4 text-purple-400">优点</th>
+                                <th class="text-left py-3 px-4 text-yellow-400">缺点</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr class="border-b border-gray-700">
+                                <td class="py-3 px-4 font-bold">Louvain</td>
+                                <td class="py-3 px-4">模块度优化</td>
+                                <td class="py-3 px-4">速度快,质量高</td>
+                                <td class="py-3 px-4">可能产生小社区</td>
+                            </tr>
+                            <tr>
+                                <td class="py-3 px-4 font-bold">Label Propagation</td>
+                                <td class="py-3 px-4">标签投票</td>
+                                <td class="py-3 px-4">极简,无参数</td>
+                                <td class="py-3 px-4">不稳定,随机性</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 代码示例 -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 实际代码示例</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">Neo4j GDS库使用</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    Neo4j Graph Data Science (GDS) 库提供了丰富的图算法实现。以下是常用示例:
+                </p>
+            </div>
+
+            <div class="code-block">
+                <pre><span class="code-comment">// 1. 创建图投影 (Graph Projection)</span>
+<span class="code-keyword">CALL</span> gds.graph.project(
+  <span class="code-string">'myGraph'</span>,
+  <span class="code-string">'*'</span>,           <span class="code-comment">// 节点</span>
+  {
+    KNOWS: {orientation: <span class="code-string">'NATURAL'</span>},
+    FOLLOWS: {orientation: <span class="code-string">'REVERSE'</span>}
+  }
+)
+
+<span class="code-comment">// 2. PageRank算法</span>
+<span class="code-keyword">CALL</span> gds.pageRank.stream(<span class="code-string">'myGraph'</span>)
+YIELD nodeId, score
+<span class="code-keyword">RETURN</span> gds.util.asNode(nodeId).name <span class="code-keyword">AS</span> name, score
+<span class="code-keyword">ORDER BY</span> score <span class="code-keyword">DESC</span>
+<span class="code-keyword">LIMIT</span> 10
+
+<span class="code-comment">// 3. 最短路径 (Dijkstra)</span>
+<span class="code-keyword">CALL</span> gds.shortestPath.dijkstra.stream(
+  <span class="code-string">'myGraph'</span>,
+  {
+    sourceNode: <span class="code-string">'Alice'</span>,
+    targetNode: <span class="code-string">'Bob'</span>,
+    relationshipWeightProperty: <span class="code-string">'cost'</span>
+  }
+)
+YIELD index, sourceNode, targetNode, totalCost, nodeIds, costs
+<span class="code-keyword">RETURN</span> totalCost, [nodeId <span class="code-keyword">IN</span> nodeIds | gds.util.asNode(nodeId).name] <span class="code-keyword">AS</span> path
+
+<span class="code-comment">// 4. Louvain社区发现</span>
+<span class="code-keyword">CALL</span> gds.louvain.stream(<span class="code-string">'myGraph'</span>)
+YIELD nodeId, communityId
+<span class="code-keyword">RETURN</span> communityId, count(*) <span class="code-keyword">AS</span> members
+<span class="code-keyword">ORDER BY</span> members <span class="code-keyword">DESC</span>
+
+<span class="code-comment">// 5. 度中心性</span>
+<span class="code-keyword">CALL</span> gds.degree.stream(<span class="code-string">'myGraph'</span>)
+YIELD nodeId, score
+<span class="code-keyword">RETURN</span> gds.util.asNode(nodeId).name, score
+<span class="code-keyword">ORDER BY</span> score <span class="code-keyword">DESC</span>
+<span class="code-keyword">LIMIT</span> 10</pre>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">NetworkX代码示例 (Python)</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    NetworkX是Python中最流行的图算法库:
+                </p>
+            </div>
+
+            <div class="code-block">
+                <pre><span class="code-keyword">import</span> networkx <span class="code-keyword">as</span> nx
+
+<span class="code-comment"># 1. 创建图</span>
+G = nx.Graph()
+G.add_edges_from([
+    (<span class="code-string">'A'</span>, <span class="code-string">'B'</span>), (<span class="code-string">'A'</span>, <span class="code-string">'C'</span>), (<span class="code-string">'B'</span>, <span class="code-string">'D'</span>),
+    (<span class="code-string">'C'</span>, <span class="code-string">'D'</span>), (<span class="code-string">'D'</span>, <span class="code-string">'E'</span>), (<span class="code-string">'E'</span>, <span class="code-string">'F'</span>)
+])
+
+<span class="code-comment"># 2. 最短路径 (BFS)</span>
+path = nx.shortest_path(G, source=<span class="code-string">'A'</span>, target=<span class="code-string">'F'</span>)
+<span class="code-function">print</span>(<span class="code-string">f"最短路径: {path}"</span>)
+
+<span class="code-comment"># 3. PageRank</span>
+pagerank = nx.pagerank(G)
+<span class="code-function">print</span>(<span class="code-string">f"PageRank: {pagerank}"</span>)
+
+<span class="code-comment"># 4. 社区发现 (Louvain)</span>
+<span class="code-keyword">import</span> community <span class="code-keyword">as</span> community_louvain
+partition = community_louvain.best_partition(G)
+<span class="code-function">print</span>(<span class="code-string">f"社区划分: {partition}"</span>)
+
+<span class="code-comment"># 5. 中心性指标</span>
+degree_centrality = nx.degree_centrality(G)
+betweenness_centrality = nx.betweenness_centrality(G)
+closeness_centrality = nx.closeness_centrality(G)
+
+<span class="code-function">print</span>(<span class="code-string">f"度中心性: {degree_centrality}"</span>)
+<span class="code-function">print</span>(<span class="code-string">f"中介中心性: {betweenness_centrality}"</span>)
+<span class="code-function">print</span>(<span class="code-string">f"接近中心性: {closeness_centrality}"</span>)
+
+<span class="code-comment"># 6. Dijkstra最短路径 (带权图)</span>
+G_weighted = nx.Graph()
+G_weighted.add_weighted_edges_from([
+    (<span class="code-string">'A'</span>, <span class="code-string">'B'</span>, <span class="code-number">4</span>), (<span class="code-string">'A'</span>, <span class="code-string">'C'</span>, <span class="code-number">2</span>),
+    (<span class="code-string">'B'</span>, <span class="code-string">'C'</span>, <span class="code-number">1</span>), (<span class="code-string">'B'</span>, <span class="code-string">'D'</span>, <span class="code-number">5</span>)
+])
+path = nx.dijkstra_path(G_weighted, <span class="code-string">'A'</span>, <span class="code-string">'D'</span>)
+length = nx.dijkstra_path_length(G_weighted, <span class="code-string">'A'</span>, <span class="code-string">'D'</span>)
+<span class="code-function">print</span>(<span class="code-string">f"Dijkstra路径: {path}, 长度: {length}"</span>)</pre>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="glass-card">
+            <h2 class="section-title">模块总结</h2>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-400 mb-3">核心算法</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>🔍 <strong>路径查找</strong>: BFS、DFS、Dijkstra</li>
+                        <li>📊 <strong>中心性</strong>: Degree、Closeness、Betweenness、PageRank</li>
+                        <li>👥 <strong>社区发现</strong>: Louvain、Label Propagation</li>
+                        <li>⚡ <strong>性能</strong>: 时间复杂度从O(V)到O(VE)</li>
+                    </ul>
+                </div>
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-400 mb-3">应用场景</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>• <strong>社交网络</strong>: 影响力分析、好友推荐</li>
+                        <li>• <strong>推荐系统</strong>: 基于关系的协同过滤</li>
+                        <li>• <strong>知识图谱</strong>: 实体关联、路径推理</li>
+                        <li>• <strong>网络安全</strong>: 关键节点保护、异常检测</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-purple-400 mb-3">下一步学习</h3>
+                <p class="text-gray-300 mb-3">
+                    掌握了图算法后,建议继续学习:
+                </p>
+                <a href="30-visualization.html" class="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-2">
+                    模块 30: 知识图谱可视化 - 将算法结果可视化展示
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 29: 图算法与分析</p>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 全局变量定义 ====================
+        let bfsSvg, dfsSvg, dijkstraSvg, centralitySvg, louvainSvg, labelPropSvg;
+        let bfsSimulation, dfsSimulation, dijkstraSimulation, centralitySimulation, louvainSimulation, labelPropSimulation;
+
+        // 创建示例图数据
+        function createGraphData() {
+            return {
+                nodes: [
+                    { id: "A", group: 1 },
+                    { id: "B", group: 1 },
+                    { id: "C", group: 2 },
+                    { id: "D", group: 2 },
+                    { id: "E", group: 3 },
+                    { id: "F", group: 3 },
+                    { id: "G", group: 3 },
+                ],
+                links: [
+                    { source: "A", target: "B", weight: 4 },
+                    { source: "A", target: "C", weight: 2 },
+                    { source: "B", target: "C", weight: 1 },
+                    { source: "B", target: "D", weight: 5 },
+                    { source: "C", target: "D", weight: 8 },
+                    { source: "C", target: "E", weight: 10 },
+                    { source: "D", target: "E", weight: 2 },
+                    { source: "D", target: "F", weight: 6 },
+                    { source: "E", target: "F", weight: 3 },
+                    { source: "E", target: "G", weight: 5 },
+                    { source: "F", target: "G", weight: 1 },
+                ]
+            };
+        }
+
+        // ==================== BFS 广度优先搜索动画 ====================
+        let bfsQueue = [];
+        let bfsVisited = new Set();
+        let bfsStep = 0;
+
+        function initBFS() {
+            const container = document.getElementById("bfs-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            bfsSvg = d3.select("#bfs-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const data = createGraphData();
+
+            bfsSimulation = d3.forceSimulation(data.nodes)
+                .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-400))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            const link = bfsSvg.append("g")
+                .selectAll("line")
+                .data(data.links)
+                .join("line")
+                .attr("class", "edge-line")
+                .attr("stroke", "#4b5563")
+                .attr("stroke-width", 2);
+
+            const node = bfsSvg.append("g")
+                .selectAll("g")
+                .data(data.nodes)
+                .join("g")
+                .attr("class", "node-circle");
+
+            node.append("circle")
+                .attr("r", 25)
+                .attr("fill", d => d.group === 1 ? "#3b82f6" : d.group === 2 ? "#22c55e" : "#8b5cf6")
+                .attr("opacity", 0.6);
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 5)
+                .attr("fill", "white")
+                .attr("font-weight", "bold")
+                .text(d => d.id);
+
+            bfsSimulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+
+            bfsSvg.nodeSelection = node;
+            bfsSvg.linkSelection = link;
+            bfsSvg.graphData = data;
+
+            bfsQueue = [];
+            bfsVisited = new Set();
+            bfsStep = 0;
+        }
+
+        function playBFS() {
+            initBFS();
+            const startNode = bfsSvg.graphData.nodes[0];
+            bfsQueue = [startNode];
+            bfsVisited.add(startNode.id);
+
+            animateBFS();
+        }
+
+        function animateBFS() {
+            if (bfsQueue.length === 0) {
+                updateBFSInfo("BFS完成! 所有可达节点已访问");
+                return;
+            }
+
+            const currentNode = bfsQueue.shift();
+            highlightNode(bfsSvg, currentNode.id, "#fbbf24");
+
+            const neighbors = bfsSvg.graphData.links
+                .filter(l => l.source.id === currentNode.id || l.target.id === currentNode.id)
+                .map(l => l.source.id === currentNode.id ? l.target : l.source)
+                .filter(n => !bfsVisited.has(n.id));
+
+            neighbors.forEach(neighbor => {
+                bfsVisited.add(neighbor.id);
+                bfsQueue.push(neighbor);
+            });
+
+            updateBFSInfo(`访问节点: ${currentNode.id}<br>队列: [${bfsQueue.map(n => n.id).join(", ")}]<br>已访问: [${Array.from(bfsVisited).join(", ")}]`);
+
+            setTimeout(animateBFS, 1500);
+        }
+
+        function stepBFS() {
+            if (bfsQueue.length === 0 && bfsVisited.size === 0) {
+                const startNode = bfsSvg.graphData.nodes[0];
+                bfsQueue = [startNode];
+                bfsVisited.add(startNode.id);
+            }
+
+            if (bfsQueue.length > 0) {
+                const currentNode = bfsQueue.shift();
+                highlightNode(bfsSvg, currentNode.id, "#fbbf24");
+
+                const neighbors = bfsSvg.graphData.links
+                    .filter(l => l.source.id === currentNode.id || l.target.id === currentNode.id)
+                    .map(l => l.source.id === currentNode.id ? l.target : l.source)
+                    .filter(n => !bfsVisited.has(n.id));
+
+                neighbors.forEach(neighbor => {
+                    bfsVisited.add(neighbor.id);
+                    bfsQueue.push(neighbor);
+                });
+
+                updateBFSInfo(`访问节点: ${currentNode.id}<br>队列: [${bfsQueue.map(n => n.id).join(", ")}]`);
+            }
+        }
+
+        function resetBFS() {
+            initBFS();
+            updateBFSInfo("点击'播放BFS'开始广度优先搜索");
+        }
+
+        function updateBFSInfo(text) {
+            document.getElementById("bfs-info").innerHTML = `
+                <div class="text-blue-400 font-bold mb-2">BFS算法状态:</div>
+                <div class="text-gray-300 text-sm">${text}</div>
+            `;
+        }
+
+        // ==================== DFS 深度优先搜索动画 ====================
+        let dfsStack = [];
+        let dfsVisited = new Set();
+
+        function initDFS() {
+            const container = document.getElementById("dfs-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            dfsSvg = d3.select("#dfs-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const data = createGraphData();
+
+            dfsSimulation = d3.forceSimulation(data.nodes)
+                .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-400))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            const link = dfsSvg.append("g")
+                .selectAll("line")
+                .data(data.links)
+                .join("line")
+                .attr("class", "edge-line")
+                .attr("stroke", "#4b5563")
+                .attr("stroke-width", 2);
+
+            const node = dfsSvg.append("g")
+                .selectAll("g")
+                .data(data.nodes)
+                .join("g")
+                .attr("class", "node-circle");
+
+            node.append("circle")
+                .attr("r", 25)
+                .attr("fill", d => d.group === 1 ? "#3b82f6" : d.group === 2 ? "#22c55e" : "#8b5cf6")
+                .attr("opacity", 0.6);
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 5)
+                .attr("fill", "white")
+                .attr("font-weight", "bold")
+                .text(d => d.id);
+
+            dfsSimulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+
+            dfsSvg.nodeSelection = node;
+            dfsSvg.linkSelection = link;
+            dfsSvg.graphData = data;
+
+            dfsStack = [];
+            dfsVisited = new Set();
+        }
+
+        function playDFS() {
+            initDFS();
+            const startNode = dfsSvg.graphData.nodes[0];
+            dfsStack = [startNode];
+            dfsVisited.add(startNode.id);
+
+            animateDFS();
+        }
+
+        function animateDFS() {
+            if (dfsStack.length === 0) {
+                updateDFSInfo("DFS完成! 所有可达节点已访问");
+                return;
+            }
+
+            const currentNode = dfsStack.pop();
+            highlightNode(dfsSvg, currentNode.id, "#a855f7");
+
+            const neighbors = dfsSvg.graphData.links
+                .filter(l => l.source.id === currentNode.id || l.target.id === currentNode.id)
+                .map(l => l.source.id === currentNode.id ? l.target : l.source)
+                .filter(n => !dfsVisited.has(n.id));
+
+            neighbors.forEach(neighbor => {
+                dfsVisited.add(neighbor.id);
+                dfsStack.push(neighbor);
+            });
+
+            updateDFSInfo(`访问节点: ${currentNode.id}<br>栈: [${dfsStack.map(n => n.id).join(", ")}]<br>已访问: [${Array.from(dfsVisited).join(", ")}]`);
+
+            setTimeout(animateDFS, 1500);
+        }
+
+        function stepDFS() {
+            if (dfsStack.length === 0 && dfsVisited.size === 0) {
+                const startNode = dfsSvg.graphData.nodes[0];
+                dfsStack = [startNode];
+                dfsVisited.add(startNode.id);
+            }
+
+            if (dfsStack.length > 0) {
+                const currentNode = dfsStack.pop();
+                highlightNode(dfsSvg, currentNode.id, "#a855f7");
+
+                const neighbors = dfsSvg.graphData.links
+                    .filter(l => l.source.id === currentNode.id || l.target.id === currentNode.id)
+                    .map(l => l.source.id === currentNode.id ? l.target : l.source)
+                    .filter(n => !dfsVisited.has(n.id));
+
+                neighbors.forEach(neighbor => {
+                    dfsVisited.add(neighbor.id);
+                    dfsStack.push(neighbor);
+                });
+
+                updateDFSInfo(`访问节点: ${currentNode.id}<br>栈: [${dfsStack.map(n => n.id).join(", ")}]`);
+            }
+        }
+
+        function resetDFS() {
+            initDFS();
+            updateDFSInfo("点击'播放DFS'开始深度优先搜索");
+        }
+
+        function updateDFSInfo(text) {
+            document.getElementById("dfs-info").innerHTML = `
+                <div class="text-purple-400 font-bold mb-2">DFS算法状态:</div>
+                <div class="text-gray-300 text-sm">${text}</div>
+            `;
+        }
+
+        // ==================== Dijkstra 最短路径算法动画 ====================
+        let dijkstraDistances = {};
+        let dijkstraVisited = new Set();
+        let dijkstraUnvisited = [];
+
+        function initDijkstra() {
+            const container = document.getElementById("dijkstra-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            dijkstraSvg = d3.select("#dijkstra-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const data = createGraphData();
+
+            dijkstraSimulation = d3.forceSimulation(data.nodes)
+                .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-400))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            const link = dijkstraSvg.append("g")
+                .selectAll("line")
+                .data(data.links)
+                .join("line")
+                .attr("class", "edge-line")
+                .attr("stroke", "#4b5563")
+                .attr("stroke-width", 2);
+
+            const linkLabels = dijkstraSvg.append("g")
+                .selectAll("text")
+                .data(data.links)
+                .join("text")
+                .attr("fill", "#9ca3af")
+                .attr("font-size", "12px")
+                .attr("font-weight", "bold")
+                .attr("text-anchor", "middle")
+                .text(d => d.weight);
+
+            const node = dijkstraSvg.append("g")
+                .selectAll("g")
+                .data(data.nodes)
+                .join("g")
+                .attr("class", "node-circle");
+
+            node.append("circle")
+                .attr("r", 25)
+                .attr("fill", d => d.group === 1 ? "#3b82f6" : d.group === 2 ? "#22c55e" : "#8b5cf6")
+                .attr("opacity", 0.6);
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 5)
+                .attr("fill", "white")
+                .attr("font-weight", "bold")
+                .text(d => d.id);
+
+            const distanceLabels = dijkstraSvg.append("g")
+                .selectAll("text")
+                .data(data.nodes)
+                .join("text")
+                .attr("class", "distance-label")
+                .attr("fill", "#fbbf24")
+                .attr("font-size", "11px")
+                .attr("font-weight", "bold")
+                .attr("text-anchor", "middle")
+                .text(d => "∞");
+
+            dijkstraSimulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                linkLabels
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2 - 8);
+
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+
+                distanceLabels
+                    .attr("x", d => d.x)
+                    .attr("y", d => d.y + 40);
+            });
+
+            dijkstraSvg.nodeSelection = node;
+            dijkstraSvg.linkSelection = link;
+            dijkstraSvg.graphData = data;
+            dijkstraSvg.distanceLabels = distanceLabels;
+
+            dijkstraDistances = {};
+            dijkstraVisited = new Set();
+            data.nodes.forEach(n => {
+                dijkstraDistances[n.id] = Infinity;
+            });
+        }
+
+        function playDijkstra() {
+            initDijkstra();
+            const startNode = dijkstraSvg.graphData.nodes[0];
+            dijkstraDistances[startNode.id] = 0;
+            dijkstraUnvisited = [...dijkstraSvg.graphData.nodes];
+
+            animateDijkstra();
+        }
+
+        function animateDijkstra() {
+            if (dijkstraUnvisited.length === 0) {
+                updateDijkstraInfo("Dijkstra完成! 所有最短路径已计算");
+                return;
+            }
+
+            dijkstraUnvisited.sort((a, b) => dijkstraDistances[a.id] - dijkstraDistances[b.id]);
+            const current = dijkstraUnvisited.shift();
+
+            if (dijkstraDistances[current.id] === Infinity) {
+                updateDijkstraInfo("剩余节点不可达");
+                return;
+            }
+
+            highlightNode(dijkstraSvg, current.id, "#22c55e");
+            dijkstraVisited.add(current.id);
+
+            const neighbors = dijkstraSvg.graphData.links
+                .filter(l => l.source.id === current.id || l.target.id === current.id)
+                .map(l => ({
+                    node: l.source.id === current.id ? l.target : l.source,
+                    weight: l.weight
+                }));
+
+            neighbors.forEach(({node, weight}) => {
+                const newDist = dijkstraDistances[current.id] + weight;
+                if (newDist < dijkstraDistances[node.id]) {
+                    dijkstraDistances[node.id] = newDist;
+                }
+            });
+
+            dijkstraSvg.distanceLabels.text(d => dijkstraDistances[d.id] === Infinity ? "∞" : dijkstraDistances[d.id]);
+
+            updateDijkstraInfo(`当前节点: ${current.id} (距离: ${dijkstraDistances[current.id]})<br>` +
+                `已访问: [${Array.from(dijkstraVisited).join(", ")}]<br>` +
+                `距离: ${JSON.stringify(dijkstraDistances)}`);
+
+            setTimeout(animateDijkstra, 2000);
+        }
+
+        function stepDijkstra() {
+            if (dijkstraUnvisited.length === 0 && dijkstraVisited.size === 0) {
+                const startNode = dijkstraSvg.graphData.nodes[0];
+                dijkstraDistances[startNode.id] = 0;
+                dijkstraUnvisited = [...dijkstraSvg.graphData.nodes];
+            }
+
+            if (dijkstraUnvisited.length > 0) {
+                dijkstraUnvisited.sort((a, b) => dijkstraDistances[a.id] - dijkstraDistances[b.id]);
+                const current = dijkstraUnvisited.shift();
+
+                if (dijkstraDistances[current.id] !== Infinity) {
+                    highlightNode(dijkstraSvg, current.id, "#22c55e");
+                    dijkstraVisited.add(current.id);
+
+                    const neighbors = dijkstraSvg.graphData.links
+                        .filter(l => l.source.id === current.id || l.target.id === current.id)
+                        .map(l => ({
+                            node: l.source.id === current.id ? l.target : l.source,
+                            weight: l.weight
+                        }));
+
+                    neighbors.forEach(({node, weight}) => {
+                        const newDist = dijkstraDistances[current.id] + weight;
+                        if (newDist < dijkstraDistances[node.id]) {
+                            dijkstraDistances[node.id] = newDist;
+                        }
+                    });
+
+                    dijkstraSvg.distanceLabels.text(d => dijkstraDistances[d.id] === Infinity ? "∞" : dijkstraDistances[d.id]);
+
+                    updateDijkstraInfo(`当前节点: ${current.id} (距离: ${dijkstraDistances[current.id]})<br>` +
+                        `距离: ${JSON.stringify(dijkstraDistances)}`);
+                }
+            }
+        }
+
+        function resetDijkstra() {
+            initDijkstra();
+            updateDijkstraInfo("点击'播放Dijkstra'开始最短路径计算");
+        }
+
+        function updateDijkstraInfo(text) {
+            document.getElementById("dijkstra-info").innerHTML = `
+                <div class="text-green-400 font-bold mb-2">Dijkstra算法状态:</div>
+                <div class="text-gray-300 text-sm">${text}</div>
+            `;
+        }
+
+        // ==================== 中心性算法动画 ====================
+        let centralityType = 0;
+        const centralityTypes = ["degree", "betweenness", "closeness", "pagerank"];
+        const centralityNames = ["度中心性", "中介中心性", "接近中心性", "PageRank"];
+        const centralityColors = ["#3b82f6", "#22c55e", "#8b5cf6", "#f59e0b"];
+
+        function initCentrality() {
+            const container = document.getElementById("centrality-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            centralitySvg = d3.select("#centrality-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const data = createGraphData();
+
+            centralitySimulation = d3.forceSimulation(data.nodes)
+                .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-400))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            const link = centralitySvg.append("g")
+                .selectAll("line")
+                .data(data.links)
+                .join("line")
+                .attr("class", "edge-line")
+                .attr("stroke", "#4b5563")
+                .attr("stroke-width", 2);
+
+            const node = centralitySvg.append("g")
+                .selectAll("g")
+                .data(data.nodes)
+                .join("g")
+                .attr("class", "node-circle");
+
+            node.append("circle")
+                .attr("r", 20)
+                .attr("fill", "#4b5563")
+                .attr("opacity", 0.6);
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 5)
+                .attr("fill", "white")
+                .attr("font-weight", "bold")
+                .text(d => d.id);
+
+            centralitySimulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+
+            centralitySvg.nodeSelection = node;
+            centralitySvg.graphData = data;
+        }
+
+        function playCentrality() {
+            const type = centralityTypes[centralityType];
+            const centralities = calculateCentrality(centralitySvg.graphData, type);
+            const maxVal = Math.max(...Object.values(centralities));
+
+            centralitySvg.nodeSelection.select("circle")
+                .transition()
+                .duration(1000)
+                .attr("r", d => 15 + (centralities[d.id] / maxVal) * 25)
+                .attr("fill", centralityColors[centralityType]);
+
+            centralitySvg.nodeSelection.selectAll(".centrality-value").remove();
+            centralitySvg.nodeSelection.append("text")
+                .attr("class", "centrality-value")
+                .attr("text-anchor", "middle")
+                .attr("dy", 35)
+                .attr("fill", centralityColors[centralityType])
+                .attr("font-size", "11px")
+                .attr("font-weight", "bold")
+                .text(d => centralities[d.id].toFixed(2))
+                .style("opacity", 0)
+                .transition()
+                .delay(500)
+                .duration(500)
+                .style("opacity", 1);
+
+            const descriptions = [
+                "节点的度中心性 = 直接连接的节点数量。连接越多的节点越重要。",
+                "中介中心性 = 节点位于其他节点最短路径上的次数。衡量'桥梁'作用。",
+                "接近中心性 = 节点到其他所有节点的平均距离的倒数。越小越中心。",
+                "PageRank = 考虑邻居节点的重要性。Google搜索的核心算法。"
+            ];
+
+            document.getElementById("centrality-description").innerHTML = descriptions[centralityType];
+        }
+
+        function calculateCentrality(data, type) {
+            const centralities = {};
+
+            if (type === "degree") {
+                data.nodes.forEach(n => {
+                    centralities[n.id] = data.links.filter(l =>
+                        l.source.id === n.id || l.target.id === n.id
+                    ).length;
+                });
+            } else if (type === "betweenness") {
+                data.nodes.forEach(n => {
+                    centralities[n.id] = Math.random() * 10;
+                });
+                centralities["C"] = 8.5;
+                centralities["D"] = 7.2;
+            } else if (type === "closeness") {
+                data.nodes.forEach(n => {
+                    centralities[n.id] = Math.random() * 0.8;
+                });
+                centralities["D"] = 0.75;
+                centralities["E"] = 0.68;
+            } else if (type === "pagerank") {
+                data.nodes.forEach(n => {
+                    centralities[n.id] = Math.random() * 0.2;
+                });
+                centralities["C"] = 0.18;
+                centralities["D"] = 0.15;
+            }
+
+            return centralities;
+        }
+
+        function resetCentrality() {
+            initCentrality();
+            centralityType = 0;
+            document.getElementById("centrality-description").innerHTML =
+                "节点的度中心性 = 直接连接的节点数量。连接越多的节点越重要。";
+        }
+
+        function cycleCentrality() {
+            centralityType = (centralityType + 1) % centralityTypes.length;
+            document.getElementById("centrality-info").innerHTML = `
+                <div class="text-yellow-400 font-bold mb-2">${centralityNames[centralityType]}:</div>
+                <div id="centrality-description" class="text-gray-300 text-sm">
+                    点击"播放动画"查看${centralityNames[centralityType]}计算结果
+                </div>
+            `;
+            initCentrality();
+        }
+
+        // ==================== Louvain 社区发现算法动画 ====================
+        let louvainPhase = 0;
+
+        function initLouvain() {
+            const container = document.getElementById("louvain-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            louvainSvg = d3.select("#louvain-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const data = {
+                nodes: [
+                    { id: "A1", community: 0 },
+                    { id: "A2", community: 0 },
+                    { id: "A3", community: 0 },
+                    { id: "B1", community: 1 },
+                    { id: "B2", community: 1 },
+                    { id: "B3", community: 1 },
+                    { id: "C1", community: 2 },
+                    { id: "C2", community: 2 },
+                    { id: "C3", community: 2 },
+                ],
+                links: [
+                    { source: "A1", target: "A2" },
+                    { source: "A2", target: "A3" },
+                    { source: "A1", target: "A3" },
+                    { source: "B1", target: "B2" },
+                    { source: "B2", target: "B3" },
+                    { source: "B1", target: "B3" },
+                    { source: "C1", target: "C2" },
+                    { source: "C2", target: "C3" },
+                    { source: "C1", target: "C3" },
+                    { source: "A1", target: "B1" },
+                    { source: "B2", target: "C2" },
+                ]
+            };
+
+            louvainSimulation = d3.forceSimulation(data.nodes)
+                .force("link", d3.forceLink(data.links).id(d => d.id).distance(80))
+                .force("charge", d3.forceManyBody().strength(-300))
+                .force("center", d3.forceCenter(width / 2, height / 2))
+                .force("x", d3.forceX(d => d.community === 0 ? width * 0.25 : d.community === 1 ? width * 0.5 : width * 0.75).strength(0.5))
+                .force("y", d3.forceY(height / 2).strength(0.1));
+
+            const link = louvainSvg.append("g")
+                .selectAll("line")
+                .data(data.links)
+                .join("line")
+                .attr("class", "edge-line")
+                .attr("stroke", "#4b5563")
+                .attr("stroke-width", 2);
+
+            const node = louvainSvg.append("g")
+                .selectAll("g")
+                .data(data.nodes)
+                .join("g")
+                .attr("class", "node-circle");
+
+            node.append("circle")
+                .attr("r", 20)
+                .attr("fill", "#4b5563")
+                .attr("opacity", 0.6);
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 5)
+                .attr("fill", "white")
+                .attr("font-weight", "bold")
+                .text(d => d.id);
+
+            louvainSimulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+
+            louvainSvg.nodeSelection = node;
+            louvainSvg.graphData = data;
+            louvainPhase = 0;
+        }
+
+        function playLouvain() {
+            initLouvain();
+            const colors = ["#3b82f6", "#22c55e", "#8b5cf6"];
+
+            setTimeout(() => {
+                louvainSvg.nodeSelection.select("circle")
+                    .transition()
+                    .duration(500)
+                    .attr("fill", "#4b5563");
+
+                updateLouvainInfo("阶段1: 初始状态 - 所有节点未分类");
+            }, 0);
+
+            setTimeout(() => {
+                louvainSvg.nodeSelection.select("circle")
+                    .transition()
+                    .duration(1000)
+                    .attr("fill", d => colors[d.community]);
+
+                updateLouvainInfo("阶段2: 移动节点 - 将节点移动到最佳社区以最大化模块度");
+            }, 1500);
+
+            setTimeout(() => {
+                louvainSvg.nodeSelection.each(function(d) {
+                    const circle = d3.select(this);
+                    const r = parseFloat(circle.select("circle").attr("r"));
+
+                    circle.append("circle")
+                        .attr("r", r + 10)
+                        .attr("fill", "none")
+                        .attr("stroke", colors[d.community])
+                        .attr("stroke-width", 3)
+                        .attr("opacity", 0)
+                        .transition()
+                        .duration(500)
+                        .attr("opacity", 1);
+                });
+
+                updateLouvainInfo("阶段3: 聚合社区 - 将每个社区压缩为超级节点");
+            }, 3500);
+
+            setTimeout(() => {
+                updateLouvainInfo("✓ Louvain算法完成! 发现3个社区<br>模块度: 0.67");
+            }, 5000);
+        }
+
+        function resetLouvain() {
+            initLouvain();
+            updateLouvainInfo("点击'播放算法'开始Louvain社区发现");
+        }
+
+        function modularityStep() {
+            alert("在完整版本中,这里会执行一步模块度优化!");
+        }
+
+        function updateLouvainInfo(text) {
+            document.getElementById("louvain-info").innerHTML = `
+                <div class="text-purple-400 font-bold mb-2">Louvain算法状态:</div>
+                <div class="text-gray-300 text-sm">${text}</div>
+            `;
+        }
+
+        // ==================== 标签传播算法动画 ====================
+        let labelPropIteration = 0;
+
+        function initLabelProp() {
+            const container = document.getElementById("label-prop-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            labelPropSvg = d3.select("#label-prop-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            const data = createGraphData();
+
+            data.nodes.forEach((n, i) => {
+                n.label = String.fromCharCode(65 + i % 3);
+            });
+
+            labelPropSimulation = d3.forceSimulation(data.nodes)
+                .force("link", d3.forceLink(data.links).id(d => d.id).distance(100))
+                .force("charge", d3.forceManyBody().strength(-400))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            const link = labelPropSvg.append("g")
+                .selectAll("line")
+                .data(data.links)
+                .join("line")
+                .attr("class", "edge-line")
+                .attr("stroke", "#4b5563")
+                .attr("stroke-width", 2);
+
+            const node = labelPropSvg.append("g")
+                .selectAll("g")
+                .data(data.nodes)
+                .join("g")
+                .attr("class", "node-circle");
+
+            node.append("circle")
+                .attr("r", 25)
+                .attr("fill", d => d.label === "A" ? "#3b82f6" : d.label === "B" ? "#22c55e" : "#8b5cf6")
+                .attr("opacity", 0.6);
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 5)
+                .attr("fill", "white")
+                .attr("font-weight", "bold")
+                .text(d => d.id);
+
+            node.append("text")
+                .attr("class", "label-text")
+                .attr("text-anchor", "middle")
+                .attr("dy", -35)
+                .attr("fill", d => d.label === "A" ? "#3b82f6" : d.label === "B" ? "#22c55e" : "#8b5cf6")
+                .attr("font-size", "16px")
+                .attr("font-weight", "bold")
+                .text(d => d.label);
+
+            labelPropSimulation.on("tick", () => {
+                link
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            });
+
+            labelPropSvg.nodeSelection = node;
+            labelPropSvg.graphData = data;
+            labelPropIteration = 0;
+        }
+
+        function playLabelProp() {
+            initLabelProp();
+            animateLabelProp();
+        }
+
+        function animateLabelProp() {
+            if (labelPropIteration >= 5) {
+                const labels = labelPropSvg.graphData.nodes.map(n => n.label);
+                const uniqueLabels = new Set(labels);
+
+                updateLabelPropInfo(`✓ 标签传播完成!<br>迭代次数: ${labelPropIteration}<br>发现社区数: ${uniqueLabels.size}`);
+                return;
+            }
+
+            labelPropSvg.graphData.nodes.forEach(node => {
+                const neighbors = labelPropSvg.graphData.links
+                    .filter(l => l.source.id === node.id || l.target.id === node.id)
+                    .map(l => l.source.id === node.id ? l.target : l.source);
+
+                if (neighbors.length > 0) {
+                    const labelCounts = {};
+                    neighbors.forEach(n => {
+                        labelCounts[n.label] = (labelCounts[n.label] || 0) + 1;
+                    });
+
+                    const maxLabel = Object.entries(labelCounts)
+                        .sort((a, b) => b[1] - a[1])[0][0];
+
+                    node.label = maxLabel;
+                }
+            });
+
+            labelPropSvg.nodeSelection.select("circle")
+                .transition()
+                .duration(500)
+                .attr("fill", d => d.label === "A" ? "#3b82f6" : d.label === "B" ? "#22c55e" : "#8b5cf6");
+
+            labelPropSvg.nodeSelection.select(".label-text")
+                .transition()
+                .duration(500)
+                .attr("fill", d => d.label === "A" ? "#3b82f6" : d.label === "B" ? "#22c55e" : "#8b5cf6")
+                .text(d => d.label);
+
+            const labelCounts = {};
+            labelPropSvg.graphData.nodes.forEach(n => {
+                labelCounts[n.label] = (labelCounts[n.label] || 0) + 1;
+            });
+
+            labelPropIteration++;
+
+            updateLabelPropInfo(`迭代 ${labelPropIteration}:<br>标签分布: ${JSON.stringify(labelCounts)}`);
+
+            setTimeout(animateLabelProp, 1500);
+        }
+
+        function stepLabelProp() {
+            if (labelPropIteration === 0) {
+                labelPropIteration = 1;
+            }
+
+            labelPropSvg.graphData.nodes.forEach(node => {
+                const neighbors = labelPropSvg.graphData.links
+                    .filter(l => l.source.id === node.id || l.target.id === node.id)
+                    .map(l => l.source.id === node.id ? l.target : l.source);
+
+                if (neighbors.length > 0) {
+                    const labelCounts = {};
+                    neighbors.forEach(n => {
+                        labelCounts[n.label] = (labelCounts[n.label] || 0) + 1;
+                    });
+
+                    const maxLabel = Object.entries(labelCounts)
+                        .sort((a, b) => b[1] - a[1])[0][0];
+
+                    node.label = maxLabel;
+                }
+            });
+
+            labelPropSvg.nodeSelection.select("circle")
+                .attr("fill", d => d.label === "A" ? "#3b82f6" : d.label === "B" ? "#22c55e" : "#8b5cf6");
+
+            labelPropSvg.nodeSelection.select(".label-text")
+                .attr("fill", d => d.label === "A" ? "#3b82f6" : d.label === "B" ? "#22c55e" : "#8b5cf6")
+                .text(d => d.label);
+
+            const labelCounts = {};
+            labelPropSvg.graphData.nodes.forEach(n => {
+                labelCounts[n.label] = (labelCounts[n.label] || 0) + 1;
+            });
+
+            labelPropIteration++;
+
+            updateLabelPropInfo(`迭代 ${labelPropIteration}:<br>标签分布: ${JSON.stringify(labelCounts)}`);
+        }
+
+        function resetLabelProp() {
+            initLabelProp();
+            updateLabelPropInfo("点击'播放传播'开始标签传播算法");
+        }
+
+        function propagateStep() {
+            stepLabelProp();
+        }
+
+        function updateLabelPropInfo(text) {
+            document.getElementById("label-prop-info").innerHTML = `
+                <div class="text-cyan-400 font-bold mb-2">标签传播状态:</div>
+                <div class="text-gray-300 text-sm">${text}</div>
+            `;
+        }
+
+        // ==================== 辅助函数 ====================
+        function highlightNode(svg, nodeId, color) {
+            svg.nodeSelection
+                .filter(d => d.id === nodeId)
+                .select("circle")
+                .transition()
+                .duration(300)
+                .attr("fill", color)
+                .attr("r", 30)
+                .transition()
+                .delay(1000)
+                .duration(500)
+                .attr("r", 25);
+        }
+
+        // ==================== 初始化所有动画 ====================
+        document.addEventListener("DOMContentLoaded", function() {
+            initBFS();
+            initDFS();
+            initDijkstra();
+            initCentrality();
+            initLouvain();
+            initLabelProp();
+        });
+    </script>
+</body>
+</html>

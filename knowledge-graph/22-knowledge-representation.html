@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块22: 知识表示与语义网基础 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subsection-title {
+            font-size: 1.8em;
+            margin: 30px 0 20px 0;
+            color: #60a5fa;
+        }
+
+        /* DIKW Pyramid Animation */
+        .pyramid-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 40px auto;
+            position: relative;
+        }
+
+        .pyramid-level {
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .pyramid-level:hover {
+            transform: translateX(10px);
+            filter: brightness(1.2);
+        }
+
+        .pyramid-level.active {
+            filter: brightness(1.3);
+            box-shadow: 0 0 20px currentColor;
+        }
+
+        .pyramid-info {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 10px;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .pyramid-info.show {
+            display: block;
+            opacity: 1;
+        }
+
+        /* Reasoning Chain Animation */
+        .reasoning-container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 40px auto;
+        }
+
+        .reasoning-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 40px 0;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .reasoning-step {
+            flex: 1;
+            min-width: 200px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .reasoning-step:hover {
+            border-color: rgba(74, 222, 128, 0.5);
+            transform: translateY(-5px);
+        }
+
+        .reasoning-step.active {
+            border-color: #4ade80;
+            background: rgba(74, 222, 128, 0.1);
+        }
+
+        .reasoning-arrow {
+            font-size: 2em;
+            color: #60a5fa;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .code-block pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            color: #e2e8f0;
+        }
+
+        .keyword { color: #c792ea; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .function { color: #82aaff; }
+        .number { color: #f78c6c; }
+        .builtin { color: #ffcb6b; }
+
+        .example-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .example-title {
+            color: #22c55e;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .comparison-table th {
+            background: rgba(59, 130, 246, 0.2);
+            font-weight: 600;
+        }
+
+        .comparison-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Animation controls */
+        .animation-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 8px;
+            color: #60a5fa;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .control-btn:hover {
+            background: rgba(59, 130, 246, 0.3);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body class="text-white">
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <a href="21-graph-theory.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一模块
+                </a>
+                <a href="23-graph-modeling.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 22 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 22: 知识表示与语义网基础
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">理解知识表示理论和W3C语义网标准体系</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">入门级别</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~50 分钟</span>
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">2 个动画演示</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: What is Knowledge Representation -->
+        <div class="glass-card">
+            <h2 class="section-title">1. 什么是知识表示</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">DIKW 模型</h3>
+                <p class="text-gray-300 mb-4 leading-relaxed">
+                    DIKW 模型描述了数据、信息、知识和智慧之间的关系和层次结构：
+                </p>
+            </div>
+
+            <!-- Animation 1: DIKW Pyramid -->
+            <div class="pyramid-container">
+                <h3 class="text-2xl font-bold text-center mb-6 text-green-400">互动：DIKW 金字塔</h3>
+                <p class="text-center text-gray-400 mb-6">点击各层查看详细说明</p>
+                <svg id="dikw-pyramid" width="100%" viewBox="0 0 600 400"></svg>
+                <div class="animation-controls">
+                    <button class="control-btn" onclick="animateDIKW()">播放动画</button>
+                    <button class="control-btn" onclick="resetDIKW()">重置</button>
+                </div>
+            </div>
+
+            <div class="concept-card mt-8">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">声明式知识 vs 过程式知识</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>✅ <strong>声明式知识</strong>："是什么"（事实、规则、概念）</li>
+                    <li>✅ <strong>过程式知识</strong>："怎么做"（技能、方法、程序）</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Chapter 2: Knowledge Representation Methods -->
+        <div class="glass-card">
+            <h2 class="section-title">2. 知识表示方法</h2>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="concept-card">
+                    <h4 class="font-bold text-blue-300 mb-3">逻辑表示法</h4>
+                    <p class="text-gray-300 text-sm mb-2">
+                        使用形式逻辑表示知识，适合推理
+                    </p>
+                    <div class="code-block">
+                        <pre><code><span class="comment">// 一阶逻辑示例</span>
+<span class="keyword">∀</span>x (Human(x) <span class="keyword">→</span> Mortal(x))
+<span class="comment">"所有人类都是凡人"</span>
+
+<span class="keyword">∃</span> s (Socrates(x) <span class="keyword">∧</span> Human(s))
+<span class="comment">"苏格拉底是人类"</span>
+
+<span class="comment">// 推理</span>
+<span class="keyword">∴</span> Mortal(s)
+<span class="comment">"所以苏格拉底是凡人"</span></code></pre>
+                    </div>
+                </div>
+
+                <div class="concept-card">
+                    <h4 class="font-bold text-green-300 mb-3">语义网络</h4>
+                    <p class="text-gray-300 text-sm mb-2">
+                        用图结构表示概念之间的关系
+                    </p>
+                    <div class="code-block">
+                        <pre><code><span class="comment"># 语义网络示例</span>
+[人类] <span class="string">--是--></span> [哺乳动物]
+[苏格拉底] <span class="string">--实例--></span> [人类]
+[苏格拉底] <span class="string">--老师--></span> [柏拉图]
+
+<span class="comment"># 节点表示概念，边表示关系</span></code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">知识表示方法对比</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>方法</th>
+                            <th>优点</th>
+                            <th>缺点</th>
+                            <th>应用场景</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>一阶逻辑</td>
+                            <td>表达能力强大、可推理</td>
+                            <td>计算复杂度高</td>
+                            <td>数学证明、专家系统</td>
+                        </tr>
+                        <tr>
+                            <td>产生式规则</td>
+                            <td>直观、易于实现</td>
+                            <td>难以维护</td>
+                            <td>专家系统</td>
+                        </tr>
+                        <tr>
+                            <td>语义网络</td>
+                            <td>直观、易理解</td>
+                            <td>缺少严格语义</td>
+                            <td>自然语言理解</td>
+                        </tr>
+                        <tr>
+                            <td>框架</td>
+                            <td>结构化、模块化</td>
+                            <td>灵活性差</td>
+                            <td>知识图谱</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Chapter 3: Reasoning -->
+        <div class="glass-card">
+            <h2 class="section-title">3. 推理基础</h2>
+
+            <p class="text-gray-300 mb-6 leading-relaxed">
+                推理是从已知知识得出新知识的过程。理解不同类型的推理对掌握知识图谱至关重要。
+            </p>
+
+            <!-- Animation 2: Reasoning Chain -->
+            <div class="reasoning-container">
+                <h3 class="text-2xl font-bold text-center mb-6 text-green-400">互动：推理类型演示</h3>
+
+                <div class="mb-6">
+                    <label class="block text-gray-300 mb-2">选择推理类型：</label>
+                    <select id="reasoning-type" onchange="showReasoningType()" class="bg-gray-800 text-white px-4 py-2 rounded-lg border border-gray-600">
+                        <option value="deductive">演绎推理 (Deductive)</option>
+                        <option value="inductive">归纳推理 (Inductive)</option>
+                        <option value="abductive">溯因推理 (Abductive)</option>
+                    </select>
+                </div>
+
+                <div id="reasoning-display" class="reasoning-steps">
+                    <!-- Dynamic content -->
+                </div>
+
+                <div id="reasoning-result" class="example-box" style="display: none;">
+                    <div class="example-title">推理结果</div>
+                    <div id="reasoning-result-content"></div>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 mt-8">
+                <div class="concept-card">
+                    <h4 class="font-bold text-purple-300 mb-3">前向链 vs 后向链</h4>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>✅ <strong>前向链</strong>：从事实出发 → 应用规则 → 达到目标</li>
+                        <li>✅ <strong>后向链</strong>：从目标出发 → 反向查找规则 → 匹配事实</li>
+                    </ul>
+                </div>
+                <div class="concept-card">
+                    <h4 class="font-bold text-pink-300 mb-3">推理在知识图谱中的作用</h4>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>• 推断隐含关系</li>
+                        <li>• 发现新知识</li>
+                        <li>• 验证数据一致性</li>
+                        <li>• 问答和查询</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: W3C Semantic Web Standards -->
+        <div class="glass-card">
+            <h2 class="section-title">4. W3C语义网标准体系</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">💡 从概念到标准: 为什么需要W3C?</h3>
+
+                <div class="bg-red-500/10 p-4 rounded-lg border-l-4 border-red-500 mb-4">
+                    <div class="text-red-400 font-bold mb-2">❓ 问题: 我们在21模块学过知识图谱的核心概念</div>
+                    <div class="text-gray-300 leading-relaxed">
+                        在模块21中,你已经了解了:<br>
+                        • <strong>实体</strong>: 如"埃隆·马斯克"、"特斯拉"<br>
+                        • <strong>关系</strong>: 如"CEO_of"、"founder_of"<br>
+                        • <strong>三元组</strong>: (马斯克, CEO_of, 特斯拉)<br>
+                        • <strong>属性</strong>: 如马斯克的出生日期<br>
+                        <br>
+                        <span class="text-red-300 font-bold">→ 但这些都是"抽象概念",计算机怎么存储和交换这些数据?</span>
+                    </div>
+                </div>
+
+                <div class="bg-green-500/10 p-4 rounded-lg border-l-4 border-green-500 mb-4">
+                    <div class="text-green-400 font-bold mb-2">✅ 答案: W3C标准 = 知识图谱的"文件格式"</div>
+                    <div class="text-gray-300 leading-relaxed">
+                        <span class="font-bold text-green-300">类比1: 文档</span><br>
+                        • 概念: "写一篇文章"<br>
+                        • 标准: <strong>Word .docx / Markdown .md</strong> (文件格式)<br>
+                        <br>
+                        <span class="font-bold text-green-300">类比2: 网页</span><br>
+                        • 概念: "展示文字和图片"<br>
+                        • 标准: <strong>HTML</strong> (超文本标记语言)<br>
+                        <br>
+                        <span class="font-bold text-green-300">类比3: 知识图谱</span><br>
+                        • 概念: "实体、关系、三元组"<br>
+                        • 标准: <strong>RDF、OWL、SPARQL</strong> (W3C语义网标准)<br>
+                        <br>
+                        <span class="text-green-300 font-bold">→ 就像HTML让不同浏览器能显示同一网页,W3C标准让不同系统能共享同一知识图谱!</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-purple-300 mb-3">🔗 核心概念 → W3C标准 的映射关系</h3>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-blue-500/10 p-4 rounded-lg border border-blue-500/30">
+                        <div class="text-blue-400 font-bold mb-3">你在21模块学过的概念</div>
+                        <ul class="text-gray-300 text-sm space-y-2">
+                            <li>🏷️ <strong>实体</strong>: 具体的对象</li>
+                            <li>🔗 <strong>关系</strong>: 实体间的连接</li>
+                            <li>⚡ <strong>三元组</strong>: (主语, 谓语, 宾语)</li>
+                            <li>📊 <strong>属性</strong>: 实体的特征</li>
+                            <li>🏗️ <strong>本体</strong>: 类的定义和约束</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-purple-500/10 p-4 rounded-lg border border-purple-500/30">
+                        <div class="text-purple-400 font-bold mb-3">W3C提供的标准</div>
+                        <ul class="text-gray-300 text-sm space-y-2">
+                            <li>🏷️ <strong>URI</strong>: 实体的唯一标识符(如身份证号)</li>
+                            <li>🔗 <strong>RDF</strong>: 标准化的三元组表示法</li>
+                            <li>⚡ <strong>RDF/XML, Turtle, JSON-LD</strong>: 三元组的文件格式</li>
+                            <li>📊 <strong>RDF Schema</strong>: 属性的定义(如:姓名是字符串)</li>
+                            <li>🏗️ <strong>OWL</strong>: 本体语言,定义类和约束</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="example-box mt-4">
+                    <div class="example-title">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292c.3-.921 1.603-.921 1.902 0z"/>
+                        </svg>
+                        具体例子: "马斯克是特斯拉CEO" 如何用W3C标准表示?
+                    </div>
+                    <div class="text-gray-300 text-sm">
+                        <div class="mb-3">
+                            <span class="text-blue-400 font-bold">你在21模块理解的:</span><br>
+                            实体: 马斯克、特斯拉<br>
+                            关系: CEO_of<br>
+                            三元组: (马斯克, CEO_of, 特斯拉)
+                        </div>
+
+                        <div class="mb-3">
+                            <span class="text-purple-400 font-bold">用W3C标准(RDF)表示:</span><br>
+                            <div class="bg-black/30 p-3 rounded font-mono text-xs mt-2">
+                                <span class="text-green-400">@prefix</span> ex: &lt;http://example.org/&gt;.<br><br>
+                                <span class="text-blue-400">ex:Musk</span> <span class="text-purple-400">ex:CEO_of</span> <span class="text-pink-400">ex:Tesla</span> .<br><br>
+                                <span class="text-gray-500"># 计算机看到的标准格式:</span><br>
+                                <span class="text-gray-400">&lt;http://example.org/Musk&gt;</span><br>
+                                &nbsp;&nbsp;<span class="text-purple-400">&lt;http://example.org/CEO_of&gt;</span><br>
+                                &nbsp;&nbsp;<span class="text-pink-400">&lt;http://example.org/Tesla&gt;</span> .
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-500/10 p-3 rounded border-l-4 border-yellow-500">
+                            <div class="text-yellow-300 font-bold mb-2">🎯 关键理解</div>
+                            <ul class="text-gray-300 space-y-1 text-xs">
+                                <li>• <strong>URI</strong>: http://example.org/Musk = 实体的"身份证号"</li>
+                                <li>• <strong>RDF</strong>: "主语 谓语 宾语 ." = 标准的三元组语法</li>
+                                <li>• <strong>好处</strong>: 任何国家的公司都能用这个格式交换数据!</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">📚 语义网技术栈: 5层架构</h3>
+                <p class="text-gray-400 text-sm mb-4">从底层到上层,每一层都解决一个核心问题:</p>
+
+                <div class="space-y-3">
+                    <div class="bg-pink-500/10 p-4 rounded-lg border-l-4 border-pink-500">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="bg-pink-500 text-white px-3 py-1 rounded-full text-sm font-bold">UNICODE</span>
+                            <span class="text-pink-300 font-bold">第0层: 字符编码</span>
+                        </div>
+                        <p class="text-gray-300 text-sm mb-2">✅ 解决问题: "计算机怎么显示中文?"</p>
+                        <p class="text-gray-400 text-xs">统一字符编码,支持多语言,是所有层的基础</p>
+                    </div>
+
+                    <div class="bg-purple-500/10 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="bg-purple-500 text-white px-3 py-1 rounded-full text-sm font-bold">URI</span>
+                            <span class="text-purple-300 font-bold">第1层: 统一资源标识符</span>
+                        </div>
+                        <p class="text-gray-300 text-sm mb-2">✅ 解决问题: "怎么唯一标识一个实体?" (对应21模块的"实体")</p>
+                        <p class="text-gray-400 text-xs">给每个实体一个唯一的"身份证号",例如: http://www.wikidata.org/entity/Q42 (代表"道格拉斯·亚当斯")</p>
+                    </div>
+
+                    <div class="bg-blue-500/10 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="bg-blue-500 text-white px-3 py-1 rounded-full text-sm font-bold">RDF</span>
+                            <span class="text-blue-300 font-bold">第2层: 资源描述框架</span>
+                        </div>
+                        <p class="text-gray-300 text-sm mb-2">✅ 解决问题: "怎么表示三元组?" (对应21模块的"三元组")</p>
+                        <p class="text-gray-400 text-xs">
+                            <strong>三元组</strong>的标准格式: (主语, 谓语, 宾语)<br>
+                            提供多种序列化格式: RDF/XML, Turtle, JSON-LD<br>
+                            <span class="text-gray-500">→ 详细内容见模块24: RDF和语义网基础</span>
+                        </p>
+                    </div>
+
+                    <div class="bg-green-500/10 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold">RDFS / OWL</span>
+                            <span class="text-green-300 font-bold">第3层: 本体语言</span>
+                        </div>
+                        <p class="text-gray-300 text-sm mb-2">✅ 解决问题: "怎么定义类和约束?" (对应21模块的"本体")</p>
+                        <p class="text-gray-400 text-xs">
+                            定义<strong>类、属性、约束</strong>,让机器可以推理<br>
+                            例如: "CEO是Person的子类"、"一个人只能有一个出生日期"<br>
+                            <span class="text-gray-500">→ 详细内容见模块25: 本体和语义建模</span>
+                        </p>
+                    </div>
+
+                    <div class="bg-yellow-500/10 p-4 rounded-lg border-l-4 border-yellow-500">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-bold">SPARQL</span>
+                            <span class="text-yellow-300 font-bold">第4层: 查询语言</span>
+                        </div>
+                        <p class="text-gray-300 text-sm mb-2">✅ 解决问题: "怎么查询知识图谱?"</p>
+                        <p class="text-gray-400 text-xs">
+                            类似SQL的图查询语言,用于检索和操作RDF数据<br>
+                            <span class="text-gray-500">→ 详细内容见模块27: SPARQL和知识图谱查询</span>
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-box mt-6">
+                <div class="example-title">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292c.3-.921 1.603-.921 1.902 0z"/>
+                    </svg>
+                    标准的核心价值
+                </div>
+                <ul class="text-gray-300 space-y-2">
+                    <li>✅ <strong>互操作性</strong>: 不同系统的知识图谱可以交换数据(如:公司A的KG + 公司B的KG = 融合知识)</li>
+                    <li>✅ <strong>可推理</strong>: 基于形式化语义,机器可以自动推理(如:从"马斯克是特斯拉CEO"推断"马斯克在公司工作")</li>
+                    <li>✅ <strong>可扩展</strong>: 本体可以不断扩展,不会破坏现有数据(如:添加新的实体类型不影响旧数据)</li>
+                    <li>✅ <strong>开放性</strong>: 基于开放标准,避免厂商锁定(如:不会被某个图数据库厂商绑定)</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Chapter 5: 从理论到实践 -->
+        <div class="glass-card">
+            <h2 class="section-title">5. 知识表示的演进: 从逻辑网络到语义网</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">演进历程</h3>
+                <div class="space-y-4">
+                    <div class="bg-blue-500/10 p-4 rounded-lg border-l-4 border-blue-500">
+                        <h4 class="font-bold text-blue-300 mb-2">1970s: 语义网络</h4>
+                        <p class="text-gray-300 text-sm">
+                            用图表示概念关系,但缺少严格语义,难以推理
+                        </p>
+                    </div>
+
+                    <div class="bg-purple-500/10 p-4 rounded-lg border-l-4 border-purple-500">
+                        <h4 class="font-bold text-purple-300 mb-2">1990s: 描述逻辑 (DL)</h4>
+                        <p class="text-gray-300 text-sm">
+                            形式化逻辑,支持自动推理,但过于复杂
+                        </p>
+                    </div>
+
+                    <div class="bg-green-500/10 p-4 rounded-lg border-l-4 border-green-500">
+                        <h4 class="font-bold text-green-300 mb-2">2000s: RDF + OWL (W3C标准)</h4>
+                        <p class="text-gray-300 text-sm">
+                            <strong>平衡</strong>: 表达力 + 推理能力 + 实用性<br>
+                            <span class="text-green-300 font-bold">→ 知识图谱的技术基础!</span>
+                        </p>
+                    </div>
+
+                    <div class="bg-pink-500/10 p-4 rounded-lg border-l-4 border-pink-500">
+                        <h4 class="font-bold text-pink-300 mb-2">2012+: 知识图谱</h4>
+                        <p class="text-gray-300 text-sm">
+                            Google Knowledge Graph,大规模应用语义网技术
+                        </p>
+                    </div>
+
+                    <div class="bg-yellow-500/10 p-4 rounded-lg border-l-4 border-yellow-500">
+                        <h4 class="font-bold text-yellow-300 mb-2">2022+: GraphRAG (KG + LLM)</h4>
+                        <p class="text-gray-300 text-sm">
+                            知识图谱 + 大语言模型,结合符号推理和神经网络
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">为什么知识图谱选择RDF/OWL?</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-red-400 mb-2">传统知识表示的问题</div>
+                        <ul class="text-gray-300 text-sm space-y-2">
+                            <li>❌ 一阶逻辑: 推理太慢,难以大规模应用</li>
+                            <li>❌ 语义网络: 缺少形式化语义,无法自动推理</li>
+                            <li>❌ 关系数据库: 多跳JOIN性能差,难以表示复杂关系</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">RDF/OWL的优势</div>
+                        <ul class="text-gray-300 text-sm space-y-2">
+                            <li>✅ <strong>标准化</strong>: W3C国际标准,工具生态丰富</li>
+                            <li>✅ <strong>可推理</strong>: 基于描述逻辑,支持自动推理</li>
+                            <li>✅ <strong>图模型</strong>: 原生支持复杂关系查询</li>
+                            <li>✅ <strong>可扩展</strong>: 分布式RDF存储,支持PB级数据</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="example-box mt-6">
+                <div class="example-title">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292c.3-.921 1.603-.921 1.902 0z"/>
+                    </svg>
+                    关键要点
+                </div>
+                <p class="text-gray-300 leading-relaxed">
+                    知识图谱不是凭空出现的,而是<strong>知识表示理论</strong>和<strong>W3C语义网标准</strong>结合的产物。
+                    它继承了<strong>语义网络的直观性</strong>、<strong>逻辑的推理能力</strong>、<strong>图的查询效率</strong>,
+                    形成了一套<strong>实用化、标准化、可扩展</strong>的知识表示体系。
+                </p>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="glass-card">
+            <h2 class="section-title">模块总结</h2>
+            <div class="space-y-4">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-400 mb-3">核心要点</h3>
+                    <ul class="text-gray-300 space-y-2">
+                        <li>✅ <strong>DIKW模型</strong>: 数据→信息→知识→智慧的层次</li>
+                        <li>✅ <strong>知识表示方法</strong>: 逻辑、语义网络、框架、描述逻辑</li>
+                        <li>✅ <strong>推理类型</strong>: 演绎、归纳、溯因</li>
+                        <li>✅ <strong>W3C标准栈</strong>: URI + RDF + RDFS/OWL + SPARQL</li>
+                        <li>✅ <strong>语义网架构</strong>: 从字符编码到查询语言的5层结构</li>
+                        <li>✅ <strong>演进历程</strong>: 语义网络 → 描述逻辑 → RDF/OWL → 知识图谱 → GraphRAG</li>
+                    </ul>
+                </div>
+
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-400 mb-3">下一步学习</h3>
+                    <p class="text-gray-300 mb-3">
+                        完成本模块后,建议继续学习:
+                    </p>
+                    <div class="space-y-2">
+                        <a href="24-rdf-basics.html" class="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-2">
+                            模块 24: RDF和语义网基础 (深入理解三元组和RDF标准)
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                            </svg>
+                        </a>
+                        <br>
+                        <a href="25-ontology-modeling.html" class="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-2">
+                            模块 25: 本体和语义建模 (学习OWL和本体设计)
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 22: 知识表示与语义网基础</p>
+        </div>
+    </div>
+
+    <script>
+        // DIKW Pyramid Animation
+        let pyramidAnimationId = null;
+        let currentLevel = 0;
+
+        function createDIKWPyramid() {
+            const svg = d3.select("#dikw-pyramid");
+            svg.selectAll("*").remove();
+
+            const width = 600;
+            const height = 400;
+
+            // 从下往上: Data(最底层) → Information → Knowledge → Wisdom(最顶层)
+            const levels = [
+                { name: "数据", nameEn: "Data", color: "#22c55e", y: 280, width: 450, height: 55,
+                  info: "原始事实和观察结果，未经处理",
+                  example: "温度计显示: 25°C, 湿度90%" },
+                { name: "信息", nameEn: "Information", color: "#3b82f6", y: 215, width: 340, height: 55,
+                  info: "经过处理、有组织、有意义的数据",
+                  example: "今天天气: 高温高湿,降水概率80%" },
+                { name: "知识", nameEn: "Knowledge", color: "#8b5cf6", y: 150, width: 230, height: 55,
+                  info: "从信息中总结出的规律、规则和经验",
+                  example: "高温高湿→很可能下雨,需要带伞" },
+                { name: "智慧", nameEn: "Wisdom", color: "#f472b6", y: 85, width: 120, height: 55,
+                  info: "运用知识做出正确判断和决策",
+                  example: "虽然预报有雨,但看窗外晴朗→不带伞" }
+            ];
+
+            // 添加箭头指示"向上"
+            svg.append("defs").append("marker")
+                .attr("id", "arrowhead")
+                .attr("viewBox", "0 0 10 10")
+                .attr("refX", 5)
+                .attr("refY", 5)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                .attr("fill", "#94a3b8");
+
+            // 绘制向上箭头
+            const arrowX = 520;
+            svg.append("line")
+                .attr("x1", arrowX)
+                .attr("y1", 330)
+                .attr("x2", arrowX)
+                .attr("y2", 50)
+                .attr("stroke", "#94a3b8")
+                .attr("stroke-width", 3)
+                .attr("stroke-dasharray", "5,5")
+                .attr("marker-end", "url(#arrowhead)");
+
+            svg.append("text")
+                .attr("x", arrowX + 15)
+                .attr("y", 190)
+                .attr("fill", "#94a3b8")
+                .attr("font-size", "14px")
+                .attr("font-weight", "bold")
+                .text("价值提升");
+
+            // Create pyramid from bottom to top
+            levels.forEach((level, i) => {
+                const group = svg.append("g")
+                    .attr("class", "pyramid-level")
+                    .attr("data-level", i)
+                    .style("cursor", "pointer")
+                    .on("click", function() {
+                        showLevelInfo(i);
+                    });
+
+                // Trapezoid shape (倒梯形,下宽上窄)
+                const points = `
+                    ${(width - level.width) / 2},${level.y}
+                    ${(width + level.width) / 2},${level.y}
+                    ${(width + level.width * 0.75) / 2},${level.y + level.height}
+                    ${(width - level.width * 0.75) / 2},${level.y + level.height}
+                `;
+
+                group.append("polygon")
+                    .attr("points", points)
+                    .attr("fill", level.color)
+                    .attr("opacity", 0.25)
+                    .attr("stroke", level.color)
+                    .attr("stroke-width", 2)
+                    .attr("class", "pyramid-shape");
+
+                // 中文标签
+                group.append("text")
+                    .attr("x", width / 2)
+                    .attr("y", level.y + 25)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "white")
+                    .attr("font-size", "16px")
+                    .attr("font-weight", "bold")
+                    .text(level.name);
+
+                // 英文标签
+                group.append("text")
+                    .attr("x", width / 2)
+                    .attr("y", level.y + 42)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "rgba(255,255,255,0.7)")
+                    .attr("font-size", "11px")
+                    .text(level.nameEn);
+            });
+        }
+
+        function showLevelInfo(levelIndex) {
+            const levels = [
+                {
+                    name: "数据 (Data)",
+                    color: "#22c55e",
+                    description: "原始的事实、数字和符号，未经处理，没有上下文。",
+                    example: "温度计读数: 25°C\n湿度计读数: 90%\n气压: 1013hPa",
+                    transformation: "处理: 收集、整理、分类"
+                },
+                {
+                    name: "信息 (Information)",
+                    color: "#3b82f6",
+                    description: "经过处理的数据，有了上下文和意义，可以回答'谁、什么、哪里、何时'。",
+                    example: "今天天气: 高温高湿\n降水概率: 80%\n天气预报: 可能有阵雨",
+                    transformation: "处理: 分析、关联、解释"
+                },
+                {
+                    name: "知识 (Knowledge)",
+                    color: "#8b5cf6",
+                    description: "从信息中总结的规律、规则和经验，可以回答'如何、为什么'。",
+                    example: "经验规则: 高温+高湿=很可能下雨\n知识: 下雨天需要带伞\n规律: 夏季午后常有雷阵雨",
+                    transformation: "处理: 归纳、总结、建模"
+                },
+                {
+                    name: "智慧 (Wisdom)",
+                    color: "#f472b6",
+                    description: "运用知识做出正确判断和决策，考虑未来和不确定性。",
+                    example: "决策: 虽然预报有雨,\n但看窗外云层很薄,\n且只是短途出行→不带伞",
+                    transformation: "应用: 判断、决策、预测"
+                }
+            ];
+
+            // Remove existing info
+            d3.selectAll(".pyramid-info").remove();
+
+            const level = levels[levelIndex];
+            const info = d3.select(".pyramid-container")
+                .append("div")
+                .attr("class", "pyramid-info show");
+
+            info.html(`
+                <div style="border-left: 4px solid ${level.color}; padding-left: 15px;">
+                    <h4 style="color: ${level.color}; font-weight: bold; margin-bottom: 10px; font-size: 1.2em;">${level.name}</h4>
+                    <p class="text-gray-300 mb-3">${level.description}</p>
+                    <div class="bg-black/30 p-3 rounded mb-3">
+                        <div class="text-sm text-gray-400 mb-1">💡 例子:</div>
+                        <div class="text-sm text-white" style="white-space: pre-line;">${level.example}</div>
+                    </div>
+                    <div class="text-sm" style="color: ${level.color}">⬆️ ${level.transformation}</div>
+                </div>
+            `);
+        }
+
+        function getLevelColor(level) {
+            const colors = ["#22c55e", "#3b82f6", "#8b5cf6", "#f472b6"];
+            return colors[level];
+        }
+
+        function animateDIKW() {
+            currentLevel = 0;
+            createDIKWPyramid();
+
+            function highlightNext() {
+                if (currentLevel >= 4) {
+                    setTimeout(() => {
+                        d3.selectAll(".pyramid-info").remove();
+                    }, 3000);
+                    return;
+                }
+
+                // 高亮当前层,同时保持下层高亮(展示累积效果)
+                d3.selectAll(".pyramid-level")
+                    .transition()
+                    .duration(500)
+                    .style("opacity", (d, i) => i <= currentLevel ? 1 : 0.25);
+
+                // 高亮当前层的边框
+                d3.selectAll(".pyramid-shape")
+                    .transition()
+                    .duration(500)
+                    .attr("stroke-width", (d, i) => i === currentLevel ? 4 : 2);
+
+                showLevelInfo(currentLevel);
+
+                // 添加说明文字
+                if (currentLevel === 0) {
+                    setTimeout(() => {
+                        d3.selectAll(".pyramid-info").append("div")
+                            .style("margin-top", "15px")
+                            .style("padding", "10px")
+                            .style("background", "rgba(34, 197, 94, 0.2)")
+                            .style("border-radius", "8px")
+                            .html(`<div class="text-green-400 font-bold">📍 起点: 从原始数据开始</div>`);
+                    }, 300);
+                }
+
+                currentLevel++;
+                setTimeout(highlightNext, 2500);
+            }
+
+            highlightNext();
+        }
+
+        function resetDIKW() {
+            d3.selectAll(".pyramid-info").remove();
+            createDIKWPyramid();
+        }
+
+        // Reasoning Animation
+        const reasoningExamples = {
+            deductive: {
+                name: "演绎推理 (从一般到特殊)",
+                steps: [
+                    { title: "大前提", content: "所有人都是凡人" },
+                    { title: "小前提", content: "苏格拉底是人" },
+                    { title: "推理", content: "↓ 应用规则" },
+                    { title: "结论", content: "苏格拉底是凡人" }
+                ],
+                description: "演绎推理从一般性原理出发，应用到具体案例，得出必然结论。"
+            },
+            inductive: {
+                name: "归纳推理 (从特殊到一般)",
+                steps: [
+                    { title: "观察1", content: "天鹅1是白色的" },
+                    { title: "观察2", content: "天鹅2是白色的" },
+                    { title: "观察n", content: "..." },
+                    { title: "结论", content: "所有天鹅都是白色的" }
+                ],
+                description: "归纳推理从具体观察出发，总结出一般性规律（概率性结论）。"
+            },
+            abductive: {
+                name: "溯因推理 (最佳解释)",
+                steps: [
+                    { title: "现象", content: "草地是湿的" },
+                    { title: "假设1", content: "下雨了?" },
+                    { title: "假设2", content: "洒水车经过?" },
+                    { title: "结论", content: "最可能: 下雨了" }
+                ],
+                description: "溯因推理从现象出发，寻找最佳解释（用于诊断、侦探）。"
+            }
+        };
+
+        function showReasoningType() {
+            const type = document.getElementById("reasoning-type").value;
+            const example = reasoningExamples[type];
+
+            const display = document.getElementById("reasoning-display");
+            display.innerHTML = "";
+
+            example.steps.forEach((step, index) => {
+                const stepDiv = document.createElement("div");
+                stepDiv.className = "reasoning-step";
+                stepDiv.innerHTML = `
+                    <div class="text-sm text-gray-400 mb-2">${step.title}</div>
+                    <div class="font-bold">${step.content}</div>
+                `;
+
+                if (index < example.steps.length - 1) {
+                    const arrow = document.createElement("div");
+                    arrow.className = "reasoning-arrow";
+                    arrow.innerHTML = "→";
+                    display.appendChild(stepDiv);
+                    display.appendChild(arrow);
+                } else {
+                    display.appendChild(stepDiv);
+                }
+            });
+
+            // Show description
+            const resultDiv = document.getElementById("reasoning-result");
+            resultDiv.style.display = "block";
+            document.getElementById("reasoning-result-content").innerHTML = `
+                <p class="text-gray-300 mb-2"><strong>${example.name}</strong></p>
+                <p class="text-gray-400 text-sm">${example.description}</p>
+            `;
+
+            // Animate
+            animateSteps();
+        }
+
+        function animateSteps() {
+            const steps = document.querySelectorAll(".reasoning-step");
+            steps.forEach((step, index) => {
+                step.style.opacity = "0";
+                step.style.transform = "translateY(20px)";
+
+                setTimeout(() => {
+                    step.style.transition = "all 0.5s ease-out";
+                    step.style.opacity = "1";
+                    step.style.transform = "translateY(0)";
+                }, index * 400);
+            });
+        }
+
+        // Initialize
+        document.addEventListener("DOMContentLoaded", function() {
+            createDIKWPyramid();
+            showReasoningType();
+        });
+    </script>
+</body>
+</html>

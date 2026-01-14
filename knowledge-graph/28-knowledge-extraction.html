@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块28: 知识抽取与构建 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .animation-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            overflow-x: auto;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .ner-highlight {
+            display: inline;
+            padding: 2px 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .ner-highlight:hover {
+            filter: brightness(1.2);
+            transform: scale(1.05);
+        }
+
+        .ner-person { background: rgba(59, 130, 246, 0.3); border-bottom: 2px solid #3b82f6; }
+        .ner-location { background: rgba(34, 197, 94, 0.3); border-bottom: 2px solid #22c55e; }
+        .ner-organization { background: rgba(139, 92, 246, 0.3); border-bottom: 2px solid #8b5cf6; }
+        .ner-date { background: rgba(245, 158, 11, 0.3); border-bottom: 2px solid #f59e0b; }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2em;
+            }
+            .glass-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <a href="27-sparql.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一模块
+                </a>
+                <a href="29-graph-algorithms.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 28 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 28: 知识抽取与构建
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">从非结构化文本中自动抽取知识并构建知识图谱</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">中级级别</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~100 分钟</span>
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">6 个交互演示</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: 信息抽取流程 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. 信息抽取流程</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是信息抽取?</h3>
+                <p class="text-gray-300 leading-relaxed text-lg mb-3">
+                    <strong>信息抽取</strong> (Information Extraction) 是从<strong>非结构化文本</strong>中自动提取
+                    <strong>结构化知识</strong>的技术，是知识图谱构建的核心环节。
+                </p>
+                <p class="text-gray-400">
+                    通过信息抽取，我们可以从新闻、论文、网页等文本中识别实体、关系和事件，并将其转化为知识图谱中的三元组。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">信息抽取的主要任务</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="font-bold text-blue-400 mb-2">命名实体识别 (NER)</div>
+                        <p class="text-gray-300 text-sm">识别人名、地名、机构名等实体</p>
+                        <div class="mt-2 text-xs text-gray-400">例: "埃隆·马斯克" → PER</div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2">关系抽取 (RE)</div>
+                        <p class="text-gray-300 text-sm">识别实体之间的语义关系</p>
+                        <div class="mt-2 text-xs text-gray-400">例: "马斯克创立了SpaceX" → founder_of</div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2">事件抽取 (EE)</div>
+                        <p class="text-gray-300 text-sm">识别特定类型的事件及参与者</p>
+                        <div class="mt-2 text-xs text-gray-400">例: "特斯拉发布新车" → 产品发布事件</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    动画: 信息抽取完整流程
+                </div>
+                <div id="extraction-flow-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playExtractionFlow()">▶ 播放流程</button>
+                    <button class="btn btn-secondary" onclick="resetExtractionFlow()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="showNextStep()">→ 下一步</button>
+                </div>
+                <div id="extraction-flow-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">当前步骤:</div>
+                    <div id="extraction-flow-description" class="text-gray-300">
+                        点击"播放流程"查看信息抽取的完整流程
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: NLP 工具展示 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. NLP 工具展示</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">常用的 NLP 工具库</h3>
+                <p class="text-gray-300 leading-relaxed">
+                    信息抽取严重依赖自然语言处理(NLP)技术，以下是最常用的工具库。
+                </p>
+            </div>
+
+            <div class="space-y-4">
+                <!-- spaCy -->
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-3xl">🦀</div>
+                        <div>
+                            <h4 class="text-lg font-bold text-blue-400">spaCy</h4>
+                            <p class="text-gray-400 text-sm">工业级NLP库，支持多语言</p>
+                        </div>
+                    </div>
+                    <div class="code-block text-sm">
+                        <div class="text-gray-500"># 安装: pip install spacy</div>
+                        <div class="text-gray-500"># 下载中文模型: python -m spacy download zh_core_web_sm</div>
+                        <div class="mt-2"></div>
+                        <div class="text-green-400">import spacy</div>
+                        <div class="text-green-400">nlp = spacy.load("zh_core_web_sm")</div>
+                        <div class="text-green-400">doc = nlp("埃隆·马斯克创立了特斯拉公司")</div>
+                        <div class="text-green-400">for ent in doc.ents:</div>
+                        <div class="text-green-400 ml-4">print(ent.text, ent.label_)</div>
+                        <div class="text-gray-400"># 输出: 埃隆·马斯克 PERSON, 特斯拉 ORG</div>
+                    </div>
+                </div>
+
+                <!-- Transformers -->
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-3xl">🤗</div>
+                        <div>
+                            <h4 class="text-lg font-bold text-green-400">Transformers (Hugging Face)</h4>
+                            <p class="text-gray-400 text-sm">预训练模型库，BERT等</p>
+                        </div>
+                    </div>
+                    <div class="code-block text-sm">
+                        <div class="text-gray-500"># 安装: pip install transformers</div>
+                        <div class="mt-2"></div>
+                        <div class="text-green-400">from transformers import pipeline</div>
+                        <div class="text-green-400">ner = pipeline("ner", aggregation_strategy="simple")</div>
+                        <div class="text-green-400">results = ner("埃隆·马斯克在2003年创立了特斯拉")</div>
+                        <div class="text-green-400">print(results)</div>
+                        <div class="text-gray-400"># 输出: [{'entity_group': 'PER', 'score': 0.99, 'word': '埃隆·马斯克', ...}]</div>
+                    </div>
+                </div>
+
+                <!-- HanLP -->
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-3xl">🔥</div>
+                        <div>
+                            <h4 class="text-lg font-bold text-purple-400">HanLP</h4>
+                            <p class="text-gray-400 text-sm">中文NLP工具包</p>
+                        </div>
+                    </div>
+                    <div class="code-block text-sm">
+                        <div class="text-gray-500"># 安装: pip install hanlp</div>
+                        <div class="mt-2"></div>
+                        <div class="text-green-400">from hanlp import HanLP</div>
+                        <div class="text-green-400">result = HanLP("埃隆·马斯克创立了特斯拉", tasks='ner')</div>
+                        <div class="text-green-400">print(result['ner'])</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 3: 命名实体识别 (NER) -->
+        <div class="glass-card">
+            <h2 class="section-title">3. 命名实体识别 (NER)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是 NER?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>命名实体识别</strong> (Named Entity Recognition) 是从文本中识别并分类<strong>命名实体</strong>的任务。
+                </p>
+                <p class="text-gray-400">
+                    常见的实体类型包括：人物(PER)、地点(LOC)、组织(ORG)、时间(TIME)、数字(NUM)等。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                    </svg>
+                    交互式 NER 标注演示
+                </div>
+                <div id="ner-demo" class="bg-black/30 p-6 rounded-lg min-h-[150px]">
+                    <p class="text-lg leading-relaxed" id="ner-text">
+                        <span class="ner-highlight ner-person" onclick="showEntityInfo(this, 'PERSON', '人物')">埃隆·马斯克</span>
+                        在
+                        <span class="ner-highlight ner-date" onclick="showEntityInfo(this, 'DATE', '日期')">2003年</span>
+                        创立了
+                        <span class="ner-highlight ner-organization" onclick="showEntityInfo(this, 'ORG', '组织')">特斯拉公司</span>
+                        ，该公司位于
+                        <span class="ner-highlight ner-location" onclick="showEntityInfo(this, 'LOCATION', '地点')">美国加利福尼亚州</span>
+                        。
+                    </p>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="highlightEntities()">▶ 高亮实体</button>
+                    <button class="btn btn-secondary" onclick="loadNewText()">🔄 换一段文本</button>
+                    <button class="btn btn-secondary" onclick="extractTriples()">→ 提取三元组</button>
+                </div>
+                <div id="ner-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">实体类型说明:</div>
+                    <div class="text-sm text-gray-300">
+                        点击文本中的高亮实体查看详细信息
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-4">
+                <h3 class="text-xl font-bold text-green-300 mb-3">NER 的主要方法</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">基于规则的方法</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 使用词典和正则表达式</li>
+                            <li>• 优点: 准确率高，可解释性强</li>
+                            <li>• 缺点: 覆盖率低，维护成本高</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">基于深度学习的方法</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 使用BERT、BiLSTM-CRF等模型</li>
+                            <li>• 优点: 泛化能力强，端到端训练</li>
+                            <li>• 缺点: 需要大量标注数据</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 实体链接和消歧 -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 实体链接和消歧</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是实体链接?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>实体链接</strong> (Entity Linking) 是将文本中识别的实体映射到<strong>知识库中的唯一实体</strong>的过程。
+                </p>
+                <p class="text-gray-400">
+                    <strong>实体消歧</strong> (Entity Disambiguation) 是解决同名实体的歧义问题，例如"苹果"是指水果还是公司。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                    </svg>
+                    动画: 实体链接过程
+                </div>
+                <div id="entity-linking-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playEntityLinking()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="resetEntityLinking()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="showDisambiguation()">❓ 显示消歧</button>
+                </div>
+                <div id="entity-linking-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">实体链接说明:</div>
+                    <div id="entity-linking-description" class="text-gray-300">
+                        点击"播放动画"查看实体如何链接到知识库
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-4">
+                <h3 class="text-xl font-bold text-green-300 mb-3">实体链接的挑战</h3>
+                <ul class="text-gray-300 space-y-2 text-sm">
+                    <li>🔍 <strong>歧义性</strong>: 同名不同实体（如"苹果"）</li>
+                    <li>🆕 <strong>新实体</strong>: 知识库中不存在的实体</li>
+                    <li>📝 <strong>变体</strong>: 同一实体的不同表述（如"马斯克"、"Elon Musk"）</li>
+                    <li>🌐 <strong>跨语言</strong>: 多语言实体链接</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Chapter 5: 知识图谱构建流程 -->
+        <div class="glass-card">
+            <h2 class="section-title">5. 知识图谱构建流程</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">完整的构建流程</h3>
+                <p class="text-gray-300 leading-relaxed">
+                    从零开始构建一个知识图谱需要经过多个步骤，每一步都有其独特的技术挑战。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    动画: 知识图谱构建分步骤流程
+                </div>
+                <div id="kg-build-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playKGBuildFlow()">▶ 播放构建流程</button>
+                    <button class="btn btn-secondary" onclick="resetKGBuildFlow()">↺ 重置</button>
+                </div>
+                <div id="kg-build-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">构建步骤:</div>
+                    <div id="kg-build-description" class="text-gray-300">
+                        点击"播放构建流程"查看完整的知识图谱构建过程
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-4">
+                <h3 class="text-xl font-bold text-green-300 mb-3">构建方式对比</h3>
+                <table class="result-table text-sm">
+                    <thead>
+                        <tr>
+                            <th>方式</th>
+                            <th>优点</th>
+                            <th>缺点</th>
+                            <th>适用场景</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr>
+                            <td><strong>自顶向下</strong></td>
+                            <td>质量高，结构清晰</td>
+                            <td>成本高，灵活性差</td>
+                            <td>特定领域，高质量需求</td>
+                        </tr>
+                        <tr>
+                            <td><strong>自底向上</strong></td>
+                            <td>成本低，覆盖广</td>
+                            <td>质量参差不齐</td>
+                            <td>开放域知识图谱</td>
+                        </tr>
+                        <tr>
+                            <td><strong>混合方式</strong></td>
+                            <td>平衡质量和成本</td>
+                            <td>实现复杂</td>
+                            <td>大多数实际应用</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Chapter 6: 实际应用示例 -->
+        <div class="glass-card">
+            <h2 class="section-title">6. 实际应用示例</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">从新闻构建知识图谱</h3>
+                <p class="text-gray-300 leading-relaxed">
+                    以下是一个完整的应用示例，展示如何从新闻文本中抽取知识并构建图谱。
+                </p>
+            </div>
+
+            <div class="space-y-4">
+                <!-- 示例 1 -->
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                    <h4 class="text-lg font-bold text-blue-400 mb-2">步骤 1: 数据收集</h4>
+                    <p class="text-gray-300 text-sm mb-3">
+                        从新闻网站爬取相关文章，或使用已有的新闻数据集。
+                    </p>
+                    <div class="code-block text-sm">
+                        <div class="text-green-400">import requests</div>
+                        <div class="text-green-400">from bs4 import BeautifulSoup</div>
+                        <div class="text-green-400">url = "https://news.example.com/article/12345"</div>
+                        <div class="text-green-400">response = requests.get(url)</div>
+                        <div class="text-green-400">soup = BeautifulSoup(response.text, 'html.parser')</div>
+                        <div class="text-green-400">text = soup.find('div', class_='article-content').text</div>
+                    </div>
+                </div>
+
+                <!-- 示例 2 -->
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                    <h4 class="text-lg font-bold text-green-400 mb-2">步骤 2: 命名实体识别</h4>
+                    <p class="text-gray-300 text-sm mb-3">
+                        使用NER模型识别文本中的实体。
+                    </p>
+                    <div class="code-block text-sm">
+                        <div class="text-green-400">from transformers import pipeline</div>
+                        <div class="text-green-400">ner = pipeline("ner", aggregation_strategy="simple")</div>
+                        <div class="text-green-400">entities = ner(text)</div>
+                        <div class="text-gray-400"># 输出: [{'entity_group': 'PER', 'word': '埃隆·马斯克', ...}, ...]</div>
+                    </div>
+                </div>
+
+                <!-- 示例 3 -->
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                    <h4 class="text-lg font-bold text-purple-400 mb-2">步骤 3: 关系抽取</h4>
+                    <p class="text-gray-300 text-sm mb-3">
+                        识别实体之间的关系，形成三元组。
+                    </p>
+                    <div class="code-block text-sm">
+                        <div class="text-green-400"># 使用预训练的关系抽取模型</div>
+                        <div class="text-green-400">re_model = pipeline("relation-extraction")</div>
+                        <div class="text-green-400">triples = re_model(text)</div>
+                        <div class="text-gray-400"># 输出: [(埃隆·马斯克, CEO_of, 特斯拉), ...]</div>
+                    </div>
+                </div>
+
+                <!-- 示例 4 -->
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-yellow-500">
+                    <h4 class="text-lg font-bold text-yellow-400 mb-2">步骤 4: 实体链接</h4>
+                    <p class="text-gray-300 text-sm mb-3">
+                        将实体链接到知识库（如Wikidata）。
+                    </p>
+                    <div class="code-block text-sm">
+                        <div class="text-green-400">from requests import get</div>
+                        <div class="text-green-400">def link_entity(entity_name):</div>
+                        <div class="text-green-400 ml-4">url = f"https://www.wikidata.org/w/api.php?action=wbsearchentities&search={entity_name}&language=zh"</div>
+                        <div class="text-green-400 ml-4">response = get(url).json()</div>
+                        <div class="text-green-400 ml-4">return response['search'][0]['id'] if response['search'] else None</div>
+                    </div>
+                </div>
+
+                <!-- 示例 5 -->
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-pink-500">
+                    <h4 class="text-lg font-bold text-pink-400 mb-2">步骤 5: 存储到图数据库</h4>
+                    <p class="text-gray-300 text-sm mb-3">
+                        将三元组存储到Neo4j或其他图数据库。
+                    </p>
+                    <div class="code-block text-sm">
+                        <div class="text-green-400">from neo4j import GraphDatabase</div>
+                        <div class="text-green-400">driver = GraphDatabase.driver("bolt://localhost:7687")</div>
+                        <div class="text-green-400">with driver.session() as session:</div>
+                        <div class="text-green-400 ml-4">for subj, pred, obj in triples:</div>
+                        <div class="text-green-400 ml-8">session.run("MERGE (a:Entity {name: $subj}) MERGE (b:Entity {name: $obj}) MERGE (a)-[r:REL {type: $pred}]->(b)",</div>
+                        <div class="text-green-400 ml-12">subj=subj, pred=pred, obj=obj)</div>
+                    </div>
+                </div>
+
+                <!-- 示例 6 -->
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-cyan-500">
+                    <h4 class="text-lg font-bold text-cyan-400 mb-2">步骤 6: 知识图谱应用</h4>
+                    <p class="text-gray-300 text-sm mb-3">
+                        使用构建好的知识图谱进行查询和分析。
+                    </p>
+                    <div class="code-block text-sm">
+                        <div class="text-green-400"># 查询: 哪些公司的CEO是埃隆·马斯克?</div>
+                        <div class="text-green-400">result = session.run("MATCH (p:Person {name: '埃隆·马斯克'})-[:CEO_of]->(c:Company) RETURN c.name")</div>
+                        <div class="text-green-400">print([record["c.name"] for record in result])</div>
+                        <div class="text-gray-400"># 输出: ['特斯拉', 'SpaceX']</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="glass-card">
+            <h2 class="section-title">模块总结</h2>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-400 mb-3">核心知识点</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>📝 <strong>信息抽取</strong>: 从非结构化文本提取结构化知识</li>
+                        <li>🏷️ <strong>NER</strong>: 识别命名实体（人名、地名、机构名等）</li>
+                        <li>🔗 <strong>关系抽取</strong>: 识别实体之间的关系</li>
+                        <li>🎯 <strong>实体链接</strong>: 将实体映射到知识库</li>
+                        <li>🏗️ <strong>知识图谱构建</strong>: 从数据到图谱的完整流程</li>
+                    </ul>
+                </div>
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-400 mb-3">实践建议</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>✅ 从简单的规则方法开始，逐步转向深度学习</li>
+                        <li>✅ 使用预训练模型（如BERT）提高准确率</li>
+                        <li>✅ 重视数据质量，定期进行数据清洗</li>
+                        <li>✅ 建立人工审核机制，验证抽取结果</li>
+                        <li>✅ 持续迭代优化模型和规则</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-purple-400 mb-3">下一步学习</h3>
+                <p class="text-gray-300 mb-3">
+                    掌握了知识抽取技术后，建议继续学习:
+                </p>
+                <a href="29-graph-algorithms.html" class="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-2">
+                    模块 29: 图算法 - 学习图的遍历、最短路径、PageRank等算法
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 28: 知识抽取与构建</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 动画 1: 信息抽取流程
+        // ============================================================
+        let extractionFlowSvg;
+        let extractionStep = 0;
+        const extractionSteps = [
+            { text: "原始文本", description: "输入非结构化的新闻、论文等文本" },
+            { text: "句子分割", description: "将文本切分成句子，便于处理" },
+            { text: "词性标注", description: "标注每个词的词性（名词、动词等）" },
+            { text: "命名实体识别 (NER)", description: "识别人名、地名、机构名等实体" },
+            { text: "关系抽取", description: "识别实体之间的语义关系" },
+            { text: "实体链接", description: "将实体链接到知识库中的唯一实体" },
+            { text: "三元组生成", description: "生成 (主语, 谓语, 宾语) 三元组" },
+            { text: "知识图谱", description: "存储到图数据库，形成知识图谱" }
+        ];
+
+        function initExtractionFlowAnimation() {
+            const container = document.getElementById("extraction-flow-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            extractionFlowSvg = d3.select("#extraction-flow-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            extractionFlowSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height / 2)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#6b7280")
+                .attr("font-size", "14px")
+                .text("点击\"播放流程\"查看信息抽取的完整流程");
+        }
+
+        function playExtractionFlow() {
+            if (!extractionFlowSvg) {
+                initExtractionFlowAnimation();
+            }
+            extractionFlowSvg.selectAll("*").remove();
+            extractionStep = 0;
+
+            const width = extractionFlowSvg.attr("width");
+            const height = 400;
+
+            // 绘制流程步骤
+            const positions = [];
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const radius = 120;
+
+            extractionSteps.forEach((step, i) => {
+                const angle = (i / extractionSteps.length) * 2 * Math.PI - Math.PI / 2;
+                positions.push({
+                    x: centerX + radius * Math.cos(angle),
+                    y: centerY + radius * Math.sin(angle)
+                });
+            });
+
+            positions.forEach((pos, i) => {
+                setTimeout(() => {
+                    const g = extractionFlowSvg.append("g")
+                        .attr("transform", `translate(${pos.x}, ${pos.y})`)
+                        .style("opacity", 0);
+
+                    // 节点圆
+                    g.append("circle")
+                        .attr("r", 35)
+                        .attr("fill", i < 3 ? "#3b82f6" : i < 6 ? "#22c55e" : "#8b5cf6")
+                        .attr("opacity", 0.6);
+
+                    // 步骤编号
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", -15)
+                        .attr("fill", "white")
+                        .attr("font-size", "12px")
+                        .attr("font-weight", "bold")
+                        .text(`${i + 1}`);
+
+                    // 步骤名称
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", 5)
+                        .attr("fill", "white")
+                        .attr("font-size", "10px")
+                        .text(step.text.length > 6 ? step.text.substring(0, 6) + "..." : step.text);
+
+                    g.transition()
+                        .duration(500)
+                        .style("opacity", 1);
+
+                    // 绘制箭头到下一步
+                    if (i < positions.length - 1) {
+                        setTimeout(() => {
+                            extractionFlowSvg.insert("line", ":first-child")
+                                .attr("x1", pos.x)
+                                .attr("y1", pos.y)
+                                .attr("x2", positions[i + 1].x)
+                                .attr("y2", positions[i + 1].y)
+                                .attr("stroke", "#60a5fa")
+                                .attr("stroke-width", 2)
+                                .attr("marker-end", "url(#arrow)")
+                                .attr("opacity", 0)
+                                .transition()
+                                .duration(500)
+                                .attr("opacity", 1);
+                        }, 300);
+
+                        // 更新说明
+                        document.getElementById("extraction-flow-description").innerHTML =
+                            `<strong>步骤 ${i + 1}: ${extractionSteps[i].text}</strong><br>${extractionSteps[i].description}`;
+                    }
+
+                }, i * 1000);
+            });
+        }
+
+        function resetExtractionFlow() {
+            initExtractionFlowAnimation();
+            extractionStep = 0;
+            document.getElementById("extraction-flow-description").innerHTML = "点击\"播放流程\"查看信息抽取的完整流程";
+        }
+
+        function showNextStep() {
+            extractionStep = (extractionStep + 1) % extractionSteps.length;
+            const step = extractionSteps[extractionStep];
+            document.getElementById("extraction-flow-description").innerHTML =
+                `<strong>步骤 ${extractionStep + 1}: ${step.text}</strong><br>${step.description}`;
+        }
+
+        // ============================================================
+        // NER 交互演示
+        // ============================================================
+        function showEntityInfo(element, type, name) {
+            const infoPanel = document.getElementById("ner-info");
+            const descriptions = {
+                "PERSON": "人物: 指人名，包括真实人物和虚构人物",
+                "ORG": "组织: 指公司、机构、组织等",
+                "LOCATION": "地点: 指地理位置，包括国家、城市、地区等",
+                "DATE": "日期: 指时间、日期等时间实体"
+            };
+
+            infoPanel.innerHTML = `
+                <div class="text-${type === 'PERSON' ? 'blue' : type === 'ORG' ? 'purple' : type === 'LOCATION' ? 'green' : 'yellow'}-400 font-bold mb-2">
+                    ${name} (${type})
+                </div>
+                <div class="text-sm text-gray-300">${descriptions[type]}</div>
+            `;
+        }
+
+        function highlightEntities() {
+            alert("实体已经高亮显示！点击实体查看详细信息。");
+        }
+
+        const textOptions = [
+            `<span class="ner-highlight ner-person" onclick="showEntityInfo(this, 'PERSON', '人物')">埃隆·马斯克</span>
+             在<span class="ner-highlight ner-date" onclick="showEntityInfo(this, 'DATE', '日期')">2003年</span>创立了
+             <span class="ner-highlight ner-organization" onclick="showEntityInfo(this, 'ORG', '组织')">特斯拉公司</span>，
+             该公司位于<span class="ner-highlight ner-location" onclick="showEntityInfo(this, 'LOCATION', '地点')">美国加利福尼亚州</span>。`,
+            `<span class="ner-highlight ner-person" onclick="showEntityInfo(this, 'PERSON', '人物')">马克·扎克伯格</span>
+             在<span class="ner-highlight ner-date" onclick="showEntityInfo(this, 'DATE', '日期')">2004年</span>创立了
+             <span class="ner-highlight ner-organization" onclick="showEntityInfo(this, 'ORG', '组织')">Facebook</span>，
+             总部位于<span class="ner-highlight ner-location" onclick="showEntityInfo(this, 'LOCATION', '地点')">加利福尼亚州门洛帕克</span>。`
+        ];
+
+        let currentTextIndex = 0;
+
+        function loadNewText() {
+            currentTextIndex = (currentTextIndex + 1) % textOptions.length;
+            document.getElementById("ner-text").innerHTML = textOptions[currentTextIndex];
+            document.getElementById("ner-info").innerHTML = `
+                <div class="text-yellow-400 font-bold mb-2">实体类型说明:</div>
+                <div class="text-sm text-gray-300">点击文本中的高亮实体查看详细信息</div>
+            `;
+        }
+
+        function extractTriples() {
+            alert("在真实应用中，这里会提取三元组：(埃隆·马斯克, 创立, 特斯拉), (特斯拉, 位于, 加利福尼亚州)");
+        }
+
+        // ============================================================
+        // 动画 2: 实体链接
+        // ============================================================
+        let entityLinkingSvg;
+
+        function initEntityLinkingAnimation() {
+            const container = document.getElementById("entity-linking-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            entityLinkingSvg = d3.select("#entity-linking-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            entityLinkingSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height / 2)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#6b7280")
+                .attr("font-size", "14px")
+                .text("点击\"播放动画\"查看实体链接过程");
+        }
+
+        function playEntityLinking() {
+            if (!entityLinkingSvg) {
+                initEntityLinkingAnimation();
+            }
+            entityLinkingSvg.selectAll("*").remove();
+
+            const width = entityLinkingSvg.attr("width");
+            const height = 400;
+
+            // 文本中的实体
+            const textEntity = { name: "马斯克", x: width * 0.25, y: height / 2 };
+
+            // 知识库中的候选实体
+            const candidates = [
+                { name: "埃隆·马斯克", id: "Q317521", x: width * 0.7, y: height * 0.3, match: true },
+                { name: "金·马斯克", id: "Q2477481", x: width * 0.7, y: height * 0.5, match: false },
+                { name: "马斯克 (姓氏)", id: "Q214442", x: width * 0.7, y: height * 0.7, match: false }
+            ];
+
+            // 绘制文本实体
+            const textGroup = entityLinkingSvg.append("g")
+                .attr("transform", `translate(${textEntity.x}, ${textEntity.y})`)
+                .style("opacity", 0);
+
+            textGroup.append("circle")
+                .attr("r", 40)
+                .attr("fill", "#3b82f6")
+                .attr("opacity", 0.6);
+
+            textGroup.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 5)
+                .attr("fill", "white")
+                .attr("font-size", "12px")
+                .attr("font-weight", "bold")
+                .text(textEntity.name);
+
+            textGroup.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 60)
+                .attr("fill", "#9ca3af")
+                .attr("font-size", "10px")
+                .text("文本实体");
+
+            textGroup.transition()
+                .duration(500)
+                .style("opacity", 1);
+
+            // 绘制候选实体
+            setTimeout(() => {
+                candidates.forEach((candidate, i) => {
+                    setTimeout(() => {
+                        const g = entityLinkingSvg.append("g")
+                            .attr("transform", `translate(${candidate.x}, ${candidate.y})`)
+                            .style("opacity", 0);
+
+                        g.append("rect")
+                            .attr("x", -60)
+                            .attr("y", -25)
+                            .attr("width", 120)
+                            .attr("height", 50)
+                            .attr("rx", 8)
+                            .attr("fill", candidate.match ? "#22c55e" : "#6b7280")
+                            .attr("opacity", 0.3);
+
+                        g.append("text")
+                            .attr("text-anchor", "middle")
+                            .attr("dy", -5)
+                            .attr("fill", "white")
+                            .attr("font-size", "11px")
+                            .attr("font-weight", "bold")
+                            .text(candidate.name);
+
+                        g.append("text")
+                            .attr("text-anchor", "middle")
+                            .attr("dy", 15)
+                            .attr("fill", "#9ca3af")
+                            .attr("font-size", "9px")
+                            .text(`ID: ${candidate.id}`);
+
+                        g.transition()
+                            .duration(500)
+                            .style("opacity", 1);
+
+                        // 绘制连接线
+                        if (candidate.match) {
+                            setTimeout(() => {
+                                entityLinkingSvg.insert("line", ":first-child")
+                                    .attr("x1", textEntity.x)
+                                    .attr("y1", textEntity.y)
+                                    .attr("x2", candidate.x - 60)
+                                    .attr("y2", candidate.y)
+                                    .attr("stroke", "#22c55e")
+                                    .attr("stroke-width", 3)
+                                    .attr("stroke-dasharray", "5,5")
+                                    .attr("opacity", 0)
+                                    .transition()
+                                    .duration(500)
+                                    .attr("opacity", 1);
+
+                                document.getElementById("entity-linking-description").innerHTML =
+                                    `<strong>实体链接成功!</strong><br>文本实体 "马斯克" 链接到知识库实体 Q317521 (埃隆·马斯克)`;
+                            }, 600);
+                        }
+                    }, i * 300);
+                });
+            }, 600);
+        }
+
+        function resetEntityLinking() {
+            initEntityLinkingAnimation();
+            document.getElementById("entity-linking-description").innerHTML = "点击\"播放动画\"查看实体如何链接到知识库";
+        }
+
+        function showDisambiguation() {
+            alert("消歧示例: '苹果' 可以指水果或公司，需要根据上下文判断。在句子 '苹果发布新iPhone' 中，'苹果' 指的是 Apple 公司。");
+        }
+
+        // ============================================================
+        // 动画 3: 知识图谱构建流程
+        // ============================================================
+        let kgBuildSvg;
+
+        function initKGBuildAnimation() {
+            const container = document.getElementById("kg-build-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            kgBuildSvg = d3.select("#kg-build-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            kgBuildSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height / 2)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#6b7280")
+                .attr("font-size", "14px")
+                .text("点击\"播放构建流程\"查看完整的知识图谱构建过程");
+        }
+
+        function playKGBuildFlow() {
+            if (!kgBuildSvg) {
+                initKGBuildAnimation();
+            }
+            kgBuildSvg.selectAll("*").remove();
+
+            const width = kgBuildSvg.attr("width");
+            const height = 400;
+            const steps = [
+                { text: "1. 数据收集", x: width * 0.15, y: height * 0.3, color: "#3b82f6" },
+                { text: "2. 本体设计", x: width * 0.38, y: height * 0.3, color: "#8b5cf6" },
+                { text: "3. 信息抽取", x: width * 0.61, y: height * 0.3, color: "#22c55e" },
+                { text: "4. 知识融合", x: width * 0.84, y: height * 0.3, color: "#f59e0b" },
+                { text: "5. 质量评估", x: width * 0.27, y: height * 0.7, color: "#ec4899" },
+                { text: "6. 图谱存储", x: width * 0.5, y: height * 0.7, color: "#06b6d4" },
+                { text: "7. 应用部署", x: width * 0.73, y: height * 0.7, color: "#84cc16" }
+            ];
+
+            const descriptions = [
+                "步骤 1: 数据收集 - 从各种数据源收集文本、结构化数据等",
+                "步骤 2: 本体设计 - 定义知识图谱的模式和结构",
+                "步骤 3: 信息抽取 - 从文本中抽取实体、关系和属性",
+                "步骤 4: 知识融合 - 整合多源知识，解决冲突",
+                "步骤 5: 质量评估 - 验证知识的准确性和完整性",
+                "步骤 6: 图谱存储 - 将知识存储到图数据库",
+                "步骤 7: 应用部署 - 提供查询、推理等服务"
+            ];
+
+            steps.forEach((step, i) => {
+                setTimeout(() => {
+                    const g = kgBuildSvg.append("g")
+                        .attr("transform", `translate(${step.x}, ${step.y})`)
+                        .style("opacity", 0);
+
+                    // 节点框
+                    g.append("rect")
+                        .attr("x", -55)
+                        .attr("y", -25)
+                        .attr("width", 110)
+                        .attr("height", 50)
+                        .attr("rx", 8)
+                        .attr("fill", step.color)
+                        .attr("opacity", 0.3);
+
+                    // 文本
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", 5)
+                        .attr("fill", "white")
+                        .attr("font-size", "11px")
+                        .attr("font-weight", "bold")
+                        .text(step.text);
+
+                    g.transition()
+                        .duration(500)
+                        .style("opacity", 1);
+
+                    // 绘制箭头到下一步
+                    if (i < steps.length - 1) {
+                        setTimeout(() => {
+                            kgBuildSvg.insert("line", ":first-child")
+                                .attr("x1", step.x)
+                                .attr("y1", step.y)
+                                .attr("x2", steps[i + 1].x)
+                                .attr("y2", steps[i + 1].y)
+                                .attr("stroke", "#60a5fa")
+                                .attr("stroke-width", 2)
+                                .attr("marker-end", "url(#arrow)")
+                                .attr("opacity", 0)
+                                .transition()
+                                .duration(500)
+                                .attr("opacity", 1);
+                        }, 300);
+
+                        // 更新说明
+                        document.getElementById("kg-build-description").innerHTML = `<strong>${descriptions[i]}</strong>`;
+                    }
+
+                }, i * 1000);
+            });
+        }
+
+        function resetKGBuildFlow() {
+            initKGBuildAnimation();
+            document.getElementById("kg-build-description").innerHTML = "点击\"播放构建流程\"查看完整的知识图谱构建过程";
+        }
+
+        // ============================================================
+        // 初始化
+        // ============================================================
+        document.addEventListener("DOMContentLoaded", function() {
+            initExtractionFlowAnimation();
+            initEntityLinkingAnimation();
+            initKGBuildAnimation();
+        });
+    </script>
+</body>
+</html>

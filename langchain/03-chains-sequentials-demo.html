@@ -1,0 +1,2092 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>链的组合 - LangChain 学习 03</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 浮动光球 */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(168, 85, 247, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -30px) scale(1.1); }
+            50% { transform: translate(-20px, 20px) scale(0.9); }
+            75% { transform: translate(-30px, -20px) scale(1.05); }
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 头部 */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #0ea5e9 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(14, 165, 233, 0.3);
+        }
+
+        .header p {
+            font-size: 1.3em;
+            color: rgba(226, 232, 240, 0.8);
+        }
+
+        /* 进度条 */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #0ea5e9 0%, #3b82f6 50%, #8b5cf6 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* 场景容器 */
+        .scene {
+            display: none;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .scene.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 场景标题 */
+        .scene-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #0ea5e9 0%, #8b5cf6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 动画画布 */
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 流程图容器 */
+        .flow-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            padding: 40px;
+            flex-wrap: wrap;
+            min-height: 300px;
+        }
+
+        /* 流程节点 */
+        .flow-node {
+            background: rgba(14, 165, 233, 0.15);
+            border: 2px solid rgba(14, 165, 233, 0.4);
+            border-radius: 15px;
+            padding: 25px 30px;
+            text-align: center;
+            min-width: 160px;
+            transition: all 0.6s;
+            transform: scale(0.8);
+            opacity: 0;
+            position: relative;
+        }
+
+        .flow-node.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .flow-node:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(14, 165, 233, 0.6);
+            border-color: rgba(14, 165, 233, 0.8);
+        }
+
+        .flow-node h4 {
+            color: #0ea5e9;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .flow-node p {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.85em;
+        }
+
+        /* 流程箭头 */
+        .flow-arrow {
+            font-size: 2.5em;
+            color: #0ea5e9;
+            opacity: 0;
+            transition: all 0.6s;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .flow-arrow.visible {
+            opacity: 1;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        /* 数据流动画 */
+        .data-particle {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #0ea5e9, #8b5cf6);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(14, 165, 233, 0.9), 0 0 40px rgba(139, 92, 246, 0.6);
+            opacity: 0;
+            z-index: 100;
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+
+        .data-particle.moving {
+            opacity: 1;
+        }
+
+        .data-particle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 24px;
+            height: 24px;
+            background: radial-gradient(circle, rgba(14, 165, 233, 0.4) 0%, transparent 70%);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation: particlePulse 1s ease-in-out infinite;
+        }
+
+        @keyframes particlePulse {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+            50% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.3; }
+        }
+
+        /* 代码面板 */
+        .code-panel {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 15px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+            margin: 30px 0;
+        }
+
+        .code-panel.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .code-panel h4 {
+            padding: 20px;
+            margin: 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 1.1em;
+            color: #0ea5e9;
+        }
+
+        .code-panel pre {
+            padding: 20px;
+            margin: 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .code-panel code {
+            color: #e2e8f0;
+        }
+
+        .keyword { color: #c792ea; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .function { color: #82aaff; }
+
+        /* 高亮框 */
+        .highlight-box {
+            background: rgba(14, 165, 233, 0.15);
+            border-left: 5px solid #0ea5e9;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+            animation: slideInRight 0.8s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .highlight-box h3 {
+            color: #0ea5e9;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .highlight-box p {
+            line-height: 1.8;
+            color: rgba(226, 232, 240, 0.9);
+        }
+
+        /* 特性网格 */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .feature-item {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+        }
+
+        .feature-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-item:hover {
+            background: rgba(14, 165, 233, 0.15);
+            transform: translateY(-5px);
+        }
+
+        .feature-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .feature-item h4 {
+            color: #0ea5e9;
+            margin-bottom: 10px;
+        }
+
+        .feature-item p {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        /* 并行流程特殊样式 */
+        .parallel-container {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .parallel-branches-wrapper {
+            display: flex;
+            flex-direction: row;
+            gap: 30px;
+            justify-content: center;
+            align-items: flex-start;
+            position: relative;
+            width: 100%;
+        }
+
+        /* 连接线 - 水平线从输入分叉 */
+        .parallel-branches-wrapper::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 60px);
+            height: 3px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(14, 165, 233, 0.5) 15%,
+                rgba(168, 85, 247, 0.5) 50%,
+                rgba(236, 72, 153, 0.5) 85%,
+                transparent 100%
+            );
+        }
+
+        /* 垂直连接线到每个分支 */
+        .parallel-branch::before {
+            content: '';
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 3px;
+            height: 20px;
+            background: rgba(168, 85, 247, 0.5);
+            opacity: 0;
+            transition: opacity 0.6s;
+        }
+
+        .parallel-branch.visible::before {
+            opacity: 1;
+        }
+
+        /* 汇聚线 - 从各分支汇聚到输出 */
+        .parallel-branches-wrapper::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 60px);
+            height: 3px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                rgba(34, 197, 94, 0.5) 15%,
+                rgba(34, 197, 94, 0.5) 50%,
+                rgba(34, 197, 94, 0.5) 85%,
+                transparent 100%
+            );
+        }
+
+        .parallel-branch {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.6s;
+            position: relative;
+            min-width: 180px;
+        }
+
+        .parallel-branch.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .parallel-branches-wrapper {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .parallel-branches-wrapper::before,
+            .parallel-branches-wrapper::after {
+                width: 3px;
+                height: 20px;
+                left: 50%;
+                top: auto;
+            }
+
+            .parallel-branches-wrapper::before {
+                top: -20px;
+            }
+
+            .parallel-branches-wrapper::after {
+                bottom: -20px;
+            }
+
+            .parallel-branch::before {
+                display: none;
+            }
+        }
+
+        .parallel-branch .flow-node {
+            background: rgba(168, 85, 247, 0.15);
+            border-color: rgba(168, 85, 247, 0.4);
+        }
+
+        .parallel-branch .flow-node h4 {
+            color: #a855f7;
+        }
+
+        /* 对比容器 */
+        .comparison-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 30px 0;
+        }
+
+        .comparison-panel {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 15px;
+            padding: 30px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+        }
+
+        .comparison-panel.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .comparison-panel h4 {
+            color: #0ea5e9;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            text-align: center;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(14, 165, 233, 0.2);
+            border: 2px solid rgba(14, 165, 233, 0.5);
+            border-radius: 12px;
+            color: #0ea5e9;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(14, 165, 233, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(14, 165, 233, 0.4);
+        }
+
+        /* 针对 a 标签的导航按钮样式 */
+        .nav-btn.back-to-list {
+            text-decoration: none;
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+        }
+
+        .nav-btn.back-to-list:hover {
+            background: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 5px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-btn.next {
+            margin-left: auto;
+        }
+
+        /* 场景指示器 */
+        .scene-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 40px 0;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            background: #0ea5e9;
+            transform: scale(1.3);
+        }
+
+        .indicator:hover {
+            transform: scale(1.2);
+        }
+
+        /* 使用场景卡片 */
+        .usecase-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .usecase-card {
+            background: rgba(14, 165, 233, 0.1);
+            border-left: 5px solid #0ea5e9;
+            padding: 25px;
+            border-radius: 12px;
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+        }
+
+        .usecase-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .usecase-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(14, 165, 233, 0.3);
+        }
+
+        .usecase-card h4 {
+            color: #0ea5e9;
+            margin-bottom: 12px;
+            font-size: 1.2em;
+        }
+
+        .usecase-card p {
+            color: rgba(226, 232, 240, 0.8);
+            line-height: 1.7;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .comparison-container {
+                grid-template-columns: 1fr;
+            }
+
+            .flow-diagram {
+                flex-direction: column;
+            }
+
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    
+        /* 标准导航样式 */
+        .nav-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-card a {
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-card a:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 顶部导航卡片 */
+        .top-nav-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .top-nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .top-nav-left,
+        .top-nav-center,
+        .top-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .top-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #9ca3af;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .top-nav-link:hover {
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .top-nav-link.home {
+            color: #4ade80;
+        }
+
+        .top-nav-link.home:hover {
+            color: #86efac;
+        }
+
+        .top-nav-link svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .top-nav-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .top-nav-text {
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+
+        .top-nav-progress {
+            color: #9ca3af;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+</style>
+</head>
+<body>
+    <!-- 浮动光球 -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>    <!-- 顶部导航 - 跨模块 -->
+    <div class="top-nav-card">
+        <div class="top-nav-container">
+            <div class="top-nav-left">
+                <a href="index.html" class="top-nav-link home">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回LangChain目录
+                </a>
+            </div>
+            <div class="top-nav-center">
+                <a href="02-prompt-template-demo.html" class="top-nav-link">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一课
+                </a>
+                <div class="top-nav-divider"></div>
+                <a href="04-memory-conversation-demo.html" class="top-nav-link">
+                    下一课
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="top-nav-right">
+                <span class="top-nav-progress">课程 3 / 20</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>🔗 链的组合</h1>
+            <p>Sequential Chains - 构建强大的多步骤处理流程</p>
+        </div>
+
+        <!-- 场景 1: 为什么需要组合链 -->
+        <div class="scene active" id="scene1">
+            <h2 class="scene-title">🤔 为什么需要链的组合？</h2>
+
+            <div class="usecase-grid">
+                <div class="usecase-card" data-delay="0">
+                    <h4>📝 内容生成流程</h4>
+                    <p><strong>场景：</strong>先生成大纲，再根据大纲写完整文章<br><strong>问题：</strong>单次调用无法保证文章结构和逻辑连贯性</p>
+                </div>
+
+                <div class="usecase-card" data-delay="100">
+                    <h4>🔍 数据分析管道</h4>
+                    <p><strong>场景：</strong>提取数据 → 分析 → 生成报告<br><strong>问题：</strong>需要多个步骤，每步依赖前一步的输出</p>
+                </div>
+
+                <div class="usecase-card" data-delay="200">
+                    <h4>💬 对话式交互</h4>
+                    <p><strong>场景：</strong>理解意图 → 检索信息 → 生成回答<br><strong>问题：</strong>需要整合多个 LLM 调用和外部工具</p>
+                </div>
+
+                <div class="usecase-card" data-delay="300">
+                    <h4>🎯 多阶段推理</h4>
+                    <p><strong>场景：</strong>拆解问题 → 逐步推理 → 整合结论<br><strong>问题：</strong>复杂任务需要分步骤处理</p>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3>💡 核心痛点</h3>
+                <p>
+                    <strong>单个 LLM 调用的局限性：</strong><br><br>
+                    ❌ 无法处理复杂的多步骤任务<br>
+                    ❌ 上下文长度受限，无法一次性完成所有工作<br>
+                    ❌ 难以控制中间步骤的输出质量<br>
+                    ❌ 无法并行处理独立任务<br><br>
+                    <strong style="color: #22c55e;">✅ 解决方案：链的组合（Chains）</strong><br>
+                    将多个处理步骤串联或并联，形成强大的处理管道！
+                </p>
+            </div>
+
+            <div class="flow-diagram">
+                <div class="flow-node" data-delay="0">
+                    <h4>输入</h4>
+                    <p>原始数据</p>
+                </div>
+                <div class="flow-arrow" data-delay="200">→</div>
+                <div class="flow-node" data-delay="400">
+                    <h4>步骤 1</h4>
+                    <p>预处理/提取</p>
+                </div>
+                <div class="flow-arrow" data-delay="600">→</div>
+                <div class="flow-node" data-delay="800">
+                    <h4>步骤 2</h4>
+                    <p>分析/转换</p>
+                </div>
+                <div class="flow-arrow" data-delay="1000">→</div>
+                <div class="flow-node" data-delay="1200">
+                    <h4>步骤 3</h4>
+                    <p>生成/输出</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景 2: SequentialChain 基础 -->
+        <div class="scene" id="scene2">
+            <h2 class="scene-title">🔗 SequentialChain - 顺序链基础</h2>
+
+            <div class="canvas-container" style="position: relative;">
+                <div class="flow-diagram" id="simpleChainFlow">
+                    <div class="flow-node" data-delay="0" id="simple-node-input">
+                        <h4>📥 输入</h4>
+                        <p id="simple-input-data">{topic: "春天"}</p>
+                    </div>
+                    <div class="flow-arrow" data-delay="200" id="simple-arrow1">→</div>
+                    <div class="flow-node" data-delay="400" id="simple-node-chain1">
+                        <h4>😄 Chain 1</h4>
+                        <p id="simple-chain1-data">生成中文笑话</p>
+                    </div>
+                    <div class="flow-arrow" data-delay="600" id="simple-arrow2">→</div>
+                    <div class="flow-node" data-delay="800" id="simple-node-chain2">
+                        <h4>🌐 Chain 2</h4>
+                        <p id="simple-chain2-data">翻译成英文</p>
+                    </div>
+                    <div class="flow-arrow" data-delay="1000" id="simple-arrow3">→</div>
+                    <div class="flow-node" data-delay="1200" id="simple-node-output">
+                        <h4>✅ 输出</h4>
+                        <p id="simple-output-data">英文笑话</p>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 25px; padding: 20px; background: rgba(168, 85, 247, 0.15); border-radius: 12px; border: 2px solid rgba(168, 85, 247, 0.3);">
+                    <p id="simple-flow-description" style="font-size: 1.1em; color: rgba(226, 232, 240, 0.9); line-height: 1.7;">
+                        💡 <strong>核心概念：</strong>前一个 Chain 的输出自动成为下一个 Chain 的输入
+                    </p>
+                    <button id="playSimpleChainBtn" style="margin-top: 12px; padding: 10px 30px; background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.3)); border: 2px solid #a855f7; border-radius: 10px; color: #a855f7; font-size: 1em; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        ▶️ 演示顺序执行
+                    </button>
+                </div>
+            </div>
+
+            <div class="code-panel" data-delay="0">
+                <h4>💻 使用 LCEL 构建顺序链</h4>
+                <pre><code><span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI
+<span class="keyword">from</span> langchain_core.prompts <span class="keyword">import</span> ChatPromptTemplate
+<span class="keyword">from</span> langchain_core.output_parsers <span class="keyword">import</span> StrOutputParser
+
+<span class="comment"># 初始化 LLM</span>
+llm = ChatOpenAI(model=<span class="string">"gpt-3.5-turbo"</span>)
+
+<span class="comment"># Chain 1: 生成中文笑话</span>
+joke_prompt = ChatPromptTemplate.from_template(
+    <span class="string">"讲个关于{topic}的笑话"</span>
+)
+chain1 = joke_prompt | llm | StrOutputParser()
+
+<span class="comment"># Chain 2: 翻译成英文</span>
+<span class="comment"># 注意：{joke} 会自动接收 chain1 的输出</span>
+translate_prompt = ChatPromptTemplate.from_template(
+    <span class="string">"翻译成英文：\n\n{joke}"</span>
+)
+chain2 = translate_prompt | llm | StrOutputParser()
+
+<span class="comment"># 组合：使用 | 操作符串联两个链</span>
+combined = chain1 | chain2
+
+<span class="comment"># 执行：输入 topic，chain1 的输出自动传给 chain2</span>
+result = combined.invoke({<span class="string">"topic"</span>: <span class="string">"春天"</span>})
+<span class="comment"># 输出："Why did the flower bloom in spring? Because it wanted to be radiant!"</span></code></pre>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🎯 关键理解点</h3>
+                <p style="line-height: 1.9;">
+                    <strong>1. 数据自动传递：</strong><br>
+                    • chain1 输出笑话字符串 → 自动成为 chain2 的输入<br>
+                    • chain2 的 prompt 模板中使用 `{joke}` 引用前一个输出<br><br>
+                    <strong>2. | 操作符的作用：</strong><br>
+                    • 左边的输出 → 右边的输入<br>
+                    • 类似 Unix 管道：`cat file.txt | grep "pattern"`<br><br>
+                    <strong>3. 实际应用场景：</strong><br>
+                    ✅ 多语言翻译（中→英→日）<br>
+                    ✅ 内容生成（大纲→草稿→润色）<br>
+                    ✅ 数据处理（提取→清洗→格式化）
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-item" data-delay="0">
+                    <div class="feature-icon">🎯</div>
+                    <h4>自动传递</h4>
+                    <p>前一个链的输出自动成为下一个链的输入</p>
+                </div>
+
+                <div class="feature-item" data-delay="100">
+                    <div class="feature-icon">📝</div>
+                    <h4>简洁语法</h4>
+                    <p>使用 LCEL 的 | 操作符，代码清晰易读</p>
+                </div>
+
+                <div class="feature-item" data-delay="200">
+                    <div class="feature-icon">🔧</div>
+                    <h4>易于调试</h4>
+                    <p>每个步骤可以单独测试，降低复杂度</p>
+                </div>
+
+                <div class="feature-item" data-delay="300">
+                    <div class="feature-icon">♻️</div>
+                    <h4>可复用</h4>
+                    <p>单个 Chain 可以在多个组合中重复使用</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景 3: 链式流程可视化 -->
+        <div class="scene" id="scene3">
+            <h2 class="scene-title">📊 数据流动可视化</h2>
+
+            <div class="canvas-container">
+                <div class="flow-diagram" id="animatedFlow">
+                    <div class="flow-node" data-delay="0" id="node-input">
+                        <h4>📥 输入</h4>
+                        <p id="input-data">{topic: "AI"}</p>
+                    </div>
+                    <div class="flow-arrow" data-delay="200" id="arrow1">→</div>
+                    <div class="flow-node" data-delay="400" id="node-outline">
+                        <h4>🔄 生成大纲</h4>
+                        <p id="outline-data">Chain 1 处理中...</p>
+                    </div>
+                    <div class="flow-arrow" data-delay="600" id="arrow2">→</div>
+                    <div class="flow-node" data-delay="800" id="node-expand">
+                        <h4>📝 扩展内容</h4>
+                        <p id="expand-data">Chain 2 处理中...</p>
+                    </div>
+                    <div class="flow-arrow" data-delay="1000" id="arrow3">→</div>
+                    <div class="flow-node" data-delay="1200" id="node-output">
+                        <h4>✅ 输出文章</h4>
+                        <p id="output-data">等待数据...</p>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 30px; padding: 25px; background: rgba(14, 165, 233, 0.15); border-radius: 12px; border: 2px solid rgba(14, 165, 233, 0.3);">
+                    <p id="flow-description" style="font-size: 1.2em; color: rgba(226, 232, 240, 0.9); font-weight: 500; line-height: 1.8;">
+                        👆 点击下方按钮观看数据如何在链之间<strong style="color: #0ea5e9;">流动和转换</strong>
+                    </p>
+                    <button id="playFlowBtn" style="margin-top: 15px; padding: 12px 35px; background: linear-gradient(135deg, rgba(14, 165, 233, 0.3), rgba(139, 92, 246, 0.3)); border: 2px solid #0ea5e9; border-radius: 12px; color: #0ea5e9; font-size: 1.05em; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        ▶️ 播放数据流动动画
+                    </button>
+                </div>
+            </div>
+
+            <div class="code-panel" data-delay="0">
+                <h4>💻 完整代码示例</h4>
+                <pre><code><span class="comment"># 步骤 1: 生成大纲</span>
+outline_prompt = ChatPromptTemplate.from_template(
+    <span class="string">"为{topic}生成3个关键要点的大纲"</span>
+)
+outline_chain = outline_prompt | llm | StrOutputParser()
+
+<span class="comment"># 步骤 2: 扩展每个要点</span>
+expand_prompt = ChatPromptTemplate.from_template(
+    <span class="string">"根据大纲扩展成完整文章：\n\n{outline}"</span>
+)
+expand_chain = expand_prompt | llm | StrOutputParser()
+
+<span class="comment"># 组合：大纲 → 扩展 → 文章</span>
+article_chain = outline_chain | expand_chain
+
+<span class="comment"># 执行</span>
+article = article_chain.invoke({<span class="string">"topic"</span>: <span class="string">"AI"</span>})
+
+<span class="comment"># 数据流动：</span>
+<span class="comment"># {topic: "AI"}</span>
+<span class="comment"># → "1. 机器学习 2. 深度学习 3. 应用场景"</span>
+<span class="comment"># → "人工智能(AI)是计算机科学..."</span></code></pre>
+            </div>
+        </div>
+
+        <!-- 场景 4: RunnableParallel - 并行执行 -->
+        <div class="scene" id="scene4">
+            <h2 class="scene-title">⚡ RunnableParallel - 并行执行</h2>
+
+            <div class="canvas-container">
+                <div class="parallel-container">
+                    <!-- 输入节点 -->
+                    <div class="flow-node" data-delay="0" style="background: rgba(14, 165, 233, 0.2);">
+                        <h4>📥 输入</h4>
+                        <p>{topic: "春天"}</p>
+                    </div>
+
+                    <!-- 并行分支包装器 - 横向排列 -->
+                    <div class="parallel-branches-wrapper">
+                        <div class="parallel-branch" data-delay="200">
+                            <div class="flow-node">
+                                <h4>😂 笑话链</h4>
+                                <p>讲个笑话</p>
+                            </div>
+                        </div>
+
+                        <div class="parallel-branch" data-delay="400">
+                            <div class="flow-node">
+                                <h4>📖 故事链</h4>
+                                <p>讲个故事</p>
+                            </div>
+                        </div>
+
+                        <div class="parallel-branch" data-delay="600">
+                            <div class="flow-node">
+                                <h4>🎭 诗歌链</h4>
+                                <p>写首诗</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 输出节点 -->
+                    <div class="flow-node" data-delay="800" style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.5);">
+                        <h4>📤 输出</h4>
+                        <p>{joke, story, poem}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-panel" data-delay="0">
+                <h4>💻 并行执行多个独立的链</h4>
+                <pre><code><span class="keyword">from</span> langchain_core.runnables <span class="keyword">import</span> RunnableParallel
+
+<span class="comment"># 定义三个独立的链</span>
+joke_chain = ChatPromptTemplate.from_template(
+    <span class="string">"讲个关于{topic}的笑话"</span>
+) | llm | StrOutputParser()
+
+story_chain = ChatPromptTemplate.from_template(
+    <span class="string">"讲个关于{topic}的故事"</span>
+) | llm | StrOutputParser()
+
+poem_chain = ChatPromptTemplate.from_template(
+    <span class="string">"写首关于{topic}的诗"</span>
+) | llm | StrOutputParser()
+
+<span class="comment"># 并行执行：同时运行（而不是顺序执行）</span>
+parallel_chain = RunnableParallel(
+    joke=joke_chain,
+    story=story_chain,
+    poem=poem_chain
+)
+
+<span class="comment"># 执行：同时调用三个链，等待所有结果</span>
+result = parallel_chain.invoke({<span class="string">"topic"</span>: <span class="string">"春天"</span>})
+
+<span class="comment"># 输出：</span>
+<span class="comment"># {</span>
+<span class="comment">#   "joke": "为什么春天是花最喜欢的季节？因为它们可以绽放！",</span>
+<span class="comment">#   "story": "春天的故事...",</span>
+<span class="comment">#   "poem": "春风拂面来..."</span>
+<span class="comment"># }</span></code></pre>
+            </div>
+
+            <div class="highlight-box">
+                <h3>⚡ 性能优势</h3>
+                <p>
+                    <strong>顺序执行：</strong>3个任务，每个耗时2秒 = 总共 6 秒<br><br>
+                    <strong style="color: #22c55e;">并行执行：</strong>3个任务同时执行 = 总共 2 秒<br><br>
+                    <strong>加速比：</strong>3 倍！<br><br>
+                    <strong>何时使用并行？</strong><br>
+                    ✓ 多个独立任务，互不依赖<br>
+                    ✓ 需要同时处理多个输入<br>
+                    ✓ 想要提高执行效率
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景 5: RunnablePassthrough - 数据透传 -->
+        <div class="scene" id="scene5">
+            <h2 class="scene-title">🔄 RunnablePassthrough - 数据透传</h2>
+
+            <div class="canvas-container" style="position: relative;">
+                <div class="flow-diagram" id="passthroughFlow">
+                    <div class="flow-node" data-delay="0" id="pass-node-input">
+                        <h4>📥 输入</h4>
+                        <p id="pass-input-data">{text: "Hello world"}</p>
+                    </div>
+                    <div class="flow-arrow" data-delay="200" id="pass-arrow1">→</div>
+                    <div class="flow-node" data-delay="400" id="pass-node-split" style="background: rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.5);">
+                        <h4>🔀 数据分流</h4>
+                        <p id="pass-split-data">一分为二</p>
+                    </div>
+                    <div class="flow-arrow" data-delay="600" id="pass-arrow2">→</div>
+                    <div style="display: flex; gap: 30px;">
+                        <div class="flow-node" data-delay="800" id="pass-node-translate" style="background: rgba(236, 72, 153, 0.2); border-color: rgba(236, 72, 153, 0.5);">
+                            <h4>🌐 翻译链</h4>
+                            <p id="pass-translate-data">处理翻译</p>
+                        </div>
+                        <div class="flow-node" data-delay="800" id="pass-node-passthrough" style="background: rgba(14, 165, 233, 0.2); border-color: rgba(14, 165, 233, 0.5);">
+                            <h4>🔒 透传</h4>
+                            <p id="pass-passthrough-data">保留原文</p>
+                        </div>
+                    </div>
+                    <div class="flow-arrow" data-delay="1000" id="pass-arrow3">↓</div>
+                    <div class="flow-node" data-delay="1200" id="pass-node-merge" style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.5);">
+                        <h4>🔗 数据合并</h4>
+                        <p id="pass-merge-data">原文 + 译文</p>
+                    </div>
+                    <div class="flow-arrow" data-delay="1400" id="pass-arrow4">→</div>
+                    <div class="flow-node" data-delay="1600" id="pass-node-output">
+                        <h4>✅ 对比分析</h4>
+                        <p id="pass-output-data">生成总结</p>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 25px; padding: 20px; background: rgba(168, 85, 247, 0.15); border-radius: 12px; border: 2px solid rgba(168, 85, 247, 0.3);">
+                    <p id="pass-flow-description" style="font-size: 1.1em; color: rgba(226, 232, 240, 0.9); line-height: 1.7;">
+                        💡 <strong>核心概念：</strong>在数据处理的同时<strong style="color: #a855f7;">保留原始输入</strong>供后续使用
+                    </p>
+                    <button id="playPassthroughBtn" style="margin-top: 12px; padding: 10px 30px; background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(14, 165, 233, 0.3)); border: 2px solid #a855f7; border-radius: 10px; color: #a855f7; font-size: 1em; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        ▶️ 演示数据透传
+                    </button>
+                </div>
+            </div>
+
+            <div class="code-panel" data-delay="0">
+                <h4>💻 保留原始输入供后续使用</h4>
+                <pre><code><span class="keyword">from</span> langchain_core.runnables <span class="keyword">import</span> RunnablePassthrough
+
+<span class="comment"># 场景：翻译后还要保留原文进行对比分析</span>
+<span class="comment"># Chain 1: 翻译</span>
+translate_prompt = ChatPromptTemplate.from_template(
+    <span class="string">"翻译成中文：{text}"</span>
+)
+translate_chain = translate_prompt | llm | StrOutputParser()
+
+<span class="comment"># Chain 2: 对比分析（需要原文和译文）</span>
+summary_prompt = ChatPromptTemplate.from_template(
+    <span class="string">"分析原文和译文的差异：\n原文：{text}\n译文：{translation}"</span>
+)
+summary_chain = summary_prompt | llm | StrOutputParser()
+
+<span class="comment"># 使用 RunnablePassthrough 保留原始 text</span>
+<span class="comment"># 同时做两件事：翻译 + 保留原文</span>
+chain = {
+    <span class="string">"translation"</span>: translate_chain,    <span class="comment"># 处理翻译（消耗text）</span>
+    <span class="string">"text"</span>: RunnablePassthrough()      <span class="comment"># ⭐ 透传原文（原样保留）</span>
+} | summary_chain
+
+<span class="comment"># 执行</span>
+result = chain.invoke({<span class="string">"text"</span>: <span class="string">"Hello world"</span>})
+
+<span class="comment"># 数据流动：</span>
+<span class="comment"># {text: "Hello world"}</span>
+<span class="comment"># ↓ RunnableParallel 分支</span>
+<span class="comment"># {translation: "你好世界", text: "Hello world"}  ← Passthrough保留原文!</span>
+<span class="comment"># ↓ summary_chain 同时获得两个数据</span>
+<span class="comment"># → "原文和译文的差异分析..."</span></code></pre>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🎯 关键理解点</h3>
+                <p style="line-height: 1.9;">
+                    <strong>1. 为什么需要透传？</strong><br>
+                    • 默认情况下，数据被处理后就"消耗"掉了<br>
+                    • RunnablePassthrough 让数据"原样通过"，不丢失<br><br>
+                    <strong>2. 典型使用场景：</strong><br>
+                    • <strong>翻译 + 对比：</strong>原文 → {译文, 原文} → 对比分析<br>
+                    • <strong>提取 + 保留：</strong>长文本 → {摘要, 原文} → 详细分析<br>
+                    • <strong>处理 + 原始：</strong>代码 → {优化版, 原版} → 对比审查<br><br>
+                    <strong>3. 与 RunnableParallel 的关系：</strong><br>
+                    • RunnableParallel: 并行执行多个任务<br>
+                    • RunnablePassthrough: 在并行时保留原始数据<br>
+                    • 两者配合使用，实现"同时处理和保留"
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-item" data-delay="0">
+                    <div class="feature-icon">🔒</div>
+                    <h4>保留数据</h4>
+                    <p>在处理过程中保留原始输入，供后续步骤使用</p>
+                </div>
+
+                <div class="feature-item" data-delay="100">
+                    <div class="feature-icon">🔀</div>
+                    <h4>数据分叉</h4>
+                    <p>同时进行不同处理，但保留原始数据</p>
+                </div>
+
+                <div class="feature-item" data-delay="200">
+                    <div class="feature-icon">📊</div>
+                    <h4>对比分析</h4>
+                    <p>便于对比处理前后的差异</p>
+                </div>
+
+                <div class="feature-item" data-delay="300">
+                    <div class="feature-icon">🎯</div>
+                    <h4>灵活组合</h4>
+                    <p>与 RunnableParallel 结合使用更强大</p>
+                </div>
+            </div>
+
+            <div class="highlight-box" style="background: rgba(14, 165, 233, 0.15); border-left-color: #0ea5e9;">
+                <h3 style="color: #0ea5e9;">💡 实际应用场景</h3>
+                <p style="line-height: 2;">
+                    <strong>1. 📝 文本处理：</strong>保留原文 + 提取关键信息 + 翻译 → 综合分析<br>
+                    <strong>2. 📊 数据分析：</strong>原始数据 + 统计结果 + 可视化 → 生成报告<br>
+                    <strong>3. 💻 代码审查：</strong>原代码 + 优化建议 + 改进版本 → 对比说明<br>
+                    <strong>4. 🌐 多语言处理：</strong>原文 + 译文 + 对比分析 → 质量评估
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景 6: LCEL vs 传统方式对比 -->
+        <div class="scene" id="scene6">
+            <h2 class="scene-title">⚖️ LCEL vs 传统方式对比</h2>
+
+            <div style="text-align: center; margin-bottom: 30px; padding: 20px; background: rgba(239, 68, 68, 0.15); border-radius: 12px; border: 2px solid rgba(239, 68, 68, 0.4);">
+                <p style="font-size: 1.2em; color: rgba(226, 232, 240, 0.9); line-height: 1.8;">
+                    <strong style="color: #ef4444;">⚠️ 重要提示：</strong>传统方式已弃用，<strong style="color: #ef4444;">强烈建议使用 LCEL</strong>
+                </p>
+            </div>
+
+            <div class="comparison-container">
+                <!-- 传统方式 -->
+                <div class="comparison-panel" data-delay="0" style="border-color: rgba(239, 68, 68, 0.5); background: rgba(239, 68, 68, 0.05);">
+                    <h4 style="color: #ef4444;">❌ 传统方式 (SequentialChain)</h4>
+                    <div style="background: rgba(239, 68, 68, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                        <p style="color: #ef4444; font-size: 0.9em; font-weight: 600;">
+                            ⚠️ 已弃用 - 不推荐使用
+                        </p>
+                    </div>
+                    <pre><code><span class="keyword">from</span> langchain.chains <span class="keyword">import</span> SequentialChain
+
+<span class="comment"># 创建两个简单的链</span>
+chain1 = LLMChain(llm=llm, prompt=prompt1)
+chain2 = LLMChain(llm=llm, prompt=prompt2)
+
+<span class="comment"># 😰 痛点 1: 必须手动声明所有变量名</span>
+<span class="comment"># 😰 痛点 2: 代码冗长，容易出错</span>
+chain = SequentialChain(
+    chains=[chain1, chain2],
+    input_variables=[<span class="string">"topic"</span>],
+    output_variables=[<span class="string">"result"</span>],
+    verbose=<span class="keyword">True</span>
+)
+
+<span class="comment"># 😰 痛点 3: 变量传递不直观</span>
+<span class="comment"># 😰 痛点 4: 错误信息不清晰</span>
+result = chain.run(<span class="string">"春天"</span>)</code></pre>
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(239, 68, 68, 0.1); border-radius: 8px;">
+                        <p style="font-size: 0.9em; color: #fca5a5; line-height: 1.7;">
+                            <strong>主要问题：</strong><br>
+                            ❌ 必须显式声明 input_variables<br>
+                            ❌ 必须显式声明 output_variables<br>
+                            ❌ 变量名容易拼写错误<br>
+                            ❌ 不支持类型检查<br>
+                            ❌ 错误信息难以理解<br>
+                            ❌ 不支持流式输出<br>
+                            ❌ 代码难以维护和扩展
+                        </p>
+                    </div>
+                </div>
+
+                <!-- LCEL 方式 -->
+                <div class="comparison-panel" data-delay="300" style="border-color: rgba(34, 197, 94, 0.5); background: rgba(34, 197, 94, 0.05);">
+                    <h4 style="color: #22c55e;">✅ LCEL 方式 (推荐)</h4>
+                    <div style="background: rgba(34, 197, 94, 0.1); padding: 12px; border-radius: 8px; margin-bottom: 15px;">
+                        <p style="color: #22c55e; font-size: 0.9em; font-weight: 600;">
+                            ⭐ 官方推荐 - 现代标准
+                        </p>
+                    </div>
+                    <pre><code><span class="keyword">from</span> langchain_core.prompts <span class="keyword">import</span> ChatPromptTemplate
+<span class="keyword">from</span> langchain_core.output_parsers <span class="keyword">import</span> StrOutputParser
+
+<span class="comment"># 定义提示模板</span>
+prompt1 = ChatPromptTemplate.from_template(
+    <span class="string">"讲个关于{topic}的笑话"</span>
+)
+prompt2 = ChatPromptTemplate.from_template(
+    <span class="string">"翻译成英文：{joke}"</span>
+)
+
+<span class="comment"># 😍 优势 1: 简洁直观的管道语法</span>
+<span class="comment"># 😍 优势 2: 自动推断变量名</span>
+chain = prompt1 | llm | StrOutputParser() | prompt2 | llm
+
+<span class="comment"># 😍 优势 3: 一行代码完成复杂任务</span>
+result = chain.invoke({<span class="string">"topic"</span>: <span class="string">"春天"</span>})</code></pre>
+                    <div style="margin-top: 15px; padding: 12px; background: rgba(34, 197, 94, 0.1); border-radius: 8px;">
+                        <p style="font-size: 0.9em; color: #86efac; line-height: 1.7;">
+                            <strong>核心优势：</strong><br>
+                            ✅ 自动推断输入输出变量<br>
+                            ✅ 管道语法清晰易读<br>
+                            ✅ 类型安全<br>
+                            ✅ 原生支持流式输出<br>
+                            ✅ 同步/异步同一套 API<br>
+                            ✅ 错误信息清晰<br>
+                            ✅ 易于测试和调试<br>
+                            ✅ 支持并行和透传
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box" style="background: rgba(34, 197, 94, 0.15); border-left-color: #22c55e;">
+                <h3 style="color: #22c55e;">📊 代码量对比</h3>
+                <p style="line-height: 2.2; font-size: 1.05em;">
+                    <strong>传统方式：</strong>需要 <span style="color: #ef4444; font-size: 1.3em;">15+ 行代码</span>，声明 4+ 个变量<br>
+                    <strong>LCEL 方式：</strong>只需 <span style="color: #22c55e; font-size: 1.3em;">3 行代码</span>，自动推断一切<br>
+                    <strong>代码减少：</strong><span style="color: #22c55e; font-size: 1.2em;">🎉 减少 80%+ 的代码量</span>
+                </p>
+            </div>
+
+            <div class="highlight-box" style="background: rgba(14, 165, 233, 0.15); border-left-color: #0ea5e9;">
+                <h3 style="color: #0ea5e9;">🚀 LCEL 的六大核心优势</h3>
+                <p style="line-height: 2.1;">
+                    <strong>1. 🎨 声明式语法：</strong>使用 | 操作符，代码像 Unix 管道一样自然<br>
+                    <strong>2. 🤖 自动组合：</strong>框架自动推断输入输出，无需手动管理变量<br>
+                    <strong>3. ⚡ 流式输出：</strong>原生支持 stream()，实时获取部分结果<br>
+                    <strong>4. 🔍 易于调试：</strong>每个步骤可独立测试，错误信息清晰<br>
+                    <strong>5. 🔒 类型安全：</strong>支持 TypeScript 风格的类型提示<br>
+                    <strong>6. 🔄 同步异步：</strong>同一套代码支持 invoke() 和 ainvoke()
+                </p>
+            </div>
+
+            <div style="margin-top: 30px; padding: 25px; background: rgba(251, 191, 36, 0.15); border-radius: 15px; border: 2px solid rgba(251, 191, 36, 0.4);">
+                <h3 style="color: #fbbf24; margin-bottom: 15px;">💡 迁移建议</h3>
+                <p style="line-height: 2; font-size: 1.05em;">
+                    <strong style="color: #fbbf24;">如果你在使用旧代码：</strong><br>
+                    1. 立即停止使用 SequentialChain 和 SimpleSequentialChain<br>
+                    2. 将代码迁移到 LCEL (| 操作符)<br>
+                    3. 使用 RunnableParallel 替代并行链<br>
+                    4. 使用 RunnablePassthrough 保留数据<br><br>
+                    <strong style="color: #22c55e;">如果是新项目：</strong><br>
+                    ✅ 直接使用 LCEL，这是未来的标准！
+                </p>
+            </div>
+
+            <div class="usecase-grid">
+                <div class="usecase-card" data-delay="0" style="border-left-color: #22c55e;">
+                    <h4>🚀 推荐学习路径</h4>
+                    <p style="line-height: 1.9;">
+                        <strong>步骤 1:</strong> 掌握 LCEL 基础语法 (| 操作符)<br>
+                        <strong>步骤 2:</strong> 理解顺序链的自动传递机制<br>
+                        <strong>步骤 3:</strong> 学习 RunnableParallel 并行执行<br>
+                        <strong>步骤 4:</strong> 掌握 RunnablePassthrough 数据透传<br>
+                        <strong>步骤 5:</strong> 构建复杂的多步骤 AI 应用
+                    </p>
+                </div>
+
+                <div class="usecase-card" data-delay="200" style="border-left-color: #a855f7;">
+                    <h4>📚 下一步学习</h4>
+                    <p style="line-height: 1.9;">
+                        <strong>模块 04:</strong> Memory - 记忆管理<br>
+                        <strong>模块 05:</strong> Agents - 智能代理<br>
+                        <strong>模块 06:</strong> Tools - 工具调用<br>
+                        <strong>模块 07:</strong> RAG - 检索增强生成
+                    </p>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 40px; padding: 30px; background: rgba(14, 165, 233, 0.1); border-radius: 15px;">
+                <h3 style="color: #0ea5e9; margin-bottom: 15px; font-size: 1.5em;">🎉 恭喜完成链的组合学习！</h3>
+                <p style="font-size: 1.15em; color: rgba(226, 232, 240, 0.9); line-height: 1.8;">
+                    你已经掌握了 LangChain 的核心技能：<br>
+                    ✅ 顺序链 (Sequential Chains)<br>
+                    ✅ 并行执行 (RunnableParallel)<br>
+                    ✅ 数据透传 (RunnablePassthrough)<br><br>
+                    <strong style="color: #22c55e;">现在可以构建复杂的多步骤 AI 应用了！</strong>
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景指示器 -->
+        <div class="scene-indicators">
+            <div class="indicator active" data-scene="1"></div>
+            <div class="indicator" data-scene="2"></div>
+            <div class="indicator" data-scene="3"></div>
+            <div class="indicator" data-scene="4"></div>
+            <div class="indicator" data-scene="5"></div>
+            <div class="indicator" data-scene="6"></div>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <button class="nav-btn" id="prevBtn" disabled>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                上一节
+            </button>
+            <a href="index.html" class="nav-btn back-to-list">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                </svg>
+                课程列表
+            </a>
+            <button class="nav-btn next" id="nextBtn">
+                下一节
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 场景数据
+        const totalScenes = 6;
+        let currentScene = 1;
+
+        // DOM 元素
+        const progressBar = document.getElementById('progressBar');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const indicators = document.querySelectorAll('.indicator');
+
+        // 初始化
+        function init() {
+            updateScene();
+            setupEventListeners();
+            animateSceneElements();
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            // 导航按钮
+            prevBtn.addEventListener('click', () => {
+                if (currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                }
+            });
+
+            // 指示器
+            indicators.forEach(indicator => {
+                indicator.addEventListener('click', () => {
+                    currentScene = parseInt(indicator.dataset.scene);
+                    updateScene();
+                });
+            });
+
+            // 键盘导航
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' && currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                } else if (e.key === 'ArrowLeft' && currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+
+            // 场景 3 的动画按钮
+            const playFlowBtn = document.getElementById('playFlowBtn');
+            if (playFlowBtn) {
+                playFlowBtn.addEventListener('click', playFlowAnimation);
+            }
+
+            // 场景 2 的动画按钮
+            const playSimpleChainBtn = document.getElementById('playSimpleChainBtn');
+            if (playSimpleChainBtn) {
+                playSimpleChainBtn.addEventListener('click', playSimpleChainAnimation);
+            }
+
+            // 场景 5 的动画按钮
+            const playPassthroughBtn = document.getElementById('playPassthroughBtn');
+            if (playPassthroughBtn) {
+                playPassthroughBtn.addEventListener('click', playPassthroughAnimation);
+            }
+        }
+
+        // 更新场景
+        function updateScene() {
+            // 更新进度条
+            const progress = ((currentScene - 1) / (totalScenes - 1)) * 100;
+            progressBar.style.width = progress + '%';
+
+            // 更新场景显示
+            document.querySelectorAll('.scene').forEach((scene, index) => {
+                if (index + 1 === currentScene) {
+                    scene.classList.add('active');
+                } else {
+                    scene.classList.remove('active');
+                }
+            });
+
+            // 更新指示器
+            indicators.forEach((indicator, index) => {
+                if (index + 1 === currentScene) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+
+            // 更新按钮状态
+            prevBtn.disabled = currentScene === 1;
+            nextBtn.disabled = currentScene === totalScenes;
+
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // 重置所有动画元素
+            document.querySelectorAll('.flow-node, .flow-arrow, .feature-item, .code-panel, .usecase-card, .comparison-panel, .parallel-branch').forEach(el => {
+                el.classList.remove('visible');
+            });
+
+            // 动画显示元素
+            setTimeout(() => {
+                animateSceneElements();
+            }, 300);
+        }
+
+        // 动画显示场景元素
+        function animateSceneElements() {
+            const currentSceneEl = document.querySelector(`#scene${currentScene}`);
+
+            // 流程节点动画
+            currentSceneEl.querySelectorAll('.flow-node').forEach((node, index) => {
+                const delay = parseInt(node.dataset.delay) || index * 200;
+                setTimeout(() => {
+                    node.classList.add('visible');
+                }, delay);
+            });
+
+            // 流程箭头动画
+            currentSceneEl.querySelectorAll('.flow-arrow').forEach((arrow, index) => {
+                const delay = parseInt(arrow.dataset.delay) || index * 200;
+                setTimeout(() => {
+                    arrow.classList.add('visible');
+                }, delay);
+            });
+
+            // 特性网格动画
+            currentSceneEl.querySelectorAll('.feature-item').forEach((item, index) => {
+                const delay = parseInt(item.dataset.delay) || index * 100;
+                setTimeout(() => {
+                    item.classList.add('visible');
+                }, delay);
+            });
+
+            // 代码面板动画
+            currentSceneEl.querySelectorAll('.code-panel').forEach((panel, index) => {
+                const delay = parseInt(panel.dataset.delay) || index * 200;
+                setTimeout(() => {
+                    panel.classList.add('visible');
+                }, delay);
+            });
+
+            // 使用场景卡片动画
+            currentSceneEl.querySelectorAll('.usecase-card').forEach((card, index) => {
+                const delay = parseInt(card.dataset.delay) || index * 100;
+                setTimeout(() => {
+                    card.classList.add('visible');
+                }, delay);
+            });
+
+            // 对比面板动画
+            currentSceneEl.querySelectorAll('.comparison-panel').forEach((panel, index) => {
+                const delay = parseInt(panel.dataset.delay) || index * 300;
+                setTimeout(() => {
+                    panel.classList.add('visible');
+                }, delay);
+            });
+
+            // 并行分支动画
+            currentSceneEl.querySelectorAll('.parallel-branch').forEach((branch, index) => {
+                const delay = parseInt(branch.dataset.delay) || index * 200;
+                setTimeout(() => {
+                    branch.classList.add('visible');
+                }, delay);
+            });
+        }
+
+        // 播放场景 2 的简单链动画
+        function playSimpleChainAnimation() {
+            const container = document.getElementById('simpleChainFlow');
+            const description = document.getElementById('simple-flow-description');
+            const inputData = document.getElementById('simple-input-data');
+            const chain1Data = document.getElementById('simple-chain1-data');
+            const chain2Data = document.getElementById('simple-chain2-data');
+            const outputData = document.getElementById('simple-output-data');
+
+            // 重置所有数据
+            inputData.textContent = '{topic: "春天"}';
+            chain1Data.textContent = '生成中文笑话';
+            chain2Data.textContent = '翻译成英文';
+            outputData.textContent = '英文笑话';
+
+            // 重置所有节点样式
+            document.querySelectorAll('#simpleChainFlow .flow-node').forEach(node => {
+                node.style.boxShadow = '';
+                node.style.transform = '';
+                node.style.background = '';
+            });
+
+            // 动画序列
+            async function runAnimation() {
+                // 步骤 1: 高亮输入
+                description.innerHTML = '<strong style="color: #a855f7;">步骤 1/4</strong><br>📥 用户输入: <code style="background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;">{topic: "春天"}</code>';
+                const inputNode = document.getElementById('simple-node-input');
+                inputNode.style.boxShadow = '0 0 35px rgba(14, 165, 233, 0.8)';
+                inputNode.style.transform = 'scale(1.12)';
+                inputNode.style.background = 'rgba(14, 165, 233, 0.25)';
+                await sleep(1000);
+
+                // 步骤 2: 数据流向 Chain 1
+                description.innerHTML = '<strong style="color: #a855f7;">步骤 2/4</strong><br>😄 Chain 1 处理: 生成关于"春天"的中文笑话...';
+                await animateSimpleParticle(inputNode, document.getElementById('simple-node-chain1'));
+                inputNode.style.boxShadow = '';
+                inputNode.style.transform = 'scale(1)';
+                inputNode.style.background = '';
+
+                // 高亮 Chain 1 并显示结果
+                const chain1Node = document.getElementById('simple-node-chain1');
+                chain1Node.style.boxShadow = '0 0 35px rgba(168, 85, 247, 0.8)';
+                chain1Node.style.transform = 'scale(1.12)';
+                chain1Node.style.background = 'rgba(168, 85, 247, 0.25)';
+                chain1Data.innerHTML = '<span style="color: #a855f7; font-size: 0.95em;">✓ "春天到了，花儿都笑开了！"</span>';
+                await sleep(1300);
+
+                // 步骤 3: Chain 1 输出流向 Chain 2
+                description.innerHTML = '<strong style="color: #ec4899;">步骤 3/4</strong><br>🌐 Chain 2 处理: 将笑话翻译成英文...<br><small style="color: rgba(226,232,240,0.7);">💡 Chain 1 的输出自动成为 Chain 2 的输入</small>';
+                await animateSimpleParticle(chain1Node, document.getElementById('simple-node-chain2'));
+                chain1Node.style.boxShadow = '';
+                chain1Node.style.transform = 'scale(1)';
+                chain1Node.style.background = '';
+
+                // 高亮 Chain 2 并显示结果
+                const chain2Node = document.getElementById('simple-node-chain2');
+                chain2Node.style.boxShadow = '0 0 35px rgba(236, 72, 153, 0.8)';
+                chain2Node.style.transform = 'scale(1.12)';
+                chain2Node.style.background = 'rgba(236, 72, 153, 0.25)';
+                chain2Data.innerHTML = '<span style="color: #ec4899; font-size: 0.95em;">✓ "Spring is here, flowers are blooming!"</span>';
+                await sleep(1300);
+
+                // 步骤 4: Chain 2 输出流向最终输出
+                description.innerHTML = '<strong style="color: #22c55e;">步骤 4/4</strong><br>✅ 最终输出: 英文笑话';
+                await animateSimpleParticle(chain2Node, document.getElementById('simple-node-output'));
+                chain2Node.style.boxShadow = '';
+                chain2Node.style.transform = 'scale(1)';
+                chain2Node.style.background = '';
+
+                // 高亮输出节点
+                const outputNode = document.getElementById('simple-node-output');
+                outputNode.style.boxShadow = '0 0 35px rgba(34, 197, 94, 0.8)';
+                outputNode.style.transform = 'scale(1.12)';
+                outputNode.style.background = 'rgba(34, 197, 94, 0.25)';
+                outputData.innerHTML = '<span style="color: #22c55e; font-weight: 600;">🎉 "Spring is here..."</span>';
+                await sleep(1000);
+
+                // 完成提示
+                description.innerHTML = '<strong style="color: #22c55e;">✨ 顺序执行完成！</strong><br><br>✨ 数据流动路径：<br>输入 → Chain 1 (生成) → Chain 2 (翻译) → 输出<br><br><small style="color: rgba(226,232,240,0.7);">这就是顺序链的核心：每个步骤的输出自动成为下一步的输入</small>';
+                outputNode.style.boxShadow = '';
+                outputNode.style.transform = 'scale(1)';
+                outputNode.style.background = '';
+            }
+
+            // 辅助函数: 创建简单粒子动画
+            function animateSimpleParticle(fromNode, toNode) {
+                return new Promise(resolve => {
+                    const containerRect = container.getBoundingClientRect();
+                    const fromRect = fromNode.getBoundingClientRect();
+                    const toRect = toNode.getBoundingClientRect();
+
+                    const startX = fromRect.right - containerRect.left;
+                    const startY = fromRect.top + fromRect.height / 2 - containerRect.top;
+                    const endX = toRect.left - containerRect.left;
+                    const endY = toRect.top + toRect.height / 2 - containerRect.top;
+
+                    const particle = document.createElement('div');
+                    particle.className = 'data-particle moving';
+                    particle.style.left = startX + 'px';
+                    particle.style.top = startY + 'px';
+                    container.appendChild(particle);
+
+                    particle.animate([
+                        { left: startX + 'px', top: startY + 'px' },
+                        { left: endX + 'px', top: endY + 'px' }
+                    ], {
+                        duration: 700,
+                        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                        fill: 'forwards'
+                    }).onfinish = () => {
+                        particle.remove();
+                        resolve();
+                    };
+                });
+            }
+
+            // 辅助函数: 延迟
+            function sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            runAnimation();
+        }
+
+        // 播放场景 5 的数据透传动画
+        function playPassthroughAnimation() {
+            const container = document.getElementById('passthroughFlow');
+            const description = document.getElementById('pass-flow-description');
+            const inputData = document.getElementById('pass-input-data');
+            const splitData = document.getElementById('pass-split-data');
+            const translateData = document.getElementById('pass-translate-data');
+            const passthroughData = document.getElementById('pass-passthrough-data');
+            const mergeData = document.getElementById('pass-merge-data');
+            const outputData = document.getElementById('pass-output-data');
+
+            // 重置所有数据
+            inputData.textContent = '{text: "Hello world"}';
+            splitData.textContent = '一分为二';
+            translateData.textContent = '处理翻译';
+            passthroughData.textContent = '保留原文';
+            mergeData.textContent = '原文 + 译文';
+            outputData.textContent = '生成总结';
+
+            // 重置所有节点样式
+            document.querySelectorAll('#passthroughFlow .flow-node').forEach(node => {
+                node.style.boxShadow = '';
+                node.style.transform = '';
+                node.style.background = '';
+            });
+
+            // 动画序列
+            async function runAnimation() {
+                // 步骤 1: 高亮输入
+                description.innerHTML = '<strong style="color: #a855f7;">步骤 1/6</strong><br>📥 用户输入: <code style="background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;">{text: "Hello world"}</code>';
+                const inputNode = document.getElementById('pass-node-input');
+                inputNode.style.boxShadow = '0 0 35px rgba(14, 165, 233, 0.8)';
+                inputNode.style.transform = 'scale(1.12)';
+                inputNode.style.background = 'rgba(14, 165, 233, 0.25)';
+                await sleep(1000);
+
+                // 步骤 2: 数据流向分流节点
+                description.innerHTML = '<strong style="color: #a855f7;">步骤 2/6</strong><br>🔀 数据分流: 准备同时处理和保留';
+                await animatePassthroughParticle(inputNode, document.getElementById('pass-node-split'));
+                inputNode.style.boxShadow = '';
+                inputNode.style.transform = 'scale(1)';
+                inputNode.style.background = '';
+
+                // 高亮分流节点
+                const splitNode = document.getElementById('pass-node-split');
+                splitNode.style.boxShadow = '0 0 35px rgba(168, 85, 247, 0.8)';
+                splitNode.style.transform = 'scale(1.12)';
+                splitNode.style.background = 'rgba(168, 85, 247, 0.25)';
+                splitData.innerHTML = '<span style="color: #a855f7;">准备分叉...</span>';
+                await sleep(1200);
+
+                // 步骤 3: 分流到两个分支
+                description.innerHTML = '<strong style="color: #ec4899;">步骤 3/6</strong><br>🌐 数据一分为二：左路翻译 + 右路透传';
+                await Promise.all([
+                    animatePassthroughParticle(splitNode, document.getElementById('pass-node-translate'), 'left'),
+                    animatePassthroughParticle(splitNode, document.getElementById('pass-node-passthrough'), 'right')
+                ]);
+                splitNode.style.boxShadow = '';
+                splitNode.style.transform = 'scale(1)';
+                splitNode.style.background = '';
+
+                // 步骤 4: 同时处理两个分支
+                description.innerHTML = '<strong style="color: #ec4899;">步骤 4/6</strong><br>🔄 <strong>左路：</strong>翻译处理 | <strong style="color: #0ea5e9;">右路：</strong>原样保留原文<br><small style="color: rgba(226,232,240,0.7);">💡 RunnablePassthrough 让数据"原样通过"</small>';
+
+                const translateNode = document.getElementById('pass-node-translate');
+                const passthroughNode = document.getElementById('pass-node-passthrough');
+
+                translateNode.style.boxShadow = '0 0 35px rgba(236, 72, 153, 0.8)';
+                translateNode.style.transform = 'scale(1.12)';
+                translateNode.style.background = 'rgba(236, 72, 153, 0.25)';
+                translateData.innerHTML = '<span style="color: #ec4899; font-size: 0.95em;">✓ "你好世界"</span>';
+
+                passthroughNode.style.boxShadow = '0 0 35px rgba(14, 165, 233, 0.8)';
+                passthroughNode.style.transform = 'scale(1.12)';
+                passthroughNode.style.background = 'rgba(14, 165, 233, 0.25)';
+                passthroughData.innerHTML = '<span style="color: #0ea5e9; font-size: 0.95em;">✓ "Hello world"</span>';
+
+                await sleep(1500);
+
+                // 步骤 5: 合并数据
+                description.innerHTML = '<strong style="color: #22c55e;">步骤 5/6</strong><br>🔗 数据合并: {translation: "你好世界", text: "Hello world"}<br><small style="color: rgba(226,232,240,0.7);">✨ 两个分支的结果合并成字典</small>';
+                await Promise.all([
+                    animatePassthroughParticle(translateNode, document.getElementById('pass-node-merge'), 'down'),
+                    animatePassthroughParticle(passthroughNode, document.getElementById('pass-node-merge'), 'down')
+                ]);
+                translateNode.style.boxShadow = '';
+                translateNode.style.transform = 'scale(1)';
+                translateNode.style.background = '';
+                passthroughNode.style.boxShadow = '';
+                passthroughNode.style.transform = 'scale(1)';
+                passthroughNode.style.background = '';
+
+                // 高亮合并节点
+                const mergeNode = document.getElementById('pass-node-merge');
+                mergeNode.style.boxShadow = '0 0 35px rgba(34, 197, 94, 0.8)';
+                mergeNode.style.transform = 'scale(1.12)';
+                mergeNode.style.background = 'rgba(34, 197, 94, 0.25)';
+                mergeData.innerHTML = '<span style="color: #22c55e; font-size: 0.9em;">✓ {translation, text}</span>';
+                await sleep(1300);
+
+                // 步骤 6: 输出分析结果
+                description.innerHTML = '<strong style="color: #22c55e;">步骤 6/6</strong><br>✅ 对比分析: 同时使用原文和译文生成总结';
+                await animatePassthroughParticle(mergeNode, document.getElementById('pass-node-output'));
+                mergeNode.style.boxShadow = '';
+                mergeNode.style.transform = 'scale(1)';
+                mergeNode.style.background = '';
+
+                // 高亮输出节点
+                const outputNode = document.getElementById('pass-node-output');
+                outputNode.style.boxShadow = '0 0 35px rgba(34, 197, 94, 0.8)';
+                outputNode.style.transform = 'scale(1.12)';
+                outputNode.style.background = 'rgba(34, 197, 94, 0.25)';
+                outputData.innerHTML = '<span style="color: #22c55e; font-weight: 600;">🎉 对比分析完成</span>';
+                await sleep(1000);
+
+                // 完成提示
+                description.innerHTML = '<strong style="color: #22c55e;">✨ 数据透传演示完成！</strong><br><br>✨ 核心要点：<br>• <strong style="color: #ec4899;">左路处理：</strong>翻译消耗了 text<br>• <strong style="color: #0ea5e9;">右路透传：</strong>RunnablePassthrough 保留原 text<br>• <strong style="color: #22c55e;">最终合并：</strong>同时获得译文和原文<br><br><small style="color: rgba(226,232,240,0.7);">这就是 RunnablePassthrough 的威力：在处理数据的同时保留原始输入</small>';
+                outputNode.style.boxShadow = '';
+                outputNode.style.transform = 'scale(1)';
+                outputNode.style.background = '';
+            }
+
+            // 辅助函数: 创建透传粒子动画
+            function animatePassthroughParticle(fromNode, toNode, direction = 'right') {
+                return new Promise(resolve => {
+                    const containerRect = container.getBoundingClientRect();
+                    const fromRect = fromNode.getBoundingClientRect();
+                    const toRect = toNode.getBoundingClientRect();
+
+                    let startX, startY, endX, endY;
+
+                    if (direction === 'left') {
+                        startX = fromRect.left - containerRect.left;
+                        startY = fromRect.top + fromRect.height / 2 - containerRect.top;
+                        endX = toRect.right - containerRect.left;
+                        endY = toRect.top + toRect.height / 2 - containerRect.top;
+                    } else if (direction === 'right') {
+                        startX = fromRect.right - containerRect.left;
+                        startY = fromRect.top + fromRect.height / 2 - containerRect.top;
+                        endX = toRect.left - containerRect.left;
+                        endY = toRect.top + toRect.height / 2 - containerRect.top;
+                    } else if (direction === 'down') {
+                        startX = fromRect.left + fromRect.width / 2 - containerRect.left;
+                        startY = fromRect.bottom - containerRect.top;
+                        endX = toRect.left + toRect.width / 2 - containerRect.left;
+                        endY = toRect.top - containerRect.top;
+                    } else {
+                        startX = fromRect.right - containerRect.left;
+                        startY = fromRect.top + fromRect.height / 2 - containerRect.top;
+                        endX = toRect.left - containerRect.left;
+                        endY = toRect.top + toRect.height / 2 - containerRect.top;
+                    }
+
+                    const particle = document.createElement('div');
+                    particle.className = 'data-particle moving';
+                    particle.style.left = startX + 'px';
+                    particle.style.top = startY + 'px';
+                    container.appendChild(particle);
+
+                    particle.animate([
+                        { left: startX + 'px', top: startY + 'px' },
+                        { left: endX + 'px', top: endY + 'px' }
+                    ], {
+                        duration: 700,
+                        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                        fill: 'forwards'
+                    }).onfinish = () => {
+                        particle.remove();
+                        resolve();
+                    };
+                });
+            }
+
+            // 辅助函数: 延迟
+            function sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            runAnimation();
+        }
+
+        // 播放场景 3 的数据流动动画
+        function playFlowAnimation() {
+            const container = document.getElementById('animatedFlow');
+            const description = document.getElementById('flow-description');
+            const inputData = document.getElementById('input-data');
+            const outlineData = document.getElementById('outline-data');
+            const expandData = document.getElementById('expand-data');
+            const outputData = document.getElementById('output-data');
+
+            // 重置所有数据
+            inputData.textContent = '{topic: "AI"}';
+            outlineData.textContent = 'Chain 1 处理中...';
+            expandData.textContent = 'Chain 2 处理中...';
+            outputData.textContent = '等待数据...';
+
+            // 重置所有节点样式
+            document.querySelectorAll('#animatedFlow .flow-node').forEach(node => {
+                node.style.boxShadow = '';
+                node.style.transform = '';
+                node.style.background = '';
+            });
+
+            // 动画序列
+            async function runAnimation() {
+                // 步骤 1: 高亮输入节点
+                description.innerHTML = '<strong style="color: #0ea5e9;">步骤 1/4</strong><br>📥 用户输入数据: <code style="background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px;">{topic: "AI"}</code>';
+                const inputNode = document.getElementById('node-input');
+                inputNode.style.boxShadow = '0 0 40px rgba(14, 165, 233, 0.9)';
+                inputNode.style.transform = 'scale(1.15)';
+                inputNode.style.background = 'rgba(14, 165, 233, 0.3)';
+                await sleep(1200);
+
+                // 步骤 2: 数据粒子从输入流向 Chain 1
+                description.innerHTML = '<strong style="color: #0ea5e9;">步骤 2/4</strong><br>🔄 数据流向 Chain 1，生成大纲...';
+                await animateParticle(inputNode, document.getElementById('node-outline'));
+                inputNode.style.boxShadow = '';
+                inputNode.style.transform = 'scale(1)';
+                inputNode.style.background = '';
+
+                // 高亮 Chain 1 并显示处理结果
+                const outlineNode = document.getElementById('node-outline');
+                outlineNode.style.boxShadow = '0 0 40px rgba(168, 85, 247, 0.9)';
+                outlineNode.style.transform = 'scale(1.15)';
+                outlineNode.style.background = 'rgba(168, 85, 247, 0.3)';
+                outlineData.innerHTML = '<span style="color: #a855f7;">✓ 1.机器学习<br>✓ 2.深度学习<br>✓ 3.应用场景</span>';
+                await sleep(1500);
+
+                // 步骤 3: 数据粒子从 Chain 1 流向 Chain 2
+                description.innerHTML = '<strong style="color: #a855f7;">步骤 3/4</strong><br>📝 Chain 1 输出流向 Chain 2，扩展内容...';
+                await animateParticle(outlineNode, document.getElementById('node-expand'));
+                outlineNode.style.boxShadow = '';
+                outlineNode.style.transform = 'scale(1)';
+                outlineNode.style.background = '';
+
+                // 高亮 Chain 2 并显示处理结果
+                const expandNode = document.getElementById('node-expand');
+                expandNode.style.boxShadow = '0 0 40px rgba(236, 72, 153, 0.9)';
+                expandNode.style.transform = 'scale(1.15)';
+                expandNode.style.background = 'rgba(236, 72, 153, 0.3)';
+                expandData.innerHTML = '<span style="color: #ec4899;">✓ 扩展完成<br>✓ 约800字文章</span>';
+                await sleep(1500);
+
+                // 步骤 4: 数据粒子从 Chain 2 流向输出
+                description.innerHTML = '<strong style="color: #ec4899;">步骤 4/4</strong><br>✅ 最终输出完整的文章内容';
+                await animateParticle(expandNode, document.getElementById('node-output'));
+                expandNode.style.boxShadow = '';
+                expandNode.style.transform = 'scale(1)';
+                expandNode.style.background = '';
+
+                // 高亮输出节点
+                const outputNode = document.getElementById('node-output');
+                outputNode.style.boxShadow = '0 0 40px rgba(34, 197, 94, 0.9)';
+                outputNode.style.transform = 'scale(1.15)';
+                outputNode.style.background = 'rgba(34, 197, 94, 0.3)';
+                outputData.innerHTML = '<span style="color: #22c55e; font-weight: 600;">🎉 完整文章生成成功！</span>';
+                await sleep(1200);
+
+                // 完成提示
+                description.innerHTML = '<strong style="color: #22c55e;">🎉 数据流动演示完成！</strong><br>✨ 数据从输入经过 2 个 Chain 的处理，最终生成完整输出。<br><br><small style="color: rgba(226,232,240,0.7);">这就是 LangChain 的核心：通过 LCEL 表达式语言串联多个处理步骤</small>';
+                outputNode.style.boxShadow = '';
+                outputNode.style.transform = 'scale(1)';
+                outputNode.style.background = '';
+            }
+
+            // 辅助函数: 创建数据粒子动画
+            function animateParticle(fromNode, toNode) {
+                return new Promise(resolve => {
+                    const containerRect = container.getBoundingClientRect();
+                    const fromRect = fromNode.getBoundingClientRect();
+                    const toRect = toNode.getBoundingClientRect();
+
+                    // 计算相对位置
+                    const startX = fromRect.right - containerRect.left;
+                    const startY = fromRect.top + fromRect.height / 2 - containerRect.top;
+                    const endX = toRect.left - containerRect.left;
+                    const endY = toRect.top + toRect.height / 2 - containerRect.top;
+
+                    // 创建粒子
+                    const particle = document.createElement('div');
+                    particle.className = 'data-particle moving';
+                    particle.style.left = startX + 'px';
+                    particle.style.top = startY + 'px';
+                    container.appendChild(particle);
+
+                    // 动画粒子移动
+                    particle.animate([
+                        { left: startX + 'px', top: startY + 'px' },
+                        { left: endX + 'px', top: endY + 'px' }
+                    ], {
+                        duration: 800,
+                        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+                        fill: 'forwards'
+                    }).onfinish = () => {
+                        particle.remove();
+                        resolve();
+                    };
+                });
+            }
+
+            // 辅助函数: 延迟
+            function sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            // 运行动画
+            runAnimation();
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

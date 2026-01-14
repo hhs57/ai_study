@@ -1,0 +1,1310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块30: 知识图谱可视化 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subsection-title {
+            font-size: 1.8em;
+            margin: 30px 0 20px 0;
+            color: #60a5fa;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .animation-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 500px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+
+        .code-block code {
+            color: #e2e8f0;
+        }
+
+        .keyword { color: #c792ea; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .function { color: #82aaff; }
+        .number { color: #f78c6c; }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2em;
+            }
+            .glass-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <a href="29-graph-algorithms.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一模块
+                </a>
+                <a href="31-graphrag.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 30 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 30: 知识图谱可视化
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">掌握知识图谱可视化技术：从基础图表到大规模图可视化</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">中级难度</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~80 分钟</span>
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">5 个交互动画</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: 可视化基础 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. 知识图谱可视化基础</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">为什么需要可视化?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    知识图谱包含数以万计的实体和关系,<strong>可视化</strong>帮助我们:
+                    发现隐藏的模式、理解复杂的关系、与数据进行交互、向非技术人员展示洞察。
+                </p>
+                <div class="flex flex-wrap gap-3 text-sm">
+                    <span class="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full">模式识别</span>
+                    <span class="px-3 py-1 bg-green-500/20 text-green-300 rounded-full">关系洞察</span>
+                    <span class="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full">数据探索</span>
+                    <span class="px-3 py-1 bg-yellow-500/20 text-yellow-300 rounded-full">故事讲述</span>
+                </div>
+            </div>
+
+            <!-- 核心元素 -->
+            <h3 class="subsection-title">1.1 图可视化的核心元素</h3>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                    <h4 class="text-lg font-bold text-blue-400 mb-2">节点 (Nodes)</h4>
+                    <p class="text-sm text-gray-300">表示实体,通常用圆形或矩形。大小可表示重要性,颜色可表示类型。</p>
+                </div>
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                    <h4 class="text-lg font-bold text-green-400 mb-2">边 (Edges)</h4>
+                    <p class="text-sm text-gray-300">表示关系,用线条连接节点。粗细可表示权重,方向用箭头。</p>
+                </div>
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                    <h4 class="text-lg font-bold text-purple-400 mb-2">标签 (Labels)</h4>
+                    <p class="text-sm text-gray-300">文本信息,显示实体名称、关系类型、属性值等。</p>
+                </div>
+            </div>
+
+            <!-- 交互式示例 -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                    </svg>
+                    交互式知识图谱可视化
+                </div>
+                <div id="basic-viz" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="switchLayout('force')">力导向布局</button>
+                    <button class="btn btn-primary" onclick="switchLayout('circular')">环形布局</button>
+                    <button class="btn btn-primary" onclick="switchLayout('tree')">树状布局</button>
+                    <button class="btn btn-secondary" onclick="resetVisualization()">重置</button>
+                </div>
+                <div class="info-panel">
+                    <h4 class="text-green-400 font-bold mb-2">交互说明</h4>
+                    <ul class="text-sm text-gray-300 space-y-1">
+                        <li>• <strong>拖拽节点</strong>: 调整位置</li>
+                        <li>• <strong>悬停节点</strong>: 查看详细信息</li>
+                        <li>• <strong>点击节点</strong>: 高亮邻接节点</li>
+                        <li>• <strong>滚轮缩放</strong>: 放大/缩小</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: 布局算法 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. 图布局算法</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">常见布局算法对比</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <h4 class="text-lg font-bold text-green-400 mb-2">力导向布局 (Force-Directed)</h4>
+                        <p class="text-sm text-gray-300 mb-2">模拟物理力系统,节点间有斥力,连接有弹力。</p>
+                        <ul class="text-xs text-gray-400 space-y-1">
+                            <li>✓ 适合中小型图 (< 1000节点)</li>
+                            <li>✓ 自然美观的聚类效果</li>
+                            <li>✗ 大图性能差</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <h4 class="text-lg font-bold text-blue-400 mb-2">层次布局 (Hierarchical)</h4>
+                        <p class="text-sm text-gray-300 mb-2">按层级或树形结构排列节点。</p>
+                        <ul class="text-xs text-gray-400 space-y-1">
+                            <li>✓ 适合有向无环图(DAG)</li>
+                            <li>✓ 清晰的层级关系</li>
+                            <li>✗ 不适合复杂网络</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <h4 class="text-lg font-bold text-purple-400 mb-2">环形布局 (Circular)</h4>
+                        <p class="text-sm text-gray-300 mb-2">节点沿圆周排列,适合周期性或循环结构。</p>
+                        <ul class="text-xs text-gray-400 space-y-1">
+                            <li>✓ 适合小型图</li>
+                            <li>✓ 均匀展示所有节点</li>
+                            <li>✗ 边容易交叉</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <h4 class="text-lg font-bold text-yellow-400 mb-2">网格布局 (Grid)</h4>
+                        <p class="text-sm text-gray-300 mb-2">节点按网格规则排列。</p>
+                        <ul class="text-xs text-gray-400 space-y-1">
+                            <li>✓ 节省空间</li>
+                            <li>✓ 适合密集显示</li>
+                            <li>✗ 关系不明显</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 布局对比动画 -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+                    </svg>
+                    布局算法对比
+                </div>
+                <div id="layout-comparison" class="animation-canvas" style="height: 400px;"></div>
+            </div>
+        </div>
+
+        <!-- Chapter 3: Neo4j可视化工具 -->
+        <div class="glass-card">
+            <h2 class="section-title">3. Neo4j可视化工具</h2>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">Neo4j Browser vs Neo4j Bloom</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                        <h4 class="text-lg font-bold text-blue-400 mb-2">Neo4j Browser</h4>
+                        <p class="text-sm text-gray-300 mb-2">内置的Web界面,适合开发和调试。</p>
+                        <ul class="text-xs text-gray-400 space-y-1">
+                            <li>✓ 免费,开箱即用</li>
+                            <li>✓ Cypher查询即时可视化</li>
+                            <li>✓ 最多显示300-500节点</li>
+                            <li>✗ 适合开发者,不适合业务人员</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <h4 class="text-lg font-bold text-green-400 mb-2">Neo4j Bloom</h4>
+                        <p class="text-sm text-gray-300 mb-2">专业的图可视化探索工具。</p>
+                        <ul class="text-xs text-gray-400 space-y-1">
+                            <li>✓ 自然语言搜索</li>
+                            <li>✓ 支持大规模图(百万节点)</li>
+                            <li>✓ 自定义样式和视角</li>
+                            <li>✗ 需要额外许可</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模拟Neo4j Browser -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                    模拟Neo4j Browser界面
+                </div>
+                <div class="bg-gray-900 rounded-lg p-4 font-mono text-sm">
+                    <div class="mb-3">
+                        <label class="text-gray-400 text-xs">Cypher Query:</label>
+                        <textarea id="cypher-query" class="w-full bg-black rounded p-2 text-green-400 mt-1" rows="3">MATCH (p:Person {name: 'Keanu Reeves'})-[:ACTED_IN]->(m:Movie)<-[:ACTED_IN]-(coactor:Person)
+RETURN p, m, coactor
+LIMIT 10</textarea>
+                    </div>
+                    <button class="btn btn-primary mb-3" onclick="runCypherQuery()">运行查询</button>
+                    <div id="cypher-result" class="bg-black rounded p-4 min-h-[300px]">
+                        <p class="text-gray-500 text-center mt-20">点击"运行查询"查看结果...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cypher样式配置 -->
+            <div class="code-block">
+                <code>
+<span class="comment">// Neo4j Browser中的样式配置</span>
+<span class="comment">// 在浏览器左侧的样式面板中配置</span>
+
+<span class="comment">// 节点样式</span>
+node {
+  diameter: <span class="number">60</span>px;
+  color: <span class="string">#3B82F6</span>;
+  border-color: <span class="string">#1E40AF</span>;
+  border-width: <span class="number">2</span>px;
+  font-size: <span class="number">14</span>px;
+  text-color-external: <span class="string">#FFFFFF</span>;
+  text-color-internal: <span class="string">#FFFFFF</span>;
+  caption: <span class="string">'{name}'</span>;
+}
+
+<span class="comment">// 特定节点类型样式</span>
+node.Person {
+  color: <span class="string">#10B981</span>;
+  border-color: <span class="string">#047857</span>;
+  diameter: <span class="number">50</span>px;
+}
+
+node.Movie {
+  color: <span class="string">#8B5CF6</span>;
+  border-color: <span class="string">#5B21B6</span>;
+  diameter: <span class="number">70</span>px;
+}
+
+<span class="comment">// 关系样式</span>
+relationship {
+  color: <span class="string">#64748B</span>;
+  width: <span class="number">2</span>px;
+  font-size: <span class="number">12</span>px;
+  text-color-external: <span class="string">#94A3B8</span>;
+  caption: <span class="string">'{type}'</span>;
+}
+
+relationship.ACTED_IN {
+  color: <span class="string">#F59E0B</span>;
+  width: <span class="number">3</span>px;
+}
+                </code>
+            </div>
+        </div>
+
+        <!-- Chapter 4: Python可视化库 -->
+        <div class="glass-card">
+            <h2 class="section-title">4. Python图可视化库</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                    <h4 class="text-lg font-bold text-blue-400 mb-2">NetworkX + Matplotlib</h4>
+                    <p class="text-sm text-gray-300 mb-2">经典组合,简单易用。</p>
+                    <div class="text-xs text-gray-400 space-y-1">
+                        <p>✓ 适合学术研究</p>
+                        <p>✓ 丰富的布局算法</p>
+                        <p>✗ 性能有限</p>
+                        <p>✗ 交互性弱</p>
+                    </div>
+                </div>
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                    <h4 class="text-lg font-bold text-green-400 mb-2">PyVis</h4>
+                    <p class="text-sm text-gray-300 mb-2">基于vis.js的Python封装。</p>
+                    <div class="text-xs text-gray-400 space-y-1">
+                        <p>✓ 交互式可视化</p>
+                        <p>✓ 自动生成HTML</p>
+                        <p>✓ 易于使用</p>
+                        <p>✗ 定制性一般</p>
+                    </div>
+                </div>
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                    <h4 class="text-lg font-bold text-purple-400 mb-2">Cytoscape.js + Python</h4>
+                    <p class="text-sm text-gray-300 mb-2">强大的JS库,Python通过py2cytoscape调用。</p>
+                    <div class="text-xs text-gray-400 space-y-1">
+                        <p>✓ 高度可定制</p>
+                        <p>✓ 支持大规模图</p>
+                        <p>✓ 丰富的布局</p>
+                        <p>✗ 学习曲线陡</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NetworkX示例 -->
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">示例1: NetworkX基础可视化</h3>
+                <div class="code-block">
+                    <code>
+<span class="keyword">import</span> networkx <span class="keyword">as</span> nx
+<span class="keyword">import</span> matplotlib.pyplot <span class="keyword">as</span> plt
+
+<span class="comment"># 创建图</span>
+G = nx.karate_club_graph()
+
+<span class="comment"># 设置图形大小</span>
+plt.figure(figsize=(<span class="number">12</span>, <span class="number">8</span>))
+
+<span class="comment"># 力导向布局</span>
+pos = nx.spring_layout(G, seed=<span class="number">42</span>)
+
+<span class="comment"># 节点颜色按社区着色</span>
+communities = nx.community.greedy_modularity_communities(G)
+colors = [<span class="number">0</span>] * <span class="function">len</span>(G.nodes())
+<span class="keyword">for</span> i, community <span class="keyword">in</span> <span class="function">enumerate</span>(communities):
+    <span class="keyword">for</span> node <span class="keyword">in</span> community:
+        colors[node] = i
+
+<span class="comment"># 绘制节点</span>
+nx.draw_networkx_nodes(G, pos,
+                       node_color=colors,
+                       cmap=plt.cm.rainbow,
+                       node_size=<span class="number">500</span>,
+                       alpha=<span class="number">0.8</span>)
+
+<span class="comment"># 绘制边</span>
+nx.draw_networkx_edges(G, pos,
+                       width=<span class="number">1</span>,
+                       alpha=<span class="number">0.5</span>,
+                       edge_color=<span class="string">'gray'</span>)
+
+<span class="comment"># 绘制标签</span>
+nx.draw_networkx_labels(G, pos,
+                        font_size=<span class="number">10</span>,
+                        font_color=<span class="string">'white'</span>)
+
+plt.axis(<span class="string">'off'</span>)
+plt.title(<span class="string">'空手道俱乐部网络'</span>, fontsize=<span class="number">16</span>)
+plt.tight_layout()
+plt.savefig(<span class="string">'karate_club.png'</span>, dpi=<span class="number">300</span>)
+plt.show()
+                    </code>
+                </div>
+            </div>
+
+            <!-- PyVis示例 -->
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">示例2: PyVis交互式可视化</h3>
+                <div class="code-block">
+                    <code>
+<span class="keyword">from</span> pyvis.network <span class="keyword">import</span> Network
+<span class="keyword">import</span> networkx <span class="keyword">as</span> nx
+
+<span class="comment"># 创建NetworkX图</span>
+G = nx.karate_club_graph()
+
+<span class="comment"># 转换为PyVis网络</span>
+net = Network(height=<span class="string">"750px"</span>, width=<span class="string">"100%"</span>,
+             bgcolor=<span class="string">"#222222"</span>, font_color=<span class="string">"white"</span>)
+
+<span class="comment"># 从NetworkX加载</span>
+net.from_nx(G)
+
+<span class="comment"># 配置物理参数</span>
+net.set_options(<span class="string">"""
+{
+  "nodes": {
+    "borderWidth": 2,
+    "borderWidthSelected": 4
+  },
+  "edges": {
+    "width": 2,
+    "smooth": {
+      "type": "continuous"
+    }
+  },
+  "physics": {
+    "forceAtlas2Based": {
+      "gravitationalConstant": -50,
+      "centralGravity": 0.01,
+      "springLength": 100,
+      "springConstant": 0.08
+    },
+    "maxVelocity": 50,
+    "solver": "forceAtlas2Based",
+    "timestep": 0.35,
+    "stabilization": {
+      "iterations": 150
+    }
+  }
+}
+"""</span>)
+
+<span class="comment"># 保存为HTML文件</span>
+net.save_graph(<span class="string">"interactive_graph.html"</span>)
+<span class="function">print</span>(<span class="string">"交互式图已生成: interactive_graph.html"</span>)
+                    </code>
+                </div>
+            </div>
+
+            <!-- Cytoscape.py示例 -->
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">示例3: Cytoscape.py高级可视化</h3>
+                <div class="code-block">
+                    <code>
+<span class="keyword">import</span> networkx <span class="keyword">as</span> nx
+<span class="keyword">from</span> py2cytoscape <span class="keyword">import</span> cyrest
+<span class="keyword">import</span> json
+
+<span class="comment"># 创建图</span>
+G = nx.karate_club_graph()
+
+<span class="comment"># 连接到Cytoscape</span>
+cytoscape = cyrest.cyclient()
+
+<span class="comment"># 发送网络到Cytoscape</span>
+cytoscape.network.send_from_networkx(G, <span class="string">'Karate Club'</span>)
+
+<span class="comment"># 应用样式</span>
+style = {
+  <span class="string">"title"</span>: <span class="string">'Custom Style'</span>,
+  <span class="string">"defaults"</span>: [
+    {
+      <span class="string">"visualProperty"</span>: <span class="string">"NODE_FILL_COLOR"</span>,
+      <span class="string">"value"</span>: <span class="string">"#3B82F6"</span>
+    },
+    {
+      <span class="string">"visualProperty"</span>: <span class="string">"NODE_SIZE"</span>,
+      <span class="string">"value"</span>: <span class="number">60</span>
+    },
+    {
+      <span class="string">"visualProperty"</span>: <span class="string">"EDGE_STROKE_UNSELECTED_PAINT"</span>,
+      <span class="string">"value"</span>: <span class="string">"#64748B"</span>
+    }
+  ],
+  <span class="string">"mappings"</span>: [
+    {
+      <span class="string">"mappingType"</span>: <span class="string">"continuous"</span>,
+      <span class="string">"visualProperty"</span>: <span class="string">"NODE_FILL_COLOR"</span>,
+      <span class="string">"mappingColumn"</span>: <span class="string">"degree"</span>,
+      <span class="string">"mappingColumnType"</span>: <span class="string">"Double"</span>,
+      <span class="string">"points"</span>: [
+        {<span class="string">"value"</span>: <span class="number">0</span>, <span class="string">"lesser"</span>: <span class="string">"#10B981"</span>, <span class="string">"equal"</span>: <span class="string">"#10B981"</span>, <span class="string">"greater"</span>: <span class="string">"#F59E0B"</span>},
+        {<span class="string">"value"</span>: <span class="number">10</span>, <span class="string">"lesser"</span>: <span class="string">"#F59E0B"</span>, <span class="string">"equal"</span>: <span class="string">"#F59E0B"</span>, <span class="string">"greater"</span>: <span class="string">"#EF4444"</span>}
+      ]
+    }
+  ]
+}
+
+<span class="comment"># 应用样式并导出</span>
+cytoscape.style.apply(<span class="string">'Custom Style'</span>)
+cytoscape.network.export(<span class="string">'karate_club.pdf'</span>, <span class="string">'PDF'</span>)
+                    </code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 5: 大规模图可视化策略 -->
+        <div class="glass-card">
+            <h2 class="section-title">5. 大规模图可视化策略</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">挑战: 10万+节点如何可视化?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    大规模图可视化面临<strong>性能</strong>和<strong>可读性</strong>双重挑战。
+                    需要采用聚合、采样、过滤等策略。
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                    <h4 class="text-lg font-bold text-blue-400 mb-2">节点聚合 (Aggregation)</h4>
+                    <p class="text-sm text-gray-300 mb-2">将相似节点合并为超级节点。</p>
+                    <ul class="text-xs text-gray-400 space-y-1">
+                        <li>• 按类型/属性聚合</li>
+                        <li>• 按社区聚合</li>
+                        <li>• 层次化聚合</li>
+                        <li>• 点击可展开查看详情</li>
+                    </ul>
+                </div>
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                    <h4 class="text-lg font-bold text-green-400 mb-2">边简化 (Edge Simplification)</h4>
+                    <p class="text-sm text-gray-300 mb-2">减少边的数量和复杂度。</p>
+                    <ul class="text-xs text-gray-400 space-y-1">
+                        <li>• 移除权重低的边</li>
+                        <li>• 合并平行边</li>
+                        <li>• 隐藏内部边,显示跨社区边</li>
+                        <li>• 边捆绑(Edge Bundling)</li>
+                    </ul>
+                </div>
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                    <h4 class="text-lg font-bold text-purple-400 mb-2">焦点+上下文 (Focus+Context)</h4>
+                    <p class="text-sm text-gray-300 mb-2">突出重点,保持上下文。</p>
+                    <ul class="text-xs text-gray-400 space-y-1">
+                        <li>• 鱼眼透镜(Fisheye)</li>
+                        <li>• 多级缩放</li>
+                        <li>• 邻域展开</li>
+                        <li>• 路径高亮</li>
+                    </ul>
+                </div>
+                <div class="bg-black/30 p-4 rounded-lg border-l-4 border-yellow-500">
+                    <h4 class="text-lg font-bold text-yellow-400 mb-2">采样 (Sampling)</h4>
+                    <p class="text-sm text-gray-300 mb-2">选择代表性子集展示。</p>
+                    <ul class="text-xs text-gray-400 space-y-1">
+                        <li>• 随机采样</li>
+                        <li>• 基于重要性采样</li>
+                        <li>• 雪球式采样</li>
+                        <li>• 时间切片采样</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 大规模图可视化演示 -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"/>
+                    </svg>
+                    大规模图可视化演示(节点聚合)
+                </div>
+                <div id="large-graph-viz" class="animation-canvas" style="height: 500px;"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="aggregateNodes()">聚合节点</button>
+                    <button class="btn btn-primary" onclick="expandNodes()">展开节点</button>
+                    <button class="btn btn-secondary" onclick="resetLargeGraph()">重置</button>
+                </div>
+                <div class="info-panel">
+                    <h4 class="text-green-400 font-bold mb-2">节点聚合策略</h4>
+                    <p class="text-sm text-gray-300">
+                        点击"聚合节点"将相似类型的节点合并为超级节点,减少视觉复杂度。
+                        点击"展开节点"可以查看原始节点。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 6: 最佳实践 -->
+        <div class="glass-card">
+            <h2 class="section-title">6. 可视化最佳实践</h2>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">10条黄金法则</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="space-y-3">
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">1️⃣</span>
+                            <div>
+                                <h4 class="text-blue-400 font-bold">限制节点数量</h4>
+                                <p class="text-sm text-gray-300">单次展示不超过50-100个节点,更多则使用聚合。</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">2️⃣</span>
+                            <div>
+                                <h4 class="text-blue-400 font-bold">使用颜色编码</h4>
+                                <p class="text-sm text-gray-300">不同类型节点使用不同颜色,保持一致性。</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">3️⃣</span>
+                            <div>
+                                <h4 class="text-blue-400 font-bold">节点大小表示重要性</h4>
+                                <p class="text-sm text-gray-300">使用度中心性、PageRank等指标调整节点大小。</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">4️⃣</span>
+                            <div>
+                                <h4 class="text-blue-400 font-bold">避免标签重叠</h4>
+                                <p class="text-sm text-gray-300">使用力导向布局或智能标签定位。</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">5️⃣</span>
+                            <div>
+                                <h4 class="text-blue-400 font-bold">提供交互功能</h4>
+                                <p class="text-sm text-gray-300">支持拖拽、缩放、悬停、点击等操作。</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">6️⃣</span>
+                            <div>
+                                <h4 class="text-green-400 font-bold">使用图例</h4>
+                                <p class="text-sm text-gray-300">清楚说明颜色、大小、形状的含义。</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">7️⃣</span>
+                            <div>
+                                <h4 class="text-green-400 font-bold">突出重点</h4>
+                                <p class="text-sm text-gray-300">淡化不重要的元素,高亮关键路径。</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">8️⃣</span>
+                            <div>
+                                <h4 class="text-green-400 font-bold">渐进式披露</h4>
+                                <p class="text-sm text-gray-300">从高层概览开始,允许用户深入探索。</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">9️⃣</span>
+                            <div>
+                                <h4 class="text-green-400 font-bold">考虑色盲友好</h4>
+                                <p class="text-sm text-gray-300">使用颜色+形状/图案双重编码。</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="text-2xl">🔟</span>
+                            <div>
+                                <h4 class="text-green-400 font-bold">测试不同设备</h4>
+                                <p class="text-sm text-gray-300">确保在桌面、平板、手机上都能良好显示。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 完整示例 -->
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">完整示例: 可交互的电影知识图谱</h3>
+                <div class="code-block">
+                    <code>
+<span class="keyword">import</span> networkx <span class="keyword">as</span> nx
+<span class="keyword">from</span> pyvis.network <span class="keyword">import</span> Network
+
+<span class="comment"># 创建电影知识图谱</span>
+G = nx.Graph()
+
+<span class="comment"># 添加节点(带属性)</span>
+movies = [
+    (<span class="string">'The Matrix'</span>, {<span class="string">'type'</span>: <span class="string">'Movie'</span>, <span class="string">'year'</span>: <span class="number">1999</span>, <span class="string">'rating'</span>: <span class="number">8.7</span>}),
+    (<span class="string">'Inception'</span>, {<span class="string">'type'</span>: <span class="string">'Movie'</span>, <span class="string">'year'</span>: <span class="number">2010</span>, <span class="string">'rating'</span>: <span class="number">8.8</span>}),
+    (<span class="string">'Interstellar'</span>, {<span class="string">'type'</span>: <span class="string">'Movie'</span>, <span class="string">'year'</span>: <span class="number">2014</span>, <span class="string">'rating'</span>: <span class="number">8.6</span>})
+]
+
+actors = [
+    (<span class="string">'Keanu Reeves'</span>, {<span class="string">'type'</span>: <span class="string">'Actor'</span>, <span class="string">'age'</span>: <span class="number">59</span>}),
+    (<span class="string">'Leonardo DiCaprio'</span>, {<span class="string">'type'</span>: <span class="string">'Actor'</span>, <span class="string">'age'</span>: <span class="number">49</span>}),
+    (<span class="string">'Matthew McConaughey'</span>, {<span class="string">'type'</span>: <span class="string">'Actor'</span>, <span class="string">'age'</span>: <span class="number">54</span>}),
+    (<span class="string">'Ellen Page'</span>, {<span class="string">'type'</span>: <span class="string">'Actor'</span>, <span class="string">'age'</span>: <span class="number">36</span>})
+]
+
+directors = [
+    (<span class="string">'The Wachowskis'</span>, {<span class="string">'type'</span>: <span class="string">'Director'</span>, <span class="string">'awards'</span>: <span class="number">5</span>}),
+    (<span class="string">'Christopher Nolan'</span>, {<span class="string">'type'</span>: <span class="string">'Director'</span>, <span class="string">'awards'</span>: <span class="number">11</span>})
+]
+
+G.add_nodes_from(movies)
+G.add_nodes_from(actors)
+G.add_nodes_from(directors)
+
+<span class="comment"># 添加边</span>
+edges = [
+    (<span class="string">'Keanu Reeves'</span>, <span class="string">'The Matrix'</span>, {<span class="string">'relation'</span>: <span class="string">'ACTED_IN'</span>}),
+    (<span class="string">'The Wachowskis'</span>, <span class="string">'The Matrix'</span>, {<span class="string">'relation'</span>: <span class="string">'DIRECTED'</span>}),
+    (<span class="string">'Leonardo DiCaprio'</span>, <span class="string">'Inception'</span>, {<span class="string">'relation'</span>: <span class="string">'ACTED_IN'</span>}),
+    (<span class="string">'Ellen Page'</span>, <span class="string">'Inception'</span>, {<span class="string">'relation'</span>: <span class="string">'ACTED_IN'</span>}),
+    (<span class="string">'Christopher Nolan'</span>, <span class="string">'Inception'</span>, {<span class="string">'relation'</span>: <span class="string">'DIRECTED'</span>}),
+    (<span class="string">'Matthew McConaughey'</span>, <span class="string">'Interstellar'</span>, {<span class="string">'relation'</span>: <span class="string">'ACTED_IN'</span>}),
+    (<span class="string">'Christopher Nolan'</span>, <span class="string">'Interstellar'</span>, {<span class="string">'relation'</span>: <span class="string">'DIRECTED'</span>}),
+    (<span class="string">'The Matrix'</span>, <span class="string">'Inception'</span>, {<span class="string">'relation'</span>: <span class="string">'SIMILAR_TO'</span>}),
+    (<span class="string">'Inception'</span>, <span class="string">'Interstellar'</span>, {<span class="string">'relation'</span>: <span class="string">'SIMILAR_TO'</span>})
+]
+
+G.add_edges_from(edges)
+
+<span class="comment"># 配置PyVis可视化</span>
+net = Network(height=<span class="string">"600px"</span>, width=<span class="string">"100%"</span>,
+             bgcolor=<span class="string">"#1a1a2e"</span>, font_color=<span class="string">"white"</span>)
+net.from_nx(G)
+
+<span class="comment"># 按类型设置颜色</span>
+color_map = {<span class="string">'Movie'</span>: <span class="string">'#8B5CF6'</span>, <span class="string">'Actor'</span>: <span class="string">'#10B981'</span>, <span class="string">'Director'</span>: <span class="string">'#3B82F6'</span>}
+<span class="keyword">for</span> node <span class="keyword">in</span> G.nodes():
+    node_type = G.nodes[node][<span class="string">'type'</span>]
+    net.set_node_config(node, color=color_map.get(node_type, <span class="string">'#64748B'</span>))
+
+<span class="comment"># 设置节点标题(悬停时显示)</span>
+<span class="keyword">for</span> node, data <span class="keyword">in</span> G.nodes(data=<span class="keyword">True</span>):
+    title = f<span class="string">"{node}\nType: {data['type']}\n"</span>
+    <span class="keyword">if</span> data[<span class="string">'type'</span>] == <span class="string">'Movie'</span>:
+        title += f<span class="string">"Year: {data['year']}\nRating: {data['rating']}"</span>
+    <span class="keyword">elif</span> data[<span class="string">'type'</span>] == <span class="string">'Actor'</span>:
+        title += f<span class="string">"Age: {data['age']}"</span>
+    <span class="keyword">elif</span> data[<span class="string">'type'</span>] == <span class="string">'Director'</span>:
+        title += f<span class="string">"Awards: {data['awards']}"</span>
+    net.set_node_config(node, title=title)
+
+<span class="comment"># 保存交互式HTML</span>
+net.save_graph(<span class="string">'movie_kg.html'</span>)
+<span class="function">print</span>(<span class="string">"✅ 电影知识图谱已生成: movie_kg.html"</span>)
+                    </code>
+                </div>
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="glass-card">
+            <h2 class="section-title">7. 核心要点总结</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-300 mb-3">可视化工具选择</h3>
+                    <ul class="text-gray-300 space-y-2">
+                        <li>✓ <strong>开发调试</strong>: Neo4j Browser</li>
+                        <li>✓ <strong>业务探索</strong>: Neo4j Bloom</li>
+                        <li>✓ <strong>Python脚本</strong>: NetworkX + Matplotlib</li>
+                        <li>✓ <strong>交互式</strong>: PyVis</li>
+                        <li>✓ <strong>高级定制</strong>: Cytoscape.js</li>
+                    </ul>
+                </div>
+
+                <div class="highlight-box">
+                    <h3 class="text-xl font-bold text-green-300 mb-3">布局算法选择</h3>
+                    <ul class="text-gray-300 space-y-2">
+                        <li>✓ <strong>通用图</strong>: 力导向布局</li>
+                        <li>✓ <strong>层次结构</strong>: 树状布局</li>
+                        <li>✓ <strong>循环结构</strong>: 环形布局</li>
+                        <li>✓ <strong>大规模图</strong>: 聚合+分层</li>
+                    </ul>
+                </div>
+
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-300 mb-3">大规模图策略</h3>
+                    <ul class="text-gray-300 space-y-2">
+                        <li>✓ 节点聚合(按类型/社区)</li>
+                        <li>✓ 边简化(过滤低权重边)</li>
+                        <li>✓ 焦点+上下文视图</li>
+                        <li>✓ 智能采样</li>
+                    </ul>
+                </div>
+
+                <div class="highlight-box">
+                    <h3 class="text-xl font-bold text-green-300 mb-3">最佳实践</h3>
+                    <ul class="text-gray-300 space-y-2">
+                        <li>✓ 限制节点数量(< 100)</li>
+                        <li>✓ 使用颜色编码区分类型</li>
+                        <li>✓ 节点大小表示重要性</li>
+                        <li>✓ 提供丰富的交互功能</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="mt-6 p-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-500/20">
+                <h3 class="text-xl font-bold text-white mb-3">🚀 下一步学习</h3>
+                <p class="text-gray-300 mb-4">
+                    掌握可视化技术后,下一步是学习<strong>GraphRAG</strong>(模块31),将知识图谱与LLM结合,实现更强大的检索增强生成。
+                </p>
+                <a href="31-graphrag.html" class="inline-flex items-center gap-2 text-green-400 hover:text-green-300 transition-colors">
+                    前往模块31: GraphRAG →
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==================== Basic Interactive Visualization ====================
+        let basicSvg, basicSimulation, basicLink, basicNode;
+        let basicGraph = {
+            nodes: [
+                {id: 'Knowledge Graph', group: 1},
+                {id: 'Neo4j', group: 2},
+                {id: 'NetworkX', group: 2},
+                {id: 'RDF', group: 3},
+                {id: 'OWL', group: 3},
+                {id: 'SPARQL', group: 3},
+                {id: 'Entity', group: 4},
+                {id: 'Relation', group: 4},
+                {id: 'Attribute', group: 4}
+            ],
+            links: [
+                {source: 'Knowledge Graph', target: 'Neo4j'},
+                {source: 'Knowledge Graph', target: 'NetworkX'},
+                {source: 'Knowledge Graph', target: 'RDF'},
+                {source: 'RDF', target: 'OWL'},
+                {source: 'RDF', target: 'SPARQL'},
+                {source: 'Knowledge Graph', target: 'Entity'},
+                {source: 'Knowledge Graph', target: 'Relation'},
+                {source: 'Entity', target: 'Attribute'},
+                {source: 'Relation', target: 'Entity'}
+            ]
+        };
+
+        function initBasicVisualization() {
+            const container = document.getElementById('basic-viz');
+            const width = container.clientWidth;
+            const height = 500;
+
+            basicSvg = d3.select('#basic-viz')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            basicSimulation = d3.forceSimulation(basicGraph.nodes)
+                .force('link', d3.forceLink(basicGraph.links).id(d => d.id).distance(100))
+                .force('charge', d3.forceManyBody().strength(-300))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collision', d3.forceCollide().radius(30));
+
+            // Add arrow markers
+            basicSvg.append('defs').selectAll('marker')
+                .data(['end'])
+                .enter().append('marker')
+                .attr('id', 'arrow')
+                .attr('viewBox', '0 -5 10 10')
+                .attr('refX', 25)
+                .attr('refY', 0)
+                .attr('markerWidth', 6)
+                .attr('markerHeight', 6)
+                .attr('orient', 'auto')
+                .append('path')
+                .attr('d', 'M0,-5L10,0L0,5')
+                .attr('fill', '#64748B');
+
+            basicLink = basicSvg.append('g')
+                .selectAll('line')
+                .data(basicGraph.links)
+                .enter().append('line')
+                .attr('stroke', '#64748B')
+                .attr('stroke-width', 2)
+                .attr('marker-end', 'url(#arrow)');
+
+            basicNode = basicSvg.append('g')
+                .selectAll('g')
+                .data(basicGraph.nodes)
+                .enter().append('g')
+                .call(d3.drag()
+                    .on('start', dragstarted)
+                    .on('drag', dragged)
+                    .on('end', dragended));
+
+            basicNode.append('circle')
+                .attr('r', 20)
+                .attr('fill', d => {
+                    const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B'];
+                    return colors[d.group - 1];
+                })
+                .attr('stroke', '#fff')
+                .attr('stroke-width', 2);
+
+            basicNode.append('text')
+                .attr('dy', 35)
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#e2e8f0')
+                .attr('font-size', '12px')
+                .text(d => d.id);
+
+            basicSimulation.on('tick', () => {
+                basicLink
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                basicNode
+                    .attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+        }
+
+        function dragstarted(event, d) {
+            if (!event.active) basicSimulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function dragged(event, d) {
+            d.fx = event.x;
+            d.fy = event.y;
+        }
+
+        function dragended(event, d) {
+            if (!event.active) basicSimulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+        function switchLayout(layout) {
+            const width = document.getElementById('basic-viz').clientWidth;
+            const height = 500;
+
+            if (layout === 'force') {
+                basicSimulation
+                    .force('link', d3.forceLink(basicGraph.links).id(d => d.id).distance(100))
+                    .force('charge', d3.forceManyBody().strength(-300))
+                    .force('center', d3.forceCenter(width / 2, height / 2))
+                    .alpha(1)
+                    .restart();
+            } else if (layout === 'circular') {
+                const angleStep = (2 * Math.PI) / basicGraph.nodes.length;
+                basicGraph.nodes.forEach((node, i) => {
+                    node.fx = width / 2 + 150 * Math.cos(i * angleStep);
+                    node.fy = height / 2 + 150 * Math.sin(i * angleStep);
+                });
+                basicSimulation.alpha(0).restart();
+            } else if (layout === 'tree') {
+                // Simple hierarchical layout
+                basicGraph.nodes.forEach((node, i) => {
+                    node.fx = width / 2 + (i % 3 - 1) * 100;
+                    node.fy = 100 + Math.floor(i / 3) * 100;
+                });
+                basicSimulation.alpha(0).restart();
+            }
+        }
+
+        function resetVisualization() {
+            basicGraph.nodes.forEach(node => {
+                node.fx = null;
+                node.fy = null;
+            });
+            basicSimulation.alpha(1).restart();
+        }
+
+        // ==================== Neo4j Browser Simulation ====================
+        function runCypherQuery() {
+            const resultDiv = document.getElementById('cypher-result');
+            resultDiv.innerHTML = `
+                <div class="text-green-400 mb-3">✓ 查询成功,返回 10 行结果</div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-gray-800 rounded p-3 text-center">
+                        <div class="w-12 h-12 rounded-full bg-green-500 mx-auto mb-2 flex items-center justify-center font-bold">KR</div>
+                        <div class="text-xs text-gray-300">Person</div>
+                        <div class="text-sm font-bold">Keanu Reeves</div>
+                    </div>
+                    <div class="flex items-center justify-center text-gray-500">ACTED_IN</div>
+                    <div class="bg-gray-800 rounded p-3 text-center">
+                        <div class="w-12 h-12 rounded-full bg-purple-500 mx-auto mb-2 flex items-center justify-center font-bold">TM</div>
+                        <div class="text-xs text-gray-300">Movie</div>
+                        <div class="text-sm font-bold">The Matrix</div>
+                    </div>
+                </div>
+                <div class="mt-3 text-xs text-gray-400">
+                    更多结果请使用 Neo4j Browser 查看完整可视化...
+                </div>
+            `;
+        }
+
+        // ==================== Large Graph Visualization ====================
+        function initLargeGraph() {
+            const container = document.getElementById('large-graph-viz');
+            if (!container || container.querySelector('svg')) return;
+
+            const width = container.clientWidth;
+            const height = 500;
+
+            const svg = d3.select('#large-graph-viz')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            // Create larger graph
+            const nodes = [];
+            const links = [];
+            const categories = ['Person', 'Company', 'Product', 'Location'];
+
+            for (let i = 0; i < 50; i++) {
+                nodes.push({
+                    id: i,
+                    category: categories[Math.floor(Math.random() * categories.length)],
+                    radius: 15
+                });
+            }
+
+            for (let i = 0; i < 80; i++) {
+                const source = Math.floor(Math.random() * nodes.length);
+                let target = Math.floor(Math.random() * nodes.length);
+                while (target === source) {
+                    target = Math.floor(Math.random() * nodes.length);
+                }
+                links.push({source, target});
+            }
+
+            const simulation = d3.forceSimulation(nodes)
+                .force('link', d3.forceLink(links).id(d => d.id).distance(50))
+                .force('charge', d3.forceManyBody().strength(-100))
+                .force('center', d3.forceCenter(width / 2, height / 2));
+
+            const link = svg.append('g')
+                .selectAll('line')
+                .data(links)
+                .enter().append('line')
+                .attr('stroke', '#475569')
+                .attr('stroke-width', 1);
+
+            const node = svg.append('g')
+                .selectAll('circle')
+                .data(nodes)
+                .enter().append('circle')
+                .attr('r', d => d.radius)
+                .attr('fill', d => {
+                    const colors = {Person: '#3B82F6', Company: '#10B981', Product: '#8B5CF6', Location: '#F59E0B'};
+                    return colors[d.category];
+                })
+                .attr('opacity', 0.8);
+
+            simulation.on('tick', () => {
+                link
+                    .attr('x1', d => d.source.x)
+                    .attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x)
+                    .attr('y2', d => d.target.y);
+
+                node
+                    .attr('cx', d => d.x)
+                    .attr('cy', d => d.y);
+            });
+
+            window.largeGraphData = {nodes, links, simulation, node, svg};
+        }
+
+        function aggregateNodes() {
+            if (!window.largeGraphData) return;
+            const {nodes, node} = window.largeGraphData;
+
+            nodes.forEach(n => {
+                if (n.category === 'Person') {
+                    n.radius = 30;
+                    n.aggregated = true;
+                }
+            });
+
+            node.transition()
+                .duration(500)
+                .attr('r', d => d.radius);
+        }
+
+        function expandNodes() {
+            if (!window.largeGraphData) return;
+            const {nodes, node} = window.largeGraphData;
+
+            nodes.forEach(n => {
+                if (n.aggregated) {
+                    n.radius = 15;
+                    n.aggregated = false;
+                }
+            });
+
+            node.transition()
+                .duration(500)
+                .attr('r', d => d.radius);
+        }
+
+        function resetLargeGraph() {
+            if (!window.largeGraphData) return;
+            const {nodes, node, simulation} = window.largeGraphData;
+
+            nodes.forEach(n => {
+                n.radius = 15;
+                n.fx = null;
+                n.fy = null;
+            });
+
+            node.transition()
+                .duration(500)
+                .attr('r', d => d.radius);
+
+            simulation.alpha(1).restart();
+        }
+
+        // ==================== Initialize ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            initBasicVisualization();
+            initLargeGraph();
+        });
+    </script>
+</body>
+</html>

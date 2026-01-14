@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>状态持久化 - LangChain 学习 17</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 浮动光球 */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(236, 72, 153, 0.2) 0%, rgba(168, 85, 247, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -30px) scale(1.1); }
+            50% { transform: translate(-20px, 20px) scale(0.9); }
+            75% { transform: translate(-30px, -20px) scale(1.05); }
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 头部 */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(167, 139, 250, 0.3);
+        }
+
+        .header p {
+            font-size: 1.3em;
+            color: rgba(226, 232, 240, 0.8);
+        }
+
+        /* 进度条 */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6 0%, #a855f7 50%, #d946ef 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* 场景容器 */
+        .scene {
+            display: none;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .scene.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 场景标题 */
+        .scene-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 画布容器 */
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 状态时间线 */
+        .state-timeline {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 40px;
+            padding: 40px 20px;
+            flex-wrap: wrap;
+        }
+
+        .state-point {
+            background: rgba(139, 92, 246, 0.2);
+            border: 3px solid rgba(139, 92, 246, 0.5);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            min-width: 150px;
+            transition: all 0.6s;
+            transform: scale(0.8);
+            opacity: 0;
+            position: relative;
+        }
+
+        .state-point.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .state-point.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: rgba(34, 197, 94, 0.7);
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+            transform: scale(1.15);
+            animation: pointPulse 0.6s ease-in-out;
+        }
+
+        @keyframes pointPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1.15); }
+        }
+
+        .state-point.saving {
+            animation: savingPulse 1s ease-in-out infinite;
+        }
+
+        @keyframes savingPulse {
+            0%, 100% {
+                box-shadow: 0 0 20px rgba(139, 92, 246, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 50px rgba(139, 92, 246, 0.9);
+            }
+        }
+
+        .checkpoint-icon {
+            position: absolute;
+            top: -15px;
+            right: -15px;
+            font-size: 1.8em;
+            opacity: 0;
+            transition: all 0.3s;
+            animation: iconBounce 0.5s ease-in-out;
+        }
+
+        @keyframes iconBounce {
+            0% { transform: scale(0) translateY(0); }
+            50% { transform: scale(1.2) translateY(-5px); }
+            100% { transform: scale(1) translateY(0); }
+        }
+
+        .state-point .step-number {
+            background: #8b5cf6;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 50px;
+            margin: 0 auto 15px;
+            font-weight: bold;
+            font-size: 1.3em;
+        }
+
+        .state-point.active .step-number {
+            background: #22c55e;
+        }
+
+        .state-point h4 {
+            color: #a78bfa;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .state-point p {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.85em;
+        }
+
+        .state-line {
+            flex: 1;
+            height: 4px;
+            background: rgba(139, 92, 246, 0.3);
+            min-width: 60px;
+            margin-top: 45px;
+            opacity: 0;
+            transition: all 0.6s;
+        }
+
+        .state-line.visible {
+            opacity: 1;
+            animation: lineFlow 1s ease-in-out infinite;
+        }
+
+        @keyframes lineFlow {
+            0%, 100% { background: rgba(139, 92, 246, 0.3); }
+            50% { background: rgba(139, 92, 246, 0.6); }
+        }
+
+        /* 状态变化指示器 */
+        .state-change {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-top: 8px;
+            transition: all 0.3s;
+        }
+
+        .state-change.changed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+            animation: stateUpdate 0.5s ease-in-out;
+        }
+
+        @keyframes stateUpdate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        /* 检查点标签 */
+        .checkpoint-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            border-radius: 15px;
+            padding: 6px 12px;
+            margin: 10px auto;
+            font-size: 0.9em;
+            color: #a78bfa;
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .checkpoint-tag.visible {
+            opacity: 1;
+        }
+
+        /* 特性卡片 */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-card:hover {
+            background: rgba(139, 92, 246, 0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h4 {
+            color: #a78bfa;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+
+        .feature-card p {
+            color: rgba(226, 232, 240, 0.7);
+            line-height: 1.6;
+        }
+
+        /* 代码片段 */
+        .code-snippet {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .keyword { color: #c792ea; font-weight: bold; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .function { color: #82aaff; }
+
+        /* 高亮框 */
+        .highlight-box {
+            background: rgba(139, 92, 246, 0.15);
+            border-left: 5px solid #8b5cf6;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+            animation: slideInRight 0.8s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .highlight-box h3 {
+            color: #a78bfa;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .highlight-box p {
+            line-height: 1.8;
+            color: rgba(226, 232, 240, 0.9);
+        }
+
+        /* 演示按钮 */
+        .demo-btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            margin: 20px auto;
+            display: block;
+        }
+
+        .demo-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6);
+        }
+
+        .demo-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            border-radius: 12px;
+            color: #a78bfa;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(139, 92, 246, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(139, 92, 246, 0.4);
+        }
+
+        /* 针对 a 标签的导航按钮样式 */
+        .nav-btn.back-to-list {
+            text-decoration: none;
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+        }
+
+        .nav-btn.back-to-list:hover {
+            background: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 5px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-btn.next {
+            margin-left: auto;
+        }
+
+        /* 场景指示器 */
+        .scene-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 40px 0;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            background: #8b5cf6;
+            transform: scale(1.3);
+        }
+
+        .indicator:hover {
+            transform: scale(1.2);
+        }
+
+        /* 存储对比表 */
+        .storage-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 30px 0;
+            overflow: hidden;
+            border-radius: 15px;
+        }
+
+        .storage-table thead {
+            background: rgba(139, 92, 246, 0.3);
+        }
+
+        .storage-table th {
+            padding: 20px;
+            text-align: left;
+            font-weight: bold;
+            color: #a78bfa;
+            font-size: 1.1em;
+        }
+
+        .storage-table td {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .storage-table tr:hover td {
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .state-timeline {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .state-line {
+                width: 4px;
+                height: 60px;
+                min-width: 4px;
+                margin: 0;
+            }
+        }
+    
+        /* 标准导航样式 */
+        .nav-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-card a {
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-card a:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 顶部导航卡片 */
+        .top-nav-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .top-nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .top-nav-left,
+        .top-nav-center,
+        .top-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .top-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #9ca3af;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .top-nav-link:hover {
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .top-nav-link.home {
+            color: #4ade80;
+        }
+
+        .top-nav-link.home:hover {
+            color: #86efac;
+        }
+
+        .top-nav-link svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .top-nav-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .top-nav-text {
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+
+        .top-nav-progress {
+            color: #9ca3af;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+</style>
+</head>
+<body>
+    <!-- 浮动光球 -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>    <!-- 顶部导航 - 跨模块 -->
+    <div class="top-nav-card">
+        <div class="top-nav-container">
+            <div class="top-nav-left">
+                <a href="index.html" class="top-nav-link home">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回LangGraph目录
+                </a>
+            </div>
+            <div class="top-nav-center">
+                <a href="16-human-in-loop-demo.html" class="top-nav-link">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一课
+                </a>
+                <div class="top-nav-divider"></div>
+                <a href="18-multi-agent-demo.html" class="top-nav-link">
+                    下一课
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="top-nav-right">
+                <span class="top-nav-progress">课程 17 / 20</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>状态持久化</h1>
+            <p>跨会话保存和管理状态 - 让 AI 记住每一次对话</p>
+        </div>
+
+        <!-- 场景 1: 什么是状态持久化 -->
+        <div class="scene active" id="scene1">
+            <h2 class="scene-title">什么是状态持久化？</h2>
+
+            <div class="highlight-box">
+                <h3>💡 核心概念</h3>
+                <p>
+                    状态持久化允许你在<strong>多次执行之间保存和恢复状态</strong>。<br>
+                    这对于长期运行的对话、多用户系统、以及需要暂停和恢复的应用场景至关重要。<br><br>
+                    <strong>想象一下：</strong><br>
+                    每次对话就像在记笔记，状态持久化确保你永远不会丢失任何内容<br>
+                    即使关闭浏览器，下次回来时AI还记得你们聊过什么！<br><br>
+                    <strong>核心组成：</strong>检查点(Checkpoint) + 会话ID(thread_id) + 存储后端
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card" data-delay="0">
+                    <div class="feature-icon">💾</div>
+                    <h4>检查点</h4>
+                    <p>保存执行状态，支持暂停和恢复</p>
+                </div>
+
+                <div class="feature-card" data-delay="100">
+                    <div class="feature-icon">🧵</div>
+                    <h4>会话ID</h4>
+                    <p>thread_id 唯一标识每个用户会话</p>
+                </div>
+
+                <div class="feature-card" data-delay="200">
+                    <div class="feature-icon">🔄</div>
+                    <h4>版本控制</h4>
+                    <p>记录完整的历史状态，支持回溯</p>
+                </div>
+
+                <div class="feature-card" data-delay="300">
+                    <div class="feature-icon">⏪</div>
+                    <h4>时间旅行</h4>
+                    <p>查看历史、回退版本、分支探索</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景 2: 基础检查点 -->
+        <div class="scene" id="scene2">
+            <h2 class="scene-title">基础检查点 - MemorySaver</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a78bfa; margin-bottom: 30px; font-size: 1.5em;">状态保存时间线</h3>
+
+                <div class="state-timeline" id="timeline">
+                    <div class="state-point" id="state1" data-step="1">
+                        <div class="checkpoint-icon" id="checkpoint1">💾</div>
+                        <div class="step-number">1</div>
+                        <h4>执行 1</h4>
+                        <p id="state1-value">count: 0 → 1</p>
+                        <div class="state-change" id="change1">+1</div>
+                    </div>
+
+                    <div class="state-line" data-step="2"></div>
+
+                    <div class="state-point" id="state2" data-step="3">
+                        <div class="checkpoint-icon" id="checkpoint2">💾</div>
+                        <div class="step-number">2</div>
+                        <h4>执行 2</h4>
+                        <p id="state2-value">count: 1 → 2</p>
+                        <div class="state-change" id="change2">+1</div>
+                    </div>
+
+                    <div class="state-line" data-step="4"></div>
+
+                    <div class="state-point" id="state3" data-step="5">
+                        <div class="checkpoint-icon" id="checkpoint3">💾</div>
+                        <div class="step-number">3</div>
+                        <h4>执行 3</h4>
+                        <p id="state3-value">count: 2 → 3</p>
+                        <div class="state-change" id="change3">+1</div>
+                    </div>
+                </div>
+
+                <div class="checkpoint-tag" id="checkpointStatus">
+                    💾 检查点已保存
+                </div>
+
+                <button class="demo-btn" id="runTimelineBtn" onclick="runTimeline()">▶️ 播放状态演变</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 核心代码：使用 MemorySaver 保存状态</span><br><br>
+                <span class="keyword">from</span> langgraph.checkpoint.memory <span class="keyword">import</span> MemorySaver<br><br>
+                <span class="comment"># 创建检查点保存器</span><br>
+                memory = MemorySaver()<br>
+                compiled_graph = graph.compile(checkpointer=memory)<br><br>
+                <span class="comment"># 配置：thread_id 用于标识会话</span><br>
+                config = {<span class="string">"configurable"</span>: {<span class="string">"thread_id"</span>: <span class="string">"user-session-123"</span>}}<br><br>
+                <span class="comment"># 执行第 1 次</span><br>
+                result1 = compiled_graph.invoke({<span class="string">"count"</span>: 0}, config)<br>
+                <span class="comment"># {'count': 1}</span><br><br>
+                <span class="comment"># 执行第 2 次（继续同一个会话）</span><br>
+                result2 = compiled_graph.invoke(result1, config)<br>
+                <span class="comment"># {'count': 2} - 状态累加！</span>
+            </div>
+        </div>
+
+        <!-- 场景 3: 多会话管理 -->
+        <div class="scene" id="scene3">
+            <h2 class="scene-title">多会话管理</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a78bfa; margin-bottom: 30px; font-size: 1.5em;">独立会话演示</h3>
+
+                <div style="display: flex; justify-content: space-around; flex-wrap: wrap; gap: 30px;">
+                    <div style="text-align: center;">
+                        <div style="background: rgba(14, 165, 233, 0.2); padding: 20px; border-radius: 15px; border: 2px solid rgba(14, 165, 233, 0.5); margin-bottom: 15px;">
+                            <div style="font-size: 3em;">👤</div>
+                            <h4 style="color: #0ea5e9; margin: 10px 0;">Alice</h4>
+                            <p style="color: rgba(226, 232, 240, 0.7); font-size: 0.9em;">thread_id: "alice"</p>
+                        </div>
+                        <div id="alice-messages" style="min-height: 100px;"></div>
+                    </div>
+
+                    <div style="text-align: center;">
+                        <div style="background: rgba(34, 197, 94, 0.2); padding: 20px; border-radius: 15px; border: 2px solid rgba(34, 197, 94, 0.5); margin-bottom: 15px;">
+                            <div style="font-size: 3em;">👨</div>
+                            <h4 style="color: #22c55e; margin: 10px 0;">Bob</h4>
+                            <p style="color: rgba(226, 232, 240, 0.7); font-size: 0.9em;">thread_id: "bob"</p>
+                        </div>
+                        <div id="bob-messages" style="min-height: 100px;"></div>
+                    </div>
+
+                    <div style="text-align: center;">
+                        <div style="background: rgba(251, 146, 60, 0.2); padding: 20px; border-radius: 15px; border: 2px solid rgba(251, 146, 60, 0.5); margin-bottom: 15px;">
+                            <div style="font-size: 3em;">👩</div>
+                            <h4 style="color: #fb923c; margin: 10px 0;">Charlie</h4>
+                            <p style="color: rgba(226, 232, 240, 0.7); font-size: 0.9em;">thread_id: "charlie"</p>
+                        </div>
+                        <div id="charlie-messages" style="min-height: 100px;"></div>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="runMultiSessionBtn" onclick="runMultiSession()">▶️ 播放多会话交互</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 核心代码：多用户独立会话</span><br><br>
+                <span class="comment"># 第一轮：每个用户发送一条消息</span><br>
+                <span class="keyword">for</span> user_id <span class="keyword">in</span> [<span class="string">"alice"</span>, <span class="string">"bob"</span>, <span class="string">"charlie"</span>]:<br>
+                &nbsp;&nbsp;config = {<span class="string">"configurable"</span>: {<span class="string">"thread_id"</span>: user_id}}<br>
+                &nbsp;&nbsp;result = compiled_graph.invoke({<span class="string">"messages"</span>: []}, config)<br>
+                &nbsp;&nbsp;<span class="function">print</span>(f<span class="string">"{user_id}: {len(result['messages'])} 条消息"</span>)<br><br>
+                <span class="comment"># 第二轮：某些用户继续发送消息</span><br>
+                <span class="keyword">for</span> user_id <span class="keyword">in</span> [<span class="string">"alice"</span>, <span class="string">"bob"</span>]:<br>
+                &nbsp;&nbsp;config = {<span class="string">"configurable"</span>: {<span class="string">"thread_id"</span>: user_id}}<br>
+                &nbsp;&nbsp;result = compiled_graph.invoke(<span class="keyword">None</span>, config)  <span class="comment"># 继续之前的状态</span><br>
+                &nbsp;&nbsp;<span class="function">print</span>(f<span class="string">"{user_id}: {len(result['messages'])} 条消息"</span>)<br><br>
+                <span class="comment"># 输出：alice: 2, bob: 2, charlie: 1</span>
+            </div>
+        </div>
+
+        <!-- 场景 4: 存储后端对比 -->
+        <div class="scene" id="scene4">
+            <h2 class="scene-title">存储后端对比</h2>
+
+            <div class="feature-grid">
+                <div class="feature-card" data-delay="0">
+                    <div class="feature-icon">🧠</div>
+                    <h4>MemorySaver</h4>
+                    <p>内存存储，仅用于开发，重启后丢失</p>
+                </div>
+
+                <div class="feature-card" data-delay="100">
+                    <div class="feature-icon">📁</div>
+                    <h4>SQLiteSaver</h4>
+                    <p>本地文件存储，适合单机应用</p>
+                </div>
+
+                <div class="feature-card" data-delay="200">
+                    <div class="feature-icon">🐘</div>
+                    <h4>PostgresSaver</h4>
+                    <p>生产环境，支持分布式，性能优秀</p>
+                </div>
+
+                <div class="feature-card" data-delay="300">
+                    <div class="feature-icon">⚡</div>
+                    <h4>RedisSaver</h4>
+                    <p>高性能缓存，适合高并发场景</p>
+                </div>
+            </div>
+
+            <table class="storage-table">
+                <thead>
+                    <tr>
+                        <th>后端</th>
+                        <th>性能</th>
+                        <th>持久化</th>
+                        <th>适用场景</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>MemorySaver</strong></td>
+                        <td>⭐⭐⭐⭐⭐</td>
+                        <td>❌</td>
+                        <td>开发测试</td>
+                    </tr>
+                    <tr>
+                        <td><strong>SQLiteSaver</strong></td>
+                        <td>⭐⭐⭐</td>
+                        <td>✅</td>
+                        <td>单机应用</td>
+                    </tr>
+                    <tr>
+                        <td><strong>PostgresSaver</strong></td>
+                        <td>⭐⭐⭐⭐</td>
+                        <td>✅</td>
+                        <td>生产环境</td>
+                    </tr>
+                    <tr>
+                        <td><strong>RedisSaver</strong></td>
+                        <td>⭐⭐⭐⭐⭐</td>
+                        <td>✅</td>
+                        <td>高性能缓存</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="highlight-box">
+                <h3>🎯 环境配置清单</h3>
+                <p>
+                    ✅ <strong>开发环境</strong>：使用 MemorySaver，快速迭代<br>
+                    ✅ <strong>测试环境</strong>：使用 SQLite，模拟生产<br>
+                    ✅ <strong>生产环境</strong>：使用 PostgreSQL，连接池，监控告警，定期备份<br><br>
+                    <strong>核心要点：checkpointer + thread_id = 状态持久化</strong>
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景指示器 -->
+        <div class="scene-indicators">
+            <div class="indicator active" data-scene="1"></div>
+            <div class="indicator" data-scene="2"></div>
+            <div class="indicator" data-scene="3"></div>
+            <div class="indicator" data-scene="4"></div>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <button class="nav-btn" id="prevBtn" disabled>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                上一节
+            </button>
+            <a href="../langchain/index.html" class="nav-btn back-to-list">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                </svg>
+                课程列表
+            </a>
+            <button class="nav-btn next" id="nextBtn">
+                下一节
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 场景数据
+        const totalScenes = 4;
+        let currentScene = 1;
+
+        // DOM 元素
+        const progressBar = document.getElementById('progressBar');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const indicators = document.querySelectorAll('.indicator');
+
+        // 初始化
+        function init() {
+            setupEventListeners();
+            updateScene();
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            prevBtn.addEventListener('click', () => {
+                if (currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                }
+            });
+
+            indicators.forEach(indicator => {
+                indicator.addEventListener('click', () => {
+                    currentScene = parseInt(indicator.dataset.scene);
+                    updateScene();
+                });
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' && currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                } else if (e.key === 'ArrowLeft' && currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+        }
+
+        // 更新场景
+        function updateScene() {
+            const progress = ((currentScene - 1) / (totalScenes - 1)) * 100;
+            progressBar.style.width = progress + '%';
+
+            document.querySelectorAll('.scene').forEach((scene, index) => {
+                if (index + 1 === currentScene) {
+                    scene.classList.add('active');
+                } else {
+                    scene.classList.remove('active');
+                }
+            });
+
+            indicators.forEach((indicator, index) => {
+                if (index + 1 === currentScene) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+
+            prevBtn.disabled = currentScene === 1;
+            nextBtn.disabled = currentScene === totalScenes;
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            document.querySelectorAll('.feature-card, .state-point, .state-line').forEach(el => {
+                el.classList.remove('visible');
+            });
+
+            setTimeout(() => {
+                animateSceneElements();
+            }, 100);
+        }
+
+        // 动画显示场景元素
+        function animateSceneElements() {
+            const currentSceneEl = document.querySelector(`#scene${currentScene}`);
+
+            currentSceneEl.querySelectorAll('.feature-card').forEach((card, index) => {
+                const delay = parseInt(card.dataset.delay) || index * 100;
+                setTimeout(() => {
+                    card.classList.add('visible');
+                }, delay);
+            });
+
+            currentSceneEl.querySelectorAll('.state-point').forEach((point, index) => {
+                const delay = parseInt(point.dataset.step) * 300 || index * 200;
+                setTimeout(() => {
+                    point.classList.add('visible');
+                }, delay);
+            });
+
+            currentSceneEl.querySelectorAll('.state-line').forEach((line, index) => {
+                const delay = parseInt(line.dataset.step) * 300 || index * 200;
+                setTimeout(() => {
+                    line.classList.add('visible');
+                }, delay);
+            });
+        }
+
+        // 场景 2: 时间线演示
+        async function runTimeline() {
+            const btn = document.getElementById('runTimelineBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            // 获取元素
+            const states = {
+                s1: document.getElementById('state1'),
+                s2: document.getElementById('state2'),
+                s3: document.getElementById('state3')
+            };
+
+            const checkpoints = {
+                c1: document.getElementById('checkpoint1'),
+                c2: document.getElementById('checkpoint2'),
+                c3: document.getElementById('checkpoint3')
+            };
+
+            const changes = {
+                ch1: document.getElementById('change1'),
+                ch2: document.getElementById('change2'),
+                ch3: document.getElementById('change3')
+            };
+
+            const lines = document.querySelectorAll('#timeline .state-line');
+            const checkpointStatus = document.getElementById('checkpointStatus');
+
+            // 重置所有状态
+            Object.values(states).forEach(el => el.classList.remove('visible', 'active', 'saving'));
+            Object.values(checkpoints).forEach(el => el.style.opacity = '0');
+            Object.values(changes).forEach(el => el.classList.remove('changed'));
+            lines.forEach(el => el.classList.remove('visible'));
+            checkpointStatus.classList.remove('visible');
+
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            // ============ 执行 1 ============
+            states.s1.classList.add('visible', 'saving');
+            checkpointStatus.textContent = '⏳ 正在执行...';
+            checkpointStatus.classList.add('visible');
+
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            // 显示状态变化
+            changes.ch1.classList.add('changed');
+            checkpointStatus.textContent = '✅ count: 0 → 1';
+
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            // 保存检查点
+            states.s1.classList.remove('saving');
+            states.s1.classList.add('active');
+            checkpoints.c1.style.opacity = '1';
+            checkpointStatus.textContent = '💾 检查点已保存 (checkpoint_1)';
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            states.s1.classList.remove('active');
+
+            // 箭头流动
+            lines[0].classList.add('visible');
+            await new Promise(resolve => setTimeout(resolve, 400));
+
+            // ============ 执行 2 ============
+            states.s2.classList.add('visible', 'saving');
+            checkpointStatus.textContent = '⏳ 正在从检查点恢复并执行...';
+
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            changes.ch2.classList.add('changed');
+            checkpointStatus.textContent = '✅ count: 1 → 2 (从上一个状态继续)';
+
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            states.s2.classList.remove('saving');
+            states.s2.classList.add('active');
+            checkpoints.c2.style.opacity = '1';
+            checkpointStatus.textContent = '💾 检查点已保存 (checkpoint_2)';
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            states.s2.classList.remove('active');
+
+            // 箭头流动
+            lines[1].classList.add('visible');
+            await new Promise(resolve => setTimeout(resolve, 400));
+
+            // ============ 执行 3 ============
+            states.s3.classList.add('visible', 'saving');
+            checkpointStatus.textContent = '⏳ 正在从检查点恢复并执行...';
+
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            changes.ch3.classList.add('changed');
+            checkpointStatus.textContent = '✅ count: 2 → 3 (从上一个状态继续)';
+
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            states.s3.classList.remove('saving');
+            states.s3.classList.add('active');
+            checkpoints.c3.style.opacity = '1';
+            checkpointStatus.textContent = '💾 检查点已保存 (checkpoint_3) - 完整历史已记录！';
+
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            states.s3.classList.remove('active');
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 场景 3: 多会话演示
+        async function runMultiSession() {
+            const btn = document.getElementById('runMultiSessionBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            // 清空消息
+            ['alice', 'bob', 'charlie'].forEach(user => {
+                document.getElementById(`${user}-messages`).innerHTML = '';
+            });
+
+            // 添加消息函数
+            const addMessage = (user, text, type = 'normal') => {
+                const container = document.getElementById(`${user}-messages`);
+                const msg = document.createElement('div');
+
+                const colors = {
+                    alice: 'rgba(14, 165, 233, 0.2)',
+                    bob: 'rgba(34, 197, 94, 0.2)',
+                    charlie: 'rgba(251, 146, 60, 0.2)'
+                };
+
+                const borderColors = {
+                    alice: 'rgba(14, 165, 233, 0.5)',
+                    bob: 'rgba(34, 197, 94, 0.5)',
+                    charlie: 'rgba(251, 146, 60, 0.5)'
+                };
+
+                msg.style.cssText = `
+                    background: ${colors[user]};
+                    border: 2px solid ${borderColors[user]};
+                    padding: 12px 16px;
+                    border-radius: 10px;
+                    margin: 8px 0;
+                    font-size: 0.9em;
+                    animation: fadeInUp 0.5s ease-out;
+                    transition: all 0.3s;
+                `;
+
+                if (type === 'save') {
+                    msg.innerHTML = `💾 ${text}`;
+                    msg.style.fontWeight = 'bold';
+                } else {
+                    msg.textContent = text;
+                }
+
+                container.appendChild(msg);
+                msg.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            };
+
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            // ============ 第一轮：所有用户发送消息 ============
+            addMessage('alice', '💬 消息 1', 'save');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            addMessage('alice', '✓ 已保存到 thread_id="alice"');
+
+            await new Promise(resolve => setTimeout(resolve, 400));
+            addMessage('bob', '💬 消息 1', 'save');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            addMessage('bob', '✓ 已保存到 thread_id="bob"');
+
+            await new Promise(resolve => setTimeout(resolve, 400));
+            addMessage('charlie', '💬 消息 1', 'save');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            addMessage('charlie', '✓ 已保存到 thread_id="charlie"');
+
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            // ============ 第二轮：Alice 和 Bob 继续对话 ============
+            addMessage('alice', '💬 消息 2', 'save');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            addMessage('alice', '✓ 从检查点恢复，继续 thread_id="alice"');
+
+            await new Promise(resolve => setTimeout(resolve, 400));
+            addMessage('bob', '💬 消息 2', 'save');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            addMessage('bob', '✓ 从检查点恢复，继续 thread_id="bob"');
+
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // ============ Charlie 没有新消息 ============
+            const charlieContainer = document.getElementById('charlie-messages');
+            const note = document.createElement('div');
+            note.style.cssText = `
+                background: rgba(251, 146, 60, 0.2);
+                border: 2px dashed rgba(251, 146, 60, 0.5);
+                padding: 12px 16px;
+                border-radius: 10px;
+                margin: 8px 0;
+                font-size: 0.85em;
+                animation: fadeInUp 0.5s ease-out;
+            `;
+            note.innerHTML = '😴 <strong>Charlie 暂无新消息</strong><br><span style="font-size: 0.85em;">会话状态保持为 1 条消息</span>';
+            charlieContainer.appendChild(note);
+
+            // 添加总结
+            await new Promise(resolve => setTimeout(resolve, 800));
+            const summary = document.createElement('div');
+            summary.style.cssText = `
+                text-align: center;
+                background: rgba(139, 92, 246, 0.15);
+                border: 2px solid rgba(139, 92, 246, 0.3);
+                border-radius: 15px;
+                padding: 20px;
+                margin: 20px auto;
+                max-width: 600px;
+                animation: fadeInUp 0.5s ease-out;
+            `;
+            summary.innerHTML = `
+                <h4 style="color: #a78bfa; margin-bottom: 10px;">🎯 多会话独立管理总结</h4>
+                <p style="color: rgba(226, 232, 240, 0.9); line-height: 1.8;">
+                    ✅ <strong>Alice</strong>: 2 条消息 (thread_id="alice")<br>
+                    ✅ <strong>Bob</strong>: 2 条消息 (thread_id="bob")<br>
+                    ✅ <strong>Charlie</strong>: 1 条消息 (thread_id="charlie")<br><br>
+                    <em style="font-size: 0.9em;">每个 thread_id 维护独立的状态历史</em>
+                </p>
+            `;
+            document.getElementById('scene3').querySelector('.canvas-container').appendChild(summary);
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

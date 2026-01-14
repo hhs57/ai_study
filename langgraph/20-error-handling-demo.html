@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错误处理与容错 - LangChain 学习 20</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 浮动光球 */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(239, 68, 68, 0.3) 0%, rgba(139, 92, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -30px) scale(1.1); }
+            50% { transform: translate(-20px, 20px) scale(0.9); }
+            75% { transform: translate(-30px, -20px) scale(1.05); }
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 头部 */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(239, 68, 68, 0.3);
+        }
+
+        .header p {
+            font-size: 1.3em;
+            color: rgba(226, 232, 240, 0.8);
+        }
+
+        /* 进度条 */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #ef4444 0%, #f97316 50%, #eab308 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* 场景容器 */
+        .scene {
+            display: none;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .scene.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 场景标题 */
+        .scene-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 动画画布 */
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 图节点 */
+        .graph-node {
+            background: rgba(239, 68, 68, 0.2);
+            border: 3px solid rgba(239, 68, 68, 0.5);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            min-width: 150px;
+            transition: all 0.6s;
+            transform: scale(0.8);
+            opacity: 0;
+            position: relative;
+        }
+
+        .graph-node.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .graph-node.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: rgba(34, 197, 94, 0.7);
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+            transform: scale(1.15);
+        }
+
+        .graph-node.error {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.7);
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.6);
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* 成功路径节点样式 */
+        .graph-node.success-path {
+            background: rgba(34, 197, 94, 0.15);
+            border-color: rgba(34, 197, 94, 0.4);
+        }
+
+        .graph-node.success-path.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: rgba(34, 197, 94, 0.8);
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+        }
+
+        /* 错误路径节点样式 */
+        .graph-node.error-path {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: rgba(239, 68, 68, 0.4);
+        }
+
+        .graph-node.error-path.active {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.8);
+            box-shadow: 0 0 40px rgba(239, 68, 68, 0.6);
+        }
+
+        .graph-node .icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .graph-node h4 {
+            color: #ef4444;
+            margin-bottom: 8px;
+            font-size: 1.2em;
+        }
+
+        .graph-node p {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.9em;
+        }
+
+        .graph-arrow {
+            font-size: 3em;
+            color: #f97316;
+            opacity: 0;
+            transition: all 0.6s;
+        }
+
+        .graph-arrow.visible {
+            opacity: 1;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        /* 特性卡片 */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-card:hover {
+            background: rgba(239, 68, 68, 0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h4 {
+            color: #ef4444;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+
+        .feature-card p {
+            color: rgba(226, 232, 240, 0.7);
+            line-height: 1.6;
+        }
+
+        /* 代码片段 */
+        .code-snippet {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .keyword { color: #c792ea; font-weight: bold; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .function { color: #82aaff; }
+
+        /* 高亮框 */
+        .highlight-box {
+            background: rgba(239, 68, 68, 0.15);
+            border-left: 5px solid #ef4444;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+            animation: slideInRight 0.8s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .highlight-box h3 {
+            color: #ef4444;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .highlight-box p {
+            line-height: 1.8;
+            color: rgba(226, 232, 240, 0.9);
+        }
+
+        /* 演示按钮 */
+        .demo-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+            margin: 20px auto;
+            display: block;
+        }
+
+        .demo-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(239, 68, 68, 0.6);
+        }
+
+        .demo-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(239, 68, 68, 0.2);
+            border: 2px solid rgba(239, 68, 68, 0.5);
+            border-radius: 12px;
+            color: #ef4444;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(239, 68, 68, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(239, 68, 68, 0.4);
+        }
+
+        /* 针对 a 标签的导航按钮样式 */
+        .nav-btn.back-to-list {
+            text-decoration: none;
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+        }
+
+        .nav-btn.back-to-list:hover {
+            background: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 5px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-btn.next {
+            margin-left: auto;
+        }
+
+        /* 场景指示器 */
+        .scene-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 40px 0;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            background: #ef4444;
+            transform: scale(1.3);
+        }
+
+        .indicator:hover {
+            transform: scale(1.2);
+        }
+
+        /* 流程步骤 */
+        .step-list {
+            list-style: none;
+            padding: 0;
+            margin: 30px 0;
+        }
+
+        .step-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-left: 4px solid #ef4444;
+            padding: 20px 25px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            transform: translateX(-50px);
+            opacity: 0;
+            transition: all 0.6s;
+        }
+
+        .step-item.visible {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .step-number {
+            display: inline-block;
+            background: #ef4444;
+            color: white;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 35px;
+            margin-right: 15px;
+            font-weight: bold;
+        }
+
+        .step-content {
+            display: inline-block;
+            color: rgba(226, 232, 240, 0.9);
+        }
+
+        /* 图形可视化区域 */
+        .graph-structure {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            padding: 40px 20px;
+            flex-wrap: wrap;
+        }
+
+        /* 错误日志 */
+        .error-log {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.85em;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 20px 0;
+        }
+
+        .error-entry {
+            padding: 10px;
+            margin: 5px 0;
+            border-left: 3px solid #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .error-entry.success {
+            border-left-color: #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+        }
+
+        .error-entry.warning {
+            border-left-color: #f97316;
+            background: rgba(249, 115, 22, 0.1);
+        }
+
+        .error-timestamp {
+            color: #8b5cf6;
+            font-size: 0.85em;
+        }
+
+        .error-type {
+            color: #ef4444;
+            font-weight: bold;
+        }
+
+        /* 重试计数器 */
+        .retry-counter {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.2em;
+            color: #f97316;
+            margin: 20px 0;
+        }
+
+        .retry-number {
+            font-size: 3em;
+            font-weight: bold;
+            color: #ef4444;
+        }
+
+        /* 断路器状态 */
+        .circuit-state {
+            display: flex;
+            justify-content: space-around;
+            margin: 30px 0;
+        }
+
+        .circuit-status {
+            text-align: center;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            min-width: 200px;
+        }
+
+        .circuit-icon {
+            font-size: 4em;
+            margin-bottom: 10px;
+        }
+
+        .circuit-label {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .circuit-desc {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.9em;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .graph-structure {
+                flex-direction: column;
+            }
+
+            .graph-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    
+        /* 标准导航样式 */
+        .nav-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-card a {
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-card a:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 顶部导航卡片 */
+        .top-nav-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .top-nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .top-nav-left,
+        .top-nav-center,
+        .top-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .top-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #9ca3af;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .top-nav-link:hover {
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .top-nav-link.home {
+            color: #4ade80;
+        }
+
+        .top-nav-link.home:hover {
+            color: #86efac;
+        }
+
+        .top-nav-link svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .top-nav-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .top-nav-text {
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+
+        .top-nav-progress {
+            color: #9ca3af;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+</style>
+</head>
+<body>
+    <!-- 浮动光球 -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>    <!-- 顶部导航 - 跨模块 -->
+    <div class="top-nav-card">
+        <div class="top-nav-container">
+            <div class="top-nav-left">
+                <a href="index.html" class="top-nav-link home">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回LangGraph目录
+                </a>
+            </div>
+            <div class="top-nav-center">
+                <a href="19-visualization-debug-demo.html" class="top-nav-link">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一课
+                </a>
+                <div class="top-nav-divider"></div>
+                <span class="top-nav-text">最后一课</span>
+            </div>
+            <div class="top-nav-right">
+                <span class="top-nav-progress">课程 20 / 20</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>错误处理与容错</h1>
+            <p>Error Handling & Fault Tolerance - 构建健壮的系统</p>
+        </div>
+
+        <!-- 场景 1: 为什么需要错误处理 -->
+        <div class="scene active" id="scene1">
+            <h2 class="scene-title">为什么需要错误处理？</h2>
+
+            <div class="highlight-box">
+                <h3>💡 核心价值</h3>
+                <p>
+                    在生产环境中，系统不可避免会遇到各种错误和异常。<br>
+                    良好的错误处理和容错设计可以确保系统在遇到问题时<strong>继续运行</strong>，<br>
+                    或<strong>优雅降级</strong>，而不是完全崩溃。<br><br>
+                    <strong>想象一下：</strong><br>
+                    没有错误处理就像<strong>走钢丝没有安全网</strong>，有容错设计就像<strong>系上了安全带</strong>！
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card" data-delay="0">
+                    <div class="feature-icon">🛡️</div>
+                    <h4>错误处理策略</h4>
+                    <p>try-except、重试机制、降级处理、断路器</p>
+                </div>
+
+                <div class="feature-card" data-delay="100">
+                    <div class="feature-icon">🔄</div>
+                    <h4>容错模式</h4>
+                    <p>超时、舱壁隔离、备用方案、故障隔离</p>
+                </div>
+
+                <div class="feature-card" data-delay="200">
+                    <div class="feature-icon">⚡</div>
+                    <h4>快速失败</h4>
+                    <p>及时发现和报告错误，避免级联失败</p>
+                </div>
+
+                <div class="feature-card" data-delay="300">
+                    <div class="feature-icon">🎯</div>
+                    <h4>优雅降级</h4>
+                    <p>提供备用方案，保证核心功能可用</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景 2: 基础错误处理 -->
+        <div class="scene" id="scene2">
+            <h2 class="scene-title">基础错误处理</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #ef4444; margin-bottom: 20px; font-size: 1.5em;">错误处理演示</h3>
+                <p style="text-align: center; color: rgba(226, 232, 240, 0.7); margin-bottom: 30px;">
+                    选择场景查看错误处理的工作原理
+                </p>
+
+                <div class="graph-structure" id="errorGraph">
+                    <!-- 第一层：输入 -->
+                    <div style="width: 100%; text-align: center; margin-bottom: 20px;">
+                        <div class="graph-node" data-step="1" style="display: inline-block;">
+                            <div class="icon">📥</div>
+                            <h4>输入</h4>
+                            <p>接收数据</p>
+                        </div>
+                    </div>
+
+                    <!-- 箭头向下 -->
+                    <div style="text-align: center; font-size: 2em; color: #f97316; margin: 10px 0;">↓</div>
+
+                    <!-- 第二层：验证 -->
+                    <div style="width: 100%; text-align: center; margin-bottom: 20px;">
+                        <div class="graph-node" data-step="2" style="display: inline-block;">
+                            <div class="icon">🔍</div>
+                            <h4>验证</h4>
+                            <p>检查数据</p>
+                        </div>
+                    </div>
+
+                    <!-- 分支：失败和成功 -->
+                    <div style="display: flex; justify-content: center; gap: 100px; margin: 20px 0;">
+                        <!-- 左侧：错误路径 -->
+                        <div style="text-align: center;">
+                            <div style="color: #ef4444; font-size: 1.2em; margin-bottom: 10px;">❌ 验证失败</div>
+                            <div style="font-size: 2em; margin: 10px 0;">↙</div>
+                            <div class="graph-node error-path" data-step="3-error" style="display: inline-block;">
+                                <div class="icon">🔧</div>
+                                <h4>捕获异常</h4>
+                                <p>except块</p>
+                            </div>
+                            <div style="font-size: 2em; margin: 10px 0;">↓</div>
+                            <div class="graph-node error-path" data-step="4-error" style="display: inline-block;">
+                                <div class="icon">📤</div>
+                                <h4>错误响应</h4>
+                                <p>返回错误信息</p>
+                            </div>
+                        </div>
+
+                        <!-- 右侧：成功路径 -->
+                        <div style="text-align: center;">
+                            <div style="color: #22c55e; font-size: 1.2em; margin-bottom: 10px;">✅ 验证通过</div>
+                            <div style="font-size: 2em; margin: 10px 0;">↘</div>
+                            <div class="graph-node success-path" data-step="3-success" style="display: inline-block;">
+                                <div class="icon">⚙️</div>
+                                <h4>处理</h4>
+                                <p>执行操作</p>
+                            </div>
+                            <div style="font-size: 2em; margin: 10px 0;">↓</div>
+                            <div class="graph-node success-path" data-step="4-success" style="display: inline-block;">
+                                <div class="icon">📤</div>
+                                <h4>成功响应</h4>
+                                <p>返回结果</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="error-log" id="errorLog" style="min-height: 200px;">
+                    <div style="color: #8b5cf6; text-align: center; padding: 20px;">
+                        点击下方按钮开始演示...
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 20px; justify-content: center;">
+                    <button class="demo-btn" id="errorBtn" onclick="animateErrorHandling('success')"
+                            style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);">
+                        ✅ 演示成功场景
+                    </button>
+                    <button class="demo-btn" id="errorBtnError" onclick="animateErrorHandling('error')"
+                            style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                        ❌ 演示错误场景
+                    </button>
+                </div>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 基础错误处理模式</span><br><br>
+                <span class="keyword">def</span> <span class="function">safe_operation</span>(state):<br>
+                &nbsp;&nbsp;<span class="keyword">try</span>:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;data = state[<span class="string">"input"</span>]<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span> <span class="keyword">not</span> data:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">raise</span> ValueError(<span class="string">"输入为空"</span>)<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;result = process(data)<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> {<span class="string">"output"</span>: result, <span class="string">"status"</span>: <span class="string">"success"</span>}<br><br>
+                &nbsp;&nbsp;<span class="keyword">except</span> ValueError <span class="keyword">as</span> e:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"error"</span>: str(e),<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"status"</span>: <span class="string">"error"</span><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;}
+            </div>
+        </div>
+
+        <!-- 场景 3: 重试机制 -->
+        <div class="scene" id="scene3">
+            <h2 class="scene-title">重试机制</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #ef4444; margin-bottom: 30px; font-size: 1.5em;">自动重试演示</h3>
+
+                <div class="graph-structure" id="retryGraph">
+                    <div class="graph-node" data-step="1">
+                        <div class="icon">🔄</div>
+                        <h4>操作</h4>
+                        <p>尝试执行</p>
+                    </div>
+
+                    <div class="graph-arrow" data-step="2">→</div>
+
+                    <div class="graph-node" data-step="3">
+                        <div class="icon">❓</div>
+                        <h4>检查</h4>
+                        <p>成功？</p>
+                    </div>
+
+                    <div class="graph-arrow" data-step="4">↻</div>
+
+                    <div class="graph-node" data-step="5">
+                        <div class="icon">✅</div>
+                        <h4>完成</h4>
+                        <p>或放弃</p>
+                    </div>
+                </div>
+
+                <div class="retry-counter">
+                    重试次数: <span class="retry-number" id="retryCount">0</span> / 3
+                </div>
+
+                <div class="error-log" id="retryLog">
+                    <div style="color: #8b5cf6; text-align: center; padding: 20px;">
+                        点击下方按钮开始重试演示...
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="retryBtn" onclick="animateRetry()">▶️ 运行重试演示</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 带重试的节点</span><br><br>
+                <span class="keyword">def</span> <span class="function">should_retry</span>(state):<br>
+                &nbsp;&nbsp;<span class="keyword">if</span> state[<span class="string">"success"</span>]:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"done"</span><br>
+                &nbsp;&nbsp;<span class="keyword">elif</span> state[<span class="string">"attempt"</span>] < state[<span class="string">"max_attempts"</span>]:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"retry"</span><br>
+                &nbsp;&nbsp;<span class="keyword">else</span>:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"give_up"</span>
+            </div>
+        </div>
+
+        <!-- 场景 4: 断路器模式 -->
+        <div class="scene" id="scene4">
+            <h2 class="scene-title">断路器模式</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #ef4444; margin-bottom: 30px; font-size: 1.5em;">断路器状态演示</h3>
+
+                <div class="circuit-state">
+                    <div class="circuit-status" id="circuitClosed">
+                        <div class="circuit-icon">✅</div>
+                        <div class="circuit-label">Closed</div>
+                        <div class="circuit-desc">正常工作<br>请求正常通过</div>
+                    </div>
+
+                    <div class="circuit-status" id="circuitOpen">
+                        <div class="circuit-icon">🚫</div>
+                        <div class="circuit-label">Open</div>
+                        <div class="circuit-desc">熔断状态<br>直接返回错误</div>
+                    </div>
+
+                    <div class="circuit-status" id="circuitHalfOpen">
+                        <div class="circuit-icon">⚠️</div>
+                        <div class="circuit-label">Half-Open</div>
+                        <div class="circuit-desc">半开状态<br>尝试恢复服务</div>
+                    </div>
+                </div>
+
+                <div class="error-log" id="circuitLog">
+                    <div style="color: #8b5cf6; text-align: center; padding: 20px;">
+                        点击下方按钮开始断路器演示...
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="circuitBtn" onclick="animateCircuitBreaker()">▶️ 运行断路器演示</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 断路器模式</span><br><br>
+                <span class="keyword">class</span> <span class="function">CircuitBreaker</span>:<br>
+                &nbsp;&nbsp;<span class="keyword">def</span> <span class="function">__init__</span>(self, threshold=5):<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;self.failure_count = 0<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;self.threshold = threshold<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;self.state = <span class="string">"closed"</span>  <span class="comment"># closed, open, half-open</span><br><br>
+                &nbsp;&nbsp;<span class="keyword">def</span> <span class="function">record_failure</span>(self):<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;self.failure_count += 1<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">if</span> self.failure_count >= self.threshold:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;self.state = <span class="string">"open"</span>
+            </div>
+        </div>
+
+        <!-- 场景 5: 最佳实践 -->
+        <div class="scene" id="scene5">
+            <h2 class="scene-title">最佳实践总结</h2>
+
+            <ul class="step-list">
+                <li class="step-item" data-delay="0">
+                    <span class="step-number">1</span>
+                    <span class="step-content"><strong>区分错误类型</strong> - 可重试、不可重试、业务错误、系统错误</span>
+                </li>
+
+                <li class="step-item" data-delay="150">
+                    <span class="step-number">2</span>
+                    <span class="step-content"><strong>实现重试策略</strong> - 指数退避、最大重试次数、只重试幂等操作</span>
+                </li>
+
+                <li class="step-item" data-delay="300">
+                    <span class="step-number">3</span>
+                    <span class="step-content"><strong>提供降级方案</strong> - 功能降级、服务降级、数据降级</span>
+                </li>
+
+                <li class="step-item" data-delay="450">
+                    <span class="step-number">4</span>
+                    <span class="step-content"><strong>设置超时限制</strong> - 防止无限等待，及时失败</span>
+                </li>
+
+                <li class="step-item" data-delay="600">
+                    <span class="step-number">5</span>
+                    <span class="step-content"><strong>记录详细日志</strong> - 错误信息、堆栈跟踪、上下文数据</span>
+                </li>
+            </ul>
+
+            <div class="highlight-box" style="background: rgba(34, 197, 94, 0.15); border-left-color: #22c55e;">
+                <h3 style="color: #22c55e;">✅ 推荐做法（DO）</h3>
+                <p>
+                    ✓ 区分错误类型，针对性处理<br>
+                    ✓ 实现适当的重试机制<br>
+                    ✓ 设置超时限制<br>
+                    ✓ 提供降级方案<br>
+                    ✓ 记录详细日志<br>
+                    ✓ 监控错误指标
+                </p>
+            </div>
+
+            <div class="highlight-box" style="background: rgba(239, 68, 68, 0.15); border-left-color: #ef4444;">
+                <h3 style="color: #ef4444;">❌ 避免做法（DON'T）</h3>
+                <p>
+                    ✗ 吞掉异常不处理<br>
+                    ✗ 无限重试不设限<br>
+                    ✗ 无超时限制<br>
+                    ✗ 无降级方案<br>
+                    ✗ 无错误日志<br>
+                    ✗ 无监控告警
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🎉 恭喜完成所有 20 个课程！</h3>
+                <p>
+                    你现在已经掌握了 LangChain 和 LangGraph 的核心概念，<br>
+                    包括基础链、Agents、RAG、LangGraph、状态管理、<br>
+                    人机交互、持久化、多 Agent 系统、可视化调试、错误处理等。<br><br>
+                    <strong>下一步建议：</strong>实践项目，构建一个完整的 RAG 应用！
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景指示器 -->
+        <div class="scene-indicators">
+            <div class="indicator active" data-scene="1"></div>
+            <div class="indicator" data-scene="2"></div>
+            <div class="indicator" data-scene="3"></div>
+            <div class="indicator" data-scene="4"></div>
+            <div class="indicator" data-scene="5"></div>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <button class="nav-btn" id="prevBtn" disabled>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                上一节
+            </button>
+            <a href="../langchain/index.html" class="nav-btn back-to-list">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                </svg>
+                课程列表
+            </a>
+            <button class="nav-btn next" id="nextBtn">
+                下一节
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 场景数据
+        const totalScenes = 5;
+        let currentScene = 1;
+
+        // DOM 元素
+        const progressBar = document.getElementById('progressBar');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const indicators = document.querySelectorAll('.indicator');
+
+        // 初始化
+        function init() {
+            setupEventListeners();
+            updateScene();
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            // 导航按钮
+            prevBtn.addEventListener('click', () => {
+                if (currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                }
+            });
+
+            // 指示器
+            indicators.forEach(indicator => {
+                indicator.addEventListener('click', () => {
+                    currentScene = parseInt(indicator.dataset.scene);
+                    updateScene();
+                });
+            });
+
+            // 键盘导航
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' && currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                } else if (e.key === 'ArrowLeft' && currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+        }
+
+        // 更新场景
+        function updateScene() {
+            // 更新进度条
+            const progress = ((currentScene - 1) / (totalScenes - 1)) * 100;
+            progressBar.style.width = progress + '%';
+
+            // 更新场景显示
+            document.querySelectorAll('.scene').forEach((scene, index) => {
+                if (index + 1 === currentScene) {
+                    scene.classList.add('active');
+                } else {
+                    scene.classList.remove('active');
+                }
+            });
+
+            // 更新指示器
+            indicators.forEach((indicator, index) => {
+                if (index + 1 === currentScene) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+
+            // 更新按钮状态
+            prevBtn.disabled = currentScene === 1;
+            nextBtn.disabled = currentScene === totalScenes;
+
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // 重置所有动画元素
+            document.querySelectorAll('.feature-card, .graph-node, .graph-arrow, .step-item').forEach(el => {
+                el.classList.remove('visible');
+            });
+
+            // 动画显示元素
+            setTimeout(() => {
+                animateSceneElements();
+            }, 100);
+        }
+
+        // 动画显示场景元素
+        function animateSceneElements() {
+            const currentSceneEl = document.querySelector(`#scene${currentScene}`);
+
+            // 特性卡片动画
+            currentSceneEl.querySelectorAll('.feature-card').forEach((card, index) => {
+                const delay = parseInt(card.dataset.delay) || index * 100;
+                setTimeout(() => {
+                    card.classList.add('visible');
+                }, delay);
+            });
+
+            // 图节点动画
+            currentSceneEl.querySelectorAll('.graph-node').forEach((node, index) => {
+                const delay = parseInt(node.dataset.delay) || index * 200;
+                setTimeout(() => {
+                    node.classList.add('visible');
+                }, delay);
+            });
+
+            // 图箭头动画
+            currentSceneEl.querySelectorAll('.graph-arrow').forEach((arrow, index) => {
+                const delay = parseInt(arrow.dataset.delay) || index * 200;
+                setTimeout(() => {
+                    arrow.classList.add('visible');
+                }, delay);
+            });
+
+            // 步骤项动画
+            currentSceneEl.querySelectorAll('.step-item').forEach((item, index) => {
+                const delay = parseInt(item.dataset.delay) || index * 150;
+                setTimeout(() => {
+                    item.classList.add('visible');
+                }, delay);
+            });
+        }
+
+        // 场景 2: 错误处理演示
+        async function animateErrorHandling(scenario) {
+            const btnSuccess = document.getElementById('errorBtn');
+            const btnError = document.getElementById('errorBtnError');
+            const log = document.getElementById('errorLog');
+
+            // 禁用所有按钮
+            btnSuccess.disabled = true;
+            btnError.disabled = true;
+
+            const scenarioText = scenario === 'success' ? '成功场景演示中...' : '错误场景演示中...';
+            btnSuccess.textContent = scenarioText;
+            btnError.textContent = scenarioText;
+            log.innerHTML = '';
+
+            // 重置所有节点
+            document.querySelectorAll('#errorGraph .graph-node').forEach(el => {
+                el.classList.remove('visible', 'active', 'error');
+            });
+
+            // 公共步骤：输入和验证
+            const nodes = document.querySelectorAll('#errorGraph .graph-node');
+            const inputNode = nodes[0];  // 输入节点
+            const validateNode = nodes[1]; // 验证节点
+
+            // 步骤1：接收输入
+            inputNode.classList.add('visible', 'active');
+            addLogEntry(log, '接收输入: ' + (scenario === 'success' ? '"Hello World"' : '""'), 'success');
+            await delay(1500);
+            inputNode.classList.remove('active');
+
+            // 步骤2：数据验证
+            validateNode.classList.add('visible', 'active');
+            addLogEntry(log, '数据验证: 检查输入是否为空...', 'warning');
+            await delay(1500);
+            validateNode.classList.remove('active');
+
+            if (scenario === 'success') {
+                // ===== 成功路径 =====
+                const successNodes = document.querySelectorAll('.success-path');
+
+                // 验证通过
+                addLogEntry(log, '✅ 验证通过：输入不为空', 'success');
+                await delay(1000);
+
+                // 处理节点
+                successNodes[0].classList.add('visible', 'active');
+                addLogEntry(log, '⚙️ 执行操作: 处理数据...', 'warning');
+                await delay(1500);
+                successNodes[0].classList.remove('active');
+
+                // 成功响应
+                successNodes[1].classList.add('visible', 'active');
+                addLogEntry(log, '✅ 处理完成: 返回结果 {"output": "HELLO WORLD", "status": "success"}', 'success');
+                addLogEntry(log, '💡 程序正常执行，用户获得预期结果', 'success');
+                await delay(1500);
+                successNodes[1].classList.remove('active');
+
+            } else {
+                // ===== 错误路径 =====
+                const errorNodes = document.querySelectorAll('.error-path');
+
+                // 验证失败
+                addLogEntry(log, '❌ 验证失败：输入为空', 'error');
+                addLogEntry(log, '⚠️ 抛出异常: ValueError("输入为空")', 'error');
+                await delay(1000);
+
+                // 捕获异常节点
+                errorNodes[0].classList.add('visible', 'active');
+                addLogEntry(log, '🔧 except 块捕获异常', 'warning');
+                await delay(1000);
+
+                // 显示代码执行
+                addLogEntry(log, '📝 执行: except ValueError as e:', 'warning');
+                await delay(800);
+                addLogEntry(log, '📝 获取错误信息: str(e)', 'warning');
+                await delay(800);
+                errorNodes[0].classList.remove('active');
+
+                // 错误响应
+                errorNodes[1].classList.add('visible', 'active');
+                addLogEntry(log, '📤 返回错误响应: {"error": "输入为空", "status": "error"}', 'error');
+                await delay(1000);
+
+                addLogEntry(log, '💡 关键：程序没有崩溃，而是优雅地返回了错误信息！', 'success');
+                addLogEntry(log, '💡 用户看到友好的提示，而不是报错页面', 'success');
+                await delay(1500);
+                errorNodes[1].classList.remove('active');
+            }
+
+            // 恢复按钮
+            btnSuccess.disabled = false;
+            btnError.disabled = false;
+            btnSuccess.textContent = '✅ 演示成功场景';
+            btnError.textContent = '❌ 演示错误场景';
+        }
+
+        // 辅助函数：添加日志条目
+        function addLogEntry(logElement, message, type) {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `error-entry ${type}`;
+            entry.innerHTML = `
+                <span class="error-timestamp">[${timestamp}]</span>
+                <span>${message}</span>
+            `;
+            logElement.appendChild(entry);
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // 辅助函数：延迟
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // 场景 3: 重试演示
+        async function animateRetry() {
+            const btn = document.getElementById('retryBtn');
+            const log = document.getElementById('retryLog');
+            const counter = document.getElementById('retryCount');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ 重试中...';
+            log.innerHTML = '';
+            counter.textContent = '0';
+
+            // 重置节点
+            document.querySelectorAll('#retryGraph .graph-node').forEach(el => {
+                el.classList.remove('visible', 'active');
+            });
+            document.querySelectorAll('#retryGraph .graph-arrow').forEach(el => {
+                el.classList.remove('visible');
+            });
+
+            const nodes = document.querySelectorAll('#retryGraph .graph-node');
+            const arrows = document.querySelectorAll('#retryGraph .graph-arrow');
+
+            // 模拟重试场景：前两次失败，第三次成功
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                counter.textContent = attempt;
+
+                // 激活操作节点
+                nodes[0].classList.add('visible', 'active');
+
+                const timestamp = new Date().toLocaleTimeString();
+                let entry;
+
+                if (attempt < 3) {
+                    // 失败
+                    entry = document.createElement('div');
+                    entry.className = 'error-entry';
+                    entry.innerHTML = `
+                        <span class="error-timestamp">[${timestamp}]</span>
+                        <span class="error-type">尝试 ${attempt} 失败</span>
+                        <span>: 连接超时，准备重试...</span>
+                    `;
+                    log.appendChild(entry);
+
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    nodes[0].classList.remove('active');
+                    nodes[0].classList.add('error');
+
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    nodes[0].classList.remove('error');
+
+                    // 显示箭头
+                    arrows[0].classList.add('visible');
+                    nodes[1].classList.add('visible');
+
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                } else {
+                    // 成功
+                    entry = document.createElement('div');
+                    entry.className = 'error-entry success';
+                    entry.innerHTML = `
+                        <span class="error-timestamp">[${timestamp}]</span>
+                        <span>✅ 尝试 ${attempt} 成功</span>
+                        <span>: 操作完成！</span>
+                    `;
+                    log.appendChild(entry);
+
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    nodes[0].classList.remove('active');
+
+                    // 显示成功路径
+                    arrows[0].classList.add('visible');
+                    nodes[1].classList.add('visible', 'active');
+
+                    await new Promise(resolve => setTimeout(resolve, 800));
+
+                    nodes[1].classList.remove('active');
+                    arrows[1].classList.add('visible');
+                    nodes[2].classList.add('visible', 'active');
+
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    nodes[2].classList.remove('active');
+                }
+
+                log.scrollTop = log.scrollHeight;
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 场景 4: 断路器演示
+        async function animateCircuitBreaker() {
+            const btn = document.getElementById('circuitBtn');
+            const log = document.getElementById('circuitLog');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+            log.innerHTML = '';
+
+            // 重置状态
+            document.querySelectorAll('.circuit-status').forEach(el => {
+                el.style.opacity = '0.3';
+                el.style.transform = 'scale(1)';
+            });
+
+            // 模拟断路器状态变化：Closed -> Open -> Half-Open -> Closed
+            const states = [
+                { id: 'circuitClosed', name: 'Closed', message: '系统正常工作，请求正常通过' },
+                { id: 'circuitOpen', name: 'Open', message: '连续失败超过阈值，断路器打开' },
+                { id: 'circuitHalfOpen', name: 'Half-Open', message: '等待超时，尝试恢复服务' },
+                { id: 'circuitClosed', name: 'Closed', message: '请求成功，断路器关闭，恢复正常' }
+            ];
+
+            for (let i = 0; i < states.length; i++) {
+                const state = states[i];
+                const element = document.getElementById(state.id);
+
+                // 高亮当前状态
+                document.querySelectorAll('.circuit-status').forEach(el => {
+                    el.style.opacity = '0.3';
+                    el.style.transform = 'scale(1)';
+                });
+                element.style.opacity = '1';
+                element.style.transform = 'scale(1.1)';
+
+                // 添加日志
+                const timestamp = new Date().toLocaleTimeString();
+                const entry = document.createElement('div');
+                entry.className = 'error-entry ' + (state.name === 'Open' ? '' : 'success');
+                entry.innerHTML = `
+                    <span class="error-timestamp">[${timestamp}]</span>
+                    <span class="error-type">${state.name}</span>
+                    <span>: ${state.message}</span>
+                `;
+                log.appendChild(entry);
+                log.scrollTop = log.scrollHeight;
+
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

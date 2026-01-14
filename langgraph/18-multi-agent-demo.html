@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多 Agent 系统 - LangChain 学习 18</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 浮动光球 */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(251, 146, 60, 0.3) 0%, rgba(168, 85, 247, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.2) 0%, rgba(14, 165, 233, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -30px) scale(1.1); }
+            50% { transform: translate(-20px, 20px) scale(0.9); }
+            75% { transform: translate(-30px, -20px) scale(1.05); }
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 头部 */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #fb923c 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(251, 146, 60, 0.3);
+        }
+
+        .header p {
+            font-size: 1.3em;
+            color: rgba(226, 232, 240, 0.8);
+        }
+
+        /* 进度条 */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #fb923c 0%, #a855f7 50%, #22c55e 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* 场景容器 */
+        .scene {
+            display: none;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .scene.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 场景标题 */
+        .scene-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #fb923c 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 画布容器 */
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Agent 网格 */
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            padding: 40px 20px;
+        }
+
+        .agent-card {
+            background: rgba(251, 146, 60, 0.2);
+            border: 3px solid rgba(251, 146, 60, 0.5);
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            transition: all 0.6s;
+            transform: scale(0.8);
+            opacity: 0;
+            position: relative;
+        }
+
+        .agent-card.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .agent-card.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: rgba(34, 197, 94, 0.7);
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+            transform: scale(1.15);
+        }
+
+        .agent-card .avatar {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .agent-card h4 {
+            color: #fb923c;
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+
+        .agent-card p {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+
+        /* Agent 协作可视化 */
+        .collab-flow {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            padding: 40px 20px;
+            flex-wrap: wrap;
+        }
+
+        .collab-agent {
+            background: rgba(251, 146, 60, 0.2);
+            border: 3px solid rgba(251, 146, 60, 0.5);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            min-width: 160px;
+            transition: all 0.6s;
+            transform: scale(0.8);
+            opacity: 0;
+            position: relative;
+        }
+
+        .collab-agent.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .collab-agent.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: rgba(34, 197, 94, 0.7);
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+            transform: scale(1.15);
+        }
+
+        .collab-agent .icon {
+            font-size: 3em;
+            margin-bottom: 10px;
+        }
+
+        .collab-agent h4 {
+            color: #fb923c;
+            margin-bottom: 8px;
+            font-size: 1.2em;
+        }
+
+        .collab-agent p {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.85em;
+        }
+
+        .collab-arrow {
+            font-size: 3em;
+            color: #fb923c;
+            opacity: 0;
+            transition: all 0.6s;
+        }
+
+        .collab-arrow.visible {
+            opacity: 1;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        /* 层级结构 */
+        .hierarchy-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+            padding: 40px 20px;
+        }
+
+        .hierarchy-level {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* 特性卡片 */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-card:hover {
+            background: rgba(251, 146, 60, 0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px rgba(251, 146, 60, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h4 {
+            color: #fb923c;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+
+        .feature-card p {
+            color: rgba(226, 232, 240, 0.7);
+            line-height: 1.6;
+        }
+
+        /* 代码片段 */
+        .code-snippet {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .keyword { color: #c792ea; font-weight: bold; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .function { color: #82aaff; }
+
+        /* 高亮框 */
+        .highlight-box {
+            background: rgba(251, 146, 60, 0.15);
+            border-left: 5px solid #fb923c;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+            animation: slideInRight 0.8s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .highlight-box h3 {
+            color: #fb923c;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .highlight-box p {
+            line-height: 1.8;
+            color: rgba(226, 232, 240, 0.9);
+        }
+
+        /* 演示按钮 */
+        .demo-btn {
+            background: linear-gradient(135deg, #fb923c 0%, #a855f7 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(251, 146, 60, 0.4);
+            margin: 20px auto;
+            display: block;
+        }
+
+        .demo-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(251, 146, 60, 0.6);
+        }
+
+        .demo-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(251, 146, 60, 0.2);
+            border: 2px solid rgba(251, 146, 60, 0.5);
+            border-radius: 12px;
+            color: #fb923c;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(251, 146, 60, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(251, 146, 60, 0.4);
+        }
+
+        /* 针对 a 标签的导航按钮样式 */
+        .nav-btn.back-to-list {
+            text-decoration: none;
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+        }
+
+        .nav-btn.back-to-list:hover {
+            background: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 5px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-btn.next {
+            margin-left: auto;
+        }
+
+        /* 场景指示器 */
+        .scene-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 40px 0;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            background: #fb923c;
+            transform: scale(1.3);
+        }
+
+        .indicator:hover {
+            transform: scale(1.2);
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .collab-flow {
+                flex-direction: column;
+            }
+
+            .collab-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    
+        /* 标准导航样式 */
+        .nav-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-card a {
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-card a:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 顶部导航卡片 */
+        .top-nav-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .top-nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .top-nav-left,
+        .top-nav-center,
+        .top-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .top-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #9ca3af;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .top-nav-link:hover {
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .top-nav-link.home {
+            color: #4ade80;
+        }
+
+        .top-nav-link.home:hover {
+            color: #86efac;
+        }
+
+        .top-nav-link svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .top-nav-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .top-nav-text {
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+
+        .top-nav-progress {
+            color: #9ca3af;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+</style>
+</head>
+<body>
+    <!-- 浮动光球 -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>    <!-- 顶部导航 - 跨模块 -->
+    <div class="top-nav-card">
+        <div class="top-nav-container">
+            <div class="top-nav-left">
+                <a href="index.html" class="top-nav-link home">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回LangGraph目录
+                </a>
+            </div>
+            <div class="top-nav-center">
+                <a href="17-state-persistence-demo.html" class="top-nav-link">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一课
+                </a>
+                <div class="top-nav-divider"></div>
+                <a href="19-visualization-debug-demo.html" class="top-nav-link">
+                    下一课
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="top-nav-right">
+                <span class="top-nav-progress">课程 18 / 20</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>多 Agent 系统</h1>
+            <p>Multi-Agent Systems - 让多个 AI 协作完成复杂任务</p>
+        </div>
+
+        <!-- 场景 1: 什么是多 Agent 系统 -->
+        <div class="scene active" id="scene1">
+            <h2 class="scene-title">什么是多 Agent 系统？</h2>
+
+            <div class="highlight-box">
+                <h3>💡 核心概念</h3>
+                <p>
+                    多 Agent 系统由多个智能 Agent 组成，它们可以<strong>协作、竞争或分层管理</strong>来完成复杂任务。
+                    每个 Agent 专注于特定职责，通过通信协调工作。<br><br>
+                    <strong>想象一下：</strong><br>
+                    就像一个专业团队，每个成员都有自己的专长<br>
+                    研究员收集信息 → 作家撰写内容 → 审核员质量把控<br>
+                    各司其职，协作完成单个人无法完成的任务！<br><br>
+                    <strong>核心模式：</strong>协作式 + 竞争式 + 层级式
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card" data-delay="0">
+                    <div class="feature-icon">🤝</div>
+                    <h4>协作式</h4>
+                    <p>Agent 合作完成任务，优势互补</p>
+                </div>
+
+                <div class="feature-card" data-delay="100">
+                    <div class="feature-icon">⚔️</div>
+                    <h4>竞争式</h4>
+                    <p>Agent 提供竞争方案，择优录取</p>
+                </div>
+
+                <div class="feature-card" data-delay="200">
+                    <div class="feature-icon">🏛️</div>
+                    <h4>层级式</h4>
+                    <p>管理 Agent 协调工作 Agent</p>
+                </div>
+
+                <div class="feature-card" data-delay="300">
+                    <div class="feature-icon">🌐</div>
+                    <h4>通信模式</h4>
+                    <p>共享状态、消息传递、事件驱动</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景 2: 协作式 Agent -->
+        <div class="scene" id="scene2">
+            <h2 class="scene-title">协作式 Agent - 研究团队</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #fb923c; margin-bottom: 30px; font-size: 1.5em;">内容创作协作流程</h3>
+
+                <div class="collab-flow" id="collabFlow">
+                    <div class="collab-agent" data-step="1">
+                        <div class="icon">🔍</div>
+                        <h4>研究员</h4>
+                        <p>收集信息</p>
+                    </div>
+
+                    <div class="collab-arrow" data-step="2">→</div>
+
+                    <div class="collab-agent" data-step="3">
+                        <div class="icon">✍️</div>
+                        <h4>作家</h4>
+                        <p>撰写内容</p>
+                    </div>
+
+                    <div class="collab-arrow" data-step="4">→</div>
+
+                    <div class="collab-agent" data-step="5">
+                        <div class="icon">👁️</div>
+                        <h4>审核员</h4>
+                        <p>质量把控</p>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="runCollabFlowBtn" onclick="runCollabFlow()">▶️ 播放协作流程</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 核心代码：协作式 Agent</span><br><br>
+                <span class="keyword">def</span> <span class="function">researcher_agent</span>(state):<br>
+                &nbsp;&nbsp;research = f<span class="string">"关于'{state['task']}'的研究..."</span><br>
+                &nbsp;&nbsp;<span class="keyword">return</span> {<span class="string">"research"</span>: research}<br><br>
+                <span class="keyword">def</span> <span class="function">writer_agent</span>(state):<br>
+                &nbsp;&nbsp;article = f<span class="string">"基于研究：\n{state['research']}"</span><br>
+                &nbsp;&nbsp;<span class="keyword">return</span> {<span class="string">"article"</span>: article}<br><br>
+                <span class="keyword">def</span> <span class="function">reviewer_agent</span>(state):<br>
+                &nbsp;&nbsp;review = f<span class="string">"审核意见：\n{state['article']}"</span><br>
+                &nbsp;&nbsp;<span class="keyword">return</span> {<span class="string">"review"</span>: review}<br><br>
+                graph.add_edge(<span class="string">"researcher"</span>, <span class="string">"writer"</span>)<br>
+                graph.add_edge(<span class="string">"writer"</span>, <span class="string">"reviewer"</span>)
+            </div>
+        </div>
+
+        <!-- 场景 3: 竞争式 Agent -->
+        <div class="scene" id="scene3">
+            <h2 class="scene-title">竞争式 Agent - 方案比拼</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #fb923c; margin-bottom: 30px; font-size: 1.5em;">多方案竞争选择</h3>
+
+                <div class="agent-grid" id="competitiveGrid">
+                    <div class="agent-card" data-step="1">
+                        <div class="avatar">🐢</div>
+                        <h4>保守 Agent</h4>
+                        <p>稳健方案<br>低风险<br>稳定收益</p>
+                    </div>
+
+                    <div class="agent-card" data-step="2">
+                        <div class="avatar">🐆</div>
+                        <h4>激进 Agent</h4>
+                        <p>创新方案<br>高风险<br>潜在高收益</p>
+                    </div>
+
+                    <div class="agent-card" data-step="3">
+                        <div class="avatar">⚖️</div>
+                        <h4>平衡 Agent</h4>
+                        <p>折中方案<br>中等风险<br>均衡发展</p>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <div style="display: inline-block; background: rgba(34, 197, 94, 0.2); padding: 20px 40px; border-radius: 15px; border: 2px solid rgba(34, 197, 94, 0.5);">
+                        <div style="font-size: 3em;">🏆</div>
+                        <h4 style="color: #22c55e; margin: 10px 0;">评估者</h4>
+                        <p style="color: rgba(226, 232, 240, 0.7);">选择最佳方案</p>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="runCompetitiveBtn" onclick="runCompetitive()">▶️ 播放竞争流程</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 核心代码：竞争式 Agent</span><br><br>
+                <span class="keyword">def</span> <span class="function">agent_a</span>(state):<br>
+                &nbsp;&nbsp;<span class="keyword">return</span> {<span class="string">"solution_a"</span>: <span class="string">"保守方案"</span>, <span class="string">"score_a"</span>: 7.5}<br><br>
+                <span class="keyword">def</span> <span class="function">agent_b</span>(state):<br>
+                &nbsp;&nbsp;<span class="keyword">return</span> {<span class="string">"solution_b"</span>: <span class="string">"激进方案"</span>, <span class="string">"score_b"</span>: 8.5}<br><br>
+                <span class="keyword">def</span> <span class="function">evaluator</span>(state):<br>
+                &nbsp;&nbsp;scores = {<span class="string">"a"</span>: state[<span class="string">"score_a"</span>], <span class="string">"b"</span>: state[<span class="string">"score_b"</span>]}<br>
+                &nbsp;&nbsp;best = <span class="keyword">max</span>(scores, key=scores.get)<br>
+                &nbsp;&nbsp;<span class="keyword">return</span> {<span class="string">"best"</span>: state[f<span class="string">"solution_{best}"</span>]}
+            </div>
+        </div>
+
+        <!-- 场景 4: 层级式 Agent -->
+        <div class="scene" id="scene4">
+            <h2 class="scene-title">层级式 Agent - 管理模式</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #fb923c; margin-bottom: 30px; font-size: 1.5em;">层级管理结构</h3>
+
+                <div class="hierarchy-container" id="hierarchyFlow">
+                    <!-- 管理层 -->
+                    <div class="hierarchy-level">
+                        <div class="collab-agent" style="min-width: 200px;" data-step="1">
+                            <div class="icon">👔</div>
+                            <h4>管理 Agent</h4>
+                            <p>分配任务</p>
+                        </div>
+                    </div>
+
+                    <div style="font-size: 3em; color: #fb923c; opacity: 0; transition: all 0.6s;" data-step="2">↓</div>
+
+                    <!-- 工作层 -->
+                    <div class="hierarchy-level" style="gap: 20px;">
+                        <div class="collab-agent" data-step="3">
+                            <div class="icon">⚙️</div>
+                            <h4>工作 1</h4>
+                            <p>执行子任务</p>
+                        </div>
+
+                        <div class="collab-agent" data-step="4">
+                            <div class="icon">⚙️</div>
+                            <h4>工作 2</h4>
+                            <p>执行子任务</p>
+                        </div>
+
+                        <div class="collab-agent" data-step="5">
+                            <div class="icon">⚙️</div>
+                            <h4>工作 3</h4>
+                            <p>执行子任务</p>
+                        </div>
+                    </div>
+
+                    <div style="font-size: 3em; color: #fb923c; opacity: 0; transition: all 0.6s;" data-step="6">↓</div>
+
+                    <!-- 审查层 -->
+                    <div class="hierarchy-level">
+                        <div class="collab-agent" style="min-width: 200px;" data-step="7">
+                            <div class="icon">👔</div>
+                            <h4>管理 Agent</h4>
+                            <p>审查结果</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="runHierarchyBtn" onclick="runHierarchy()">▶️ 播放层级流程</button>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🎯 最佳实践</h3>
+                <p>
+                    ✅ <strong>设计原则</strong>：单一职责、通信简洁、容错设计、可观测性<br>
+                    ✅ <strong>常见模式</strong>：专家团队、流水线、竞争选择、层次管理<br>
+                    ✅ <strong>实现建议</strong>：从简单开始（2-3个Agent）、使用标准接口、添加监控日志<br>
+                    ✅ <strong>应用场景</strong>：客服系统分类路由、研发协作、决策系统多方案比较<br><br>
+                    <strong>核心要点：协作 + 竞争 + 层级 = 强大多 Agent 系统</strong>
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景指示器 -->
+        <div class="scene-indicators">
+            <div class="indicator active" data-scene="1"></div>
+            <div class="indicator" data-scene="2"></div>
+            <div class="indicator" data-scene="3"></div>
+            <div class="indicator" data-scene="4"></div>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <button class="nav-btn" id="prevBtn" disabled>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                上一节
+            </button>
+            <a href="../langchain/index.html" class="nav-btn back-to-list">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                </svg>
+                课程列表
+            </a>
+            <button class="nav-btn next" id="nextBtn">
+                下一节
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 场景数据
+        const totalScenes = 4;
+        let currentScene = 1;
+
+        // DOM 元素
+        const progressBar = document.getElementById('progressBar');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const indicators = document.querySelectorAll('.indicator');
+
+        // 初始化
+        function init() {
+            setupEventListeners();
+            updateScene();
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            prevBtn.addEventListener('click', () => {
+                if (currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                }
+            });
+
+            indicators.forEach(indicator => {
+                indicator.addEventListener('click', () => {
+                    currentScene = parseInt(indicator.dataset.scene);
+                    updateScene();
+                });
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' && currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                } else if (e.key === 'ArrowLeft' && currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+        }
+
+        // 更新场景
+        function updateScene() {
+            const progress = ((currentScene - 1) / (totalScenes - 1)) * 100;
+            progressBar.style.width = progress + '%';
+
+            document.querySelectorAll('.scene').forEach((scene, index) => {
+                if (index + 1 === currentScene) {
+                    scene.classList.add('active');
+                } else {
+                    scene.classList.remove('active');
+                }
+            });
+
+            indicators.forEach((indicator, index) => {
+                if (index + 1 === currentScene) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+
+            prevBtn.disabled = currentScene === 1;
+            nextBtn.disabled = currentScene === totalScenes;
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            document.querySelectorAll('.feature-card, .collab-agent, .agent-card, .collab-arrow').forEach(el => {
+                el.classList.remove('visible');
+            });
+
+            setTimeout(() => {
+                animateSceneElements();
+            }, 100);
+        }
+
+        // 动画显示场景元素
+        function animateSceneElements() {
+            const currentSceneEl = document.querySelector(`#scene${currentScene}`);
+
+            currentSceneEl.querySelectorAll('.feature-card').forEach((card, index) => {
+                const delay = parseInt(card.dataset.delay) || index * 100;
+                setTimeout(() => {
+                    card.classList.add('visible');
+                }, delay);
+            });
+
+            currentSceneEl.querySelectorAll('.collab-agent, .agent-card').forEach((agent, index) => {
+                const delay = parseInt(agent.dataset.step) * 300 || index * 200;
+                setTimeout(() => {
+                    agent.classList.add('visible');
+                }, delay);
+            });
+
+            currentSceneEl.querySelectorAll('.collab-arrow').forEach((arrow, index) => {
+                const delay = parseInt(arrow.dataset.step) * 300 || index * 200;
+                setTimeout(() => {
+                    arrow.classList.add('visible');
+                }, delay);
+            });
+        }
+
+        // 场景 2: 协作流程演示
+        async function runCollabFlow() {
+            const btn = document.getElementById('runCollabFlowBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            document.querySelectorAll('#collabFlow .collab-agent, #collabFlow .collab-arrow').forEach(el => {
+                el.classList.remove('visible', 'active');
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const steps = document.querySelectorAll('#collabFlow .collab-agent, #collabFlow .collab-arrow');
+            for (let i = 0; i < steps.length; i++) {
+                const step = steps[i];
+                if (step.classList.contains('collab-agent')) {
+                    step.classList.add('visible', 'active');
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    step.classList.remove('active');
+                } else {
+                    step.classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 场景 3: 竞争流程演示
+        async function runCompetitive() {
+            const btn = document.getElementById('runCompetitiveBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            document.querySelectorAll('#competitiveGrid .agent-card').forEach(el => {
+                el.classList.remove('visible', 'active');
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 所有 Agent 同时竞争
+            const agents = document.querySelectorAll('#competitiveGrid .agent-card');
+            agents.forEach(agent => {
+                agent.classList.add('visible', 'active');
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // 闪烁效果模拟评估
+            for (let i = 0; i < 3; i++) {
+                agents.forEach(agent => agent.classList.toggle('active'));
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+
+            // 激进 Agent 胜出（示例）
+            agents.forEach(agent => agent.classList.remove('active'));
+            agents[1].classList.add('active');
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 场景 4: 层级流程演示
+        async function runHierarchy() {
+            const btn = document.getElementById('runHierarchyBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            document.querySelectorAll('#hierarchyFlow .collab-agent, #hierarchyFlow > div').forEach(el => {
+                el.classList.remove('visible');
+                el.style.opacity = '0';
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const elements = document.querySelectorAll('#hierarchyFlow .collab-agent, #hierarchyFlow > div');
+            for (let i = 0; i < elements.length; i++) {
+                const el = elements[i];
+                if (el.classList.contains('collab-agent')) {
+                    el.classList.add('visible', 'active');
+                    el.style.opacity = '1';
+                    await new Promise(resolve => setTimeout(resolve, 1200));
+                    el.classList.remove('active');
+                } else {
+                    el.style.opacity = '1';
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

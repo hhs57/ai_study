@@ -1,0 +1,2213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块21: 知识图谱基础概念 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subsection-title {
+            font-size: 1.8em;
+            margin: 30px 0 20px 0;
+            color: #60a5fa;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .animation-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .node-circle {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .node-circle:hover {
+            filter: brightness(1.2);
+        }
+
+        .edge-line {
+            stroke-width: 2;
+            fill: none;
+        }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2em;
+            }
+            .glass-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <span class="text-gray-600">第一模块</span>
+                <a href="22-knowledge-representation.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 21 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 21: 知识图谱基础概念
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">理解知识图谱的核心概念：实体、关系、属性和本体</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">入门级别</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~70 分钟</span>
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">6 个交互动画</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: 知识图谱发展的3个关键故事 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. 知识图谱发展的3个关键故事</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">💡 为什么要学发展史?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    技术发展史不是"时间线罗列",而是<strong>问题解决的故事</strong>。每个阶段都面临一个核心难题,
+                    知识图谱的演进就是为了解决这些难题。
+                </p>
+                <p class="text-gray-400">
+                    通过下方的动画,你会理解: <strong>为什么需要知识图谱?为什么选择图结构?为什么现在要结合LLM?</strong>
+                </p>
+            </div>
+
+        <!-- 故事导航卡片 - 点击展开详细内容 -->
+        <div class="space-y-4" id="stories-container">
+            <!-- 故事1 -->
+            <div class="bg-blue-500/10 border border-blue-500/30 rounded-xl overflow-hidden">
+                <div class="p-5 cursor-pointer hover:bg-blue-500/15 transition-colors" onclick="toggleStory(0)">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <span class="text-4xl">📖</span>
+                            <div>
+                                <h3 class="text-xl font-bold text-blue-400">故事1: 搜索引擎的"语义危机" (2012)</h3>
+                                <p class="text-sm text-gray-400 mt-1">从关键词匹配到理解实体关系</p>
+                            </div>
+                        </div>
+                        <div class="text-blue-400 text-2xl" id="story-arrow-0">▼</div>
+                    </div>
+                </div>
+                <div class="hidden px-6 pb-6" id="story-detail-0">
+                    <div class="space-y-4 mt-4">
+                        <div class="bg-red-500/10 p-4 rounded-lg border-l-4 border-red-500">
+                            <div class="text-red-400 font-bold mb-3">😰 核心痛点</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                2012年前,搜索引擎只能<strong>匹配关键词</strong>。
+                                <br><br>
+                                ❓ 用户搜 <span class="text-yellow-400">"特斯拉CEO"</span>
+                                <br>🔍 Google返回: 10个网页链接(包含"特斯拉"和"CEO"两个词)
+                                <br>😤 用户痛点: <strong>需要自己点击、阅读、总结</strong>
+                                <br><br>
+                                <span class="text-red-300 font-bold">→ 搜索引擎懂"词语",但不懂"关系"!</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-green-500/10 p-4 rounded-lg border-l-4 border-green-500">
+                            <div class="text-green-400 font-bold mb-3">✨ 解决方案: Google Knowledge Graph (2012)</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                Google的突破: <strong>用知识图谱理解实体和关系</strong>
+                                <br><br>
+                                🧠 识别: <span class="text-blue-400">"特斯拉"</span>是实体(公司), <span class="text-purple-400">"CEO"</span>是关系
+                                <br>🔗 查询图谱: <span class="text-green-400 font-bold">特斯拉 --[CEO_of]--> 埃隆·马斯克</span>
+                                <br>✅ 直接显示答案卡,不用用户自己翻网页!
+                                <br><br>
+                                <span class="text-green-300 font-bold">→ 不再只匹配文字,而是理解"谁是谁的CEO"!</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-500/10 p-4 rounded-lg border-l-4 border-blue-500">
+                            <div class="text-blue-400 font-bold mb-3">🎯 技术选择的逻辑</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                <strong>为什么用图结构,而不是关系数据库?</strong>
+                                <br><br>
+                                • 关系数据库: <span class="text-red-400">JOIN多张表</span>查询复杂(公司表+员工表+职位表...)
+                                <br>• 图结构: <span class="text-green-400">直接遍历关系边</span>,一次跳转找到答案!
+                                <br><br>
+                                <span class="text-blue-300 font-bold">核心优势: "关系"是一等公民,查询关系像找好友一样高效!</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 故事2 -->
+            <div class="bg-green-500/10 border border-green-500/30 rounded-xl overflow-hidden">
+                <div class="p-5 cursor-pointer hover:bg-green-500/15 transition-colors" onclick="toggleStory(1)">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <span class="text-4xl">🏢</span>
+                            <div>
+                                <h3 class="text-xl font-bold text-green-400">故事2: 企业的"知识孤岛"困境 (2015-2018)</h3>
+                                <p class="text-sm text-gray-400 mt-1">从Google独有到人人可用</p>
+                            </div>
+                        </div>
+                        <div class="text-green-400 text-2xl" id="story-arrow-1">▼</div>
+                    </div>
+                </div>
+                <div class="hidden px-6 pb-6" id="story-detail-1">
+                    <div class="space-y-4 mt-4">
+                        <div class="bg-red-500/10 p-4 rounded-lg border-l-4 border-red-500">
+                            <div class="text-red-400 font-bold mb-3">😰 核心痛点</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                企业想建知识图谱,但遇到<strong>两大难题</strong>:
+                                <br><br>
+                                <span class="font-bold text-yellow-400">难题1: 数据从哪来?</span>
+                                <br>→ 自己构建? 需要数百万实体,成本太高!
+                                <br><br>
+                                <span class="font-bold text-yellow-400">难题2: 用什么存?</span>
+                                <br>→ 关系数据库性能差,但图数据库技术不成熟...
+                                <br><br>
+                                <span class="text-red-300 font-bold">→ KG是Google的"奢侈品",企业用不起!</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-green-500/10 p-4 rounded-lg border-l-4 border-green-500">
+                            <div class="text-green-400 font-bold mb-3">✨ 解决方案: 开放图谱 + 图数据库成熟</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                <strong>2015-2018年的两大突破:</strong>
+                                <br><br>
+                                <span class="font-bold text-blue-400">突破1: 开放知识图谱兴起</span>
+                                <br>• <strong>Wikidata</strong>: 维基百科的KG,1亿+实体,免费使用!
+                                <br>• <strong>DBpedia</strong>: 从维基百科提取结构化数据
+                                <br>→ 企业可以"拿来主义",不用从零构建!
+                                <br><br>
+                                <span class="font-bold text-purple-400">突破2: 图数据库成熟</span>
+                                <br>• <strong>Neo4j 3.0</strong> (2017): 性能大幅提升,易用性好
+                                <br>• <strong>Amazon Neptune</strong> (2018): 云端图数据库,无需自建集群
+                                <br>→ 企业可以低成本部署,像用MySQL一样简单!
+                                <br><br>
+                                <span class="text-green-300 font-bold">→ KG从"Google的秘密武器"变成"企业的基础设施"!</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-500/10 p-4 rounded-lg border-l-4 border-blue-500">
+                            <div class="text-blue-400 font-bold mb-3">🎯 实际影响</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                🇨🇳 <strong>中国企业</strong>: 百度知识图谱(2016)、阿里知识图谱(2017)
+                                <br>🛒 <strong>电商</strong>: 用KG推荐商品(购买记录 --[包含]--> 商品 --[相似]--> 推荐)
+                                <br>🔍 <strong>搜索</strong>: 百度直接在搜索结果右侧显示知识卡片
+                                <br>💼 <strong>金融</strong>: 用KG识别欺诈(账户 --[交易]--> 账户,检测异常环)
+                                <br><br>
+                                <span class="text-green-300 font-bold">→ 技术民主化: 从Google独有到企业标配!</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 故事3 -->
+            <div class="bg-purple-500/10 border border-purple-500/30 rounded-xl overflow-hidden">
+                <div class="p-5 cursor-pointer hover:bg-purple-500/15 transition-colors" onclick="toggleStory(2)">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <span class="text-4xl">🤖</span>
+                            <div>
+                                <h3 class="text-xl font-bold text-purple-400">故事3: LLM的"幻觉"与知识图谱的救赎 (2022-至今)</h3>
+                                <p class="text-sm text-gray-400 mt-1">从纯神经网络到神经符号AI</p>
+                            </div>
+                        </div>
+                        <div class="text-purple-400 text-2xl" id="story-arrow-2">▼</div>
+                    </div>
+                </div>
+                <div class="hidden px-6 pb-6" id="story-detail-2">
+                    <div class="space-y-4 mt-4">
+                        <div class="bg-red-500/10 p-4 rounded-lg border-l-4 border-red-500">
+                            <div class="text-red-400 font-bold mb-3">😰 核心痛点: ChatGPT会一本正经地胡说八道</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                2022年ChatGPT爆火,但存在<strong>幻觉问题</strong>:
+                                <br><br>
+                                ❓ 用户: <span class="text-yellow-400">"马斯克的出生日期?"</span>
+                                <br>🤖 ChatGPT: <span class="text-red-400">"1972年3月15日"</span> (❌ 错误!实际是1971-06-28)
+                                <br>😤 问题: LLM基于<strong>概率预测</strong>,不是基于<strong>事实查询</strong>!
+                                <br><br>
+                                <span class="text-red-300 font-bold">→ 纯LLM: 答案"无法验证",不知道是"编造"还是"真实"</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-yellow-500/10 p-4 rounded-lg border-l-4 border-yellow-500">
+                            <div class="text-yellow-400 font-bold mb-3">🔀 尝试方案: 纯向量检索的局限</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                有人用<strong>RAG (检索增强生成)</strong>: 先检索相关文档,再让LLM回答
+                                <br><br>
+                                但传统RAG用<strong>向量检索</strong>,仍有问题:
+                                <br>❌ <strong>相似≠相关</strong>: "马斯克"和"钢铁侠"文本相似,但不是同一个人
+                                <br>❌ <strong>无法多跳推理</strong>: 问"马斯克的公司生产什么?",需要两跳
+                                <br>❌ <strong>路径不可解释</strong>: 向量检索是"黑盒",无法展示推理过程
+                            </div>
+                        </div>
+
+                        <div class="bg-green-500/10 p-4 rounded-lg border-l-4 border-green-500">
+                            <div class="text-green-400 font-bold mb-3">✨ 终极方案: GraphRAG = 知识图谱 + LLM</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                <strong>2022年至今: GraphRAG成为主流</strong>
+                                <br><br>
+                                <div class="bg-black/30 p-3 rounded mt-2 mb-3">
+                                    <div class="text-green-300 font-bold mb-2">完整流程:</div>
+                                    <div class="flex items-center gap-2 text-sm flex-wrap">
+                                        <span class="bg-blue-500/30 px-2 py-1 rounded">1. 实体识别</span>
+                                        <span class="text-gray-400">→</span>
+                                        <span class="bg-purple-500/30 px-2 py-1 rounded">2. 图谱检索</span>
+                                        <span class="text-gray-400">→</span>
+                                        <span class="bg-yellow-500/30 px-2 py-1 rounded">3. 关系路径</span>
+                                        <span class="text-gray-400">→</span>
+                                        <span class="bg-green-500/30 px-2 py-1 rounded">4. LLM生成</span>
+                                    </div>
+                                </div>
+                                <span class="text-green-300 font-bold">→ 每一步都可追溯,答案基于真实的关系路径!</span>
+                            </div>
+                        </div>
+
+                        <div class="bg-blue-500/10 p-4 rounded-lg border-l-4 border-blue-500">
+                            <div class="text-blue-400 font-bold mb-3">🎯 对比: 3种方案的优劣</div>
+                            <div class="text-gray-300 leading-relaxed">
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead>
+                                            <tr class="border-b border-gray-600">
+                                                <th class="text-left py-2 px-3 text-blue-400">方案</th>
+                                                <th class="text-left py-2 px-3 text-green-400">优点</th>
+                                                <th class="text-left py-2 px-3 text-red-400">缺点</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="text-gray-300">
+                                            <tr class="border-b border-gray-700">
+                                                <td class="py-2 px-3 font-bold">纯LLM</td>
+                                                <td class="py-2 px-3">理解自然语言,生成流畅</td>
+                                                <td class="py-2 px-3">会幻觉,答案无法验证</td>
+                                            </tr>
+                                            <tr class="border-b border-gray-700">
+                                                <td class="py-2 px-3 font-bold">向量RAG</td>
+                                                <td class="py-2 px-3">基于真实文档,减少幻觉</td>
+                                                <td class="py-2 px-3">相似≠相关,无法多跳推理</td>
+                                            </tr>
+                                            <tr>
+                                                <td class="py-2 px-3 font-bold text-purple-400">GraphRAG ✓</td>
+                                                <td class="py-2 px-3">基于真实关系,可多跳推理,路径可解释</td>
+                                                <td class="py-2 px-3">需要构建和维护知识图谱</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <p class="mt-3 text-purple-300 font-bold text-sm">→ GraphRAG是当前的最佳实践!</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">🎯 核心要点总结</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="font-bold text-blue-400 mb-2">故事1的核心教训</div>
+                        <p class="text-gray-300 text-sm">
+                            <strong>为什么用图?</strong><br>
+                            因为"关系"是核心,<br>
+                            图结构让查询关系<br>
+                            像找好友一样高效!
+                        </p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2">故事2的核心教训</div>
+                        <p class="text-gray-300 text-sm">
+                            <strong>技术民主化</strong><br>
+                            开放数据 + 云图库 =<br>
+                            人人都能用KG,<br>
+                            不只是Google!
+                        </p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2">故事3的核心教训</div>
+                        <p class="text-gray-300 text-sm">
+                            <strong>最佳实践</strong><br>
+                            GraphRAG = KG + LLM<br>
+                            事实准确 + 可解释<br>
+                            = 未来趋势!
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: 什么是知识图谱 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. 什么是知识图谱?</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">简单来说</h3>
+                <p class="text-gray-300 leading-relaxed text-lg">
+                    知识图谱就是一种用<strong>图结构</strong>来表示<strong>知识</strong>的方法。
+                </p>
+                <p class="text-gray-400 mt-3">
+                    就像我们在纸上画人物关系图一样，知识图谱用<strong>节点</strong>表示<strong>实体</strong>（人、事、物），
+                    用<strong>边</strong>表示实体之间的<strong>关系</strong>。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">一个简单例子</h3>
+                <div class="grid md:grid-cols-3 gap-4 text-center">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-3xl mb-2">👤</div>
+                        <div class="font-bold text-blue-400">实体: 埃隆·马斯克</div>
+                        <div class="text-sm text-gray-400">一个人</div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-3xl mb-2">↔️</div>
+                        <div class="font-bold text-green-400">关系: CEO_of</div>
+                        <div class="text-sm text-gray-400">是...的CEO</div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-3xl mb-2">🏢</div>
+                        <div class="font-bold text-purple-400">实体: 特斯拉</div>
+                        <div class="text-sm text-gray-400">一家公司</div>
+                    </div>
+                </div>
+                <div class="mt-4 text-center">
+                    <div class="inline-block bg-black/30 px-6 py-3 rounded-lg">
+                        <span class="text-gray-300">三元组:</span>
+                        <span class="text-blue-400 font-bold">(埃隆·马斯克)</span>
+                        <span class="text-green-400"> --[CEO_of]--> </span>
+                        <span class="text-purple-400 font-bold">(特斯拉)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">为什么叫"知识图谱"?</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>• <strong>知识</strong>: 包含有意义的实体和关系，不是随便的数据</li>
+                    <li>• <strong>图谱</strong>: 用图结构来组织这些知识</li>
+                    <li>• <strong>作用</strong>: 让计算机"理解"知识之间的关系，而不仅仅是存储数据</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Chapter 3: 实体 (Entity) -->
+        <div class="glass-card">
+            <h2 class="section-title">3. 实体 (Entity)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">🤔 先思考一个问题</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    当你<strong>认识新朋友</strong>时，你会问什么问题？
+                </p>
+                <div class="bg-black/30 p-4 rounded-lg space-y-2 text-gray-300">
+                    <p>💬 "你叫什么名字?" → <span class="text-blue-400">姓名</span></p>
+                    <p>💬 "你是做什么工作的?" → <span class="text-green-400">职业</span></p>
+                    <p>💬 "你住在哪里?" → <span class="text-purple-400">地址</span></p>
+                    <p>💬 "你有什么爱好?" → <span class="text-yellow-400">爱好</span></p>
+                </div>
+                <p class="text-gray-400 mt-3">
+                    这些问题的答案，就是描述这个人的<strong>特征</strong>。在知识图谱中，我们把这些有特征的对象叫做<strong>实体</strong>。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">💡 什么是实体?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>实体</strong>就是知识图谱中的<strong>节点</strong>，代表现实世界中存在的<strong>对象</strong>或<strong>事物</strong>。
+                </p>
+                <p class="text-gray-400 mb-3">
+                    实体可以是具体的人、物、地点，也可以是抽象的概念、事件等。
+                </p>
+                <div class="bg-blue-500/20 p-3 rounded-lg border-l-4 border-blue-500">
+                    <div class="font-bold text-blue-300 mb-1">类比理解</div>
+                    <p class="text-gray-300 text-sm">
+                        实体就像<strong>社交网络中的个人主页</strong>，包含头像、姓名、简介等各种信息。
+                    </p>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="animation-title">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        动画: 认识一个新实体
+                    </div>
+                    <div id="entity-step-indicator" class="text-sm text-gray-400">
+                        步骤: <span class="text-blue-400 font-bold">0/5</span>
+                    </div>
+                </div>
+                <div id="entity-animation" class="animation-canvas"></div>
+                <div id="entity-explanation" class="info-panel mt-3">
+                    <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                    <div class="text-gray-300">点击"播放动画"开始演示如何认识一个新实体</div>
+                </div>
+                <div class="controls mt-4">
+                    <button class="btn btn-primary" onclick="playEntityAnimation()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="nextEntityStep()">→ 下一步</button>
+                    <button class="btn btn-secondary" onclick="resetEntityAnimation()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="showEntityInfo()">ℹ️ 查看说明</button>
+                </div>
+                <div id="entity-info" class="info-panel hidden mt-3">
+                    <div class="text-yellow-400 font-bold mb-2">实体类型说明:</div>
+                    <ul class="text-gray-300 space-y-1 text-sm">
+                        <li><span class="text-blue-400">人物</span>: 埃隆·马斯克、柏拉图、苏格拉底</li>
+                        <li><span class="text-green-400">地点</span>: 北京、巴黎、太平洋</li>
+                        <li><span class="text-purple-400">组织</span>: 特斯拉、谷歌、清华大学</li>
+                        <li><span class="text-pink-400">概念</span>: 人工智能、民主、相对论</li>
+                        <li><span class="text-yellow-400">事件</span>: 2008年奥运会、第二次世界大战</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">实体的特点</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>✅ <strong>唯一标识</strong>: 每个实体都有唯一的ID（如: Q317521 是埃隆·马斯克在Wikidata中的ID）</li>
+                    <li>✅ <strong>有类型</strong>: 人物、地点、组织、概念等</li>
+                    <li>✅ <strong>有属性</strong>: 姓名、出生日期、职业等</li>
+                    <li>✅ <strong>可连接</strong>: 通过关系与其他实体相连</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 关系 (Relation) -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 关系 (Relation)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-green-300 mb-3">📱 从微信好友说起</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    在微信中，你和你的朋友之间有什么关系？
+                </p>
+                <div class="grid md:grid-cols-3 gap-4 mb-4">
+                    <div class="bg-green-500/20 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2 text-center">👥 单向关注</div>
+                        <p class="text-gray-300 text-sm text-center">你关注了某个公众号，但公众号没关注你</p>
+                    </div>
+                    <div class="bg-blue-500/20 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="font-bold text-blue-400 mb-2 text-center">🤝 双向好友</div>
+                        <p class="text-gray-300 text-sm text-center">你和你的朋友互相添加了对方</p>
+                    </div>
+                    <div class="bg-purple-500/20 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2 text-center">👨‍👩‍👧 群组关系</div>
+                        <p class="text-gray-300 text-sm text-center">你们都在同一个家庭群里</p>
+                    </div>
+                </div>
+                <p class="text-gray-400">
+                    这些就是<strong>关系</strong>！在知识图谱中，我们用<strong>有向的边</strong>来表示这些关系。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">💡 什么是关系?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>关系</strong>是连接两个实体的<strong>边</strong>，描述实体之间是如何关联的。
+                </p>
+                <p class="text-gray-400 mb-3">
+                    关系是<strong>有方向的</strong>，从主语实体指向宾语实体。
+                </p>
+                <div class="bg-green-500/20 p-3 rounded-lg border-l-4 border-green-500">
+                    <div class="font-bold text-green-300 mb-1">类比理解</div>
+                    <p class="text-gray-300 text-sm">
+                        关系就像<strong>句子中的动词</strong>，连接主语和宾语，说明它们之间的关系。
+                    </p>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="animation-title">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                        </svg>
+                        动画: 关系如何连接实体
+                    </div>
+                    <div id="relation-step-indicator" class="text-sm text-gray-400">
+                        步骤: <span class="text-green-400 font-bold">0/3</span>
+                    </div>
+                </div>
+                <div id="relation-animation" class="animation-canvas"></div>
+                <div id="relation-explanation" class="info-panel mt-3">
+                    <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                    <div class="text-gray-300">点击"播放动画"开始演示关系如何连接实体</div>
+                </div>
+                <div class="controls mt-4">
+                    <button class="btn btn-primary" onclick="playRelationAnimation()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="nextRelationStep()">→ 下一步</button>
+                    <button class="btn btn-secondary" onclick="resetRelationAnimation()">↺ 重置</button>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">关系的类型</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">层级关系</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• is_a (是...的一种)</li>
+                            <li>• subclass_of (是...的子类)</li>
+                            <li>• part_of (是...的一部分)</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">关联关系</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• located_in (位于)</li>
+                            <li>• born_in (出生在)</li>
+                            <li>• CEO_of (是...的CEO)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 属性 (Property) -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 属性 (Property)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-purple-300 mb-3">什么是属性?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>属性</strong>是实体的<strong>特征</strong>或<strong>描述信息</strong>。
+                </p>
+                <p class="text-gray-400">
+                    与"关系"不同，属性不连接到另一个实体，而是直接存储一个<strong>值</strong>（如字符串、数字、日期等）。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                    </svg>
+                    动画: 实体的属性
+                </div>
+                <div id="property-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playPropertyAnimation()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="resetPropertyAnimation()">↺ 重置</button>
+                </div>
+                <div id="property-info" class="info-panel">
+                    <div class="text-purple-400 font-bold mb-2">属性示例:</div>
+                    <ul class="text-gray-300 space-y-1 text-sm">
+                        <li><span class="text-blue-400">name</span>: "埃隆·马斯克" (字符串)</li>
+                        <li><span class="text-green-400">birth_date</span>: "1971-06-28" (日期)</li>
+                        <li><span class="text-purple-400">net_worth</span>: 240000000000 (数字，单位:美元)</li>
+                        <li><span class="text-pink-400">nationality</span>: "美国、南非、加拿大" (多值)</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-purple-300 mb-3">属性 vs 关系</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2">属性 (Property)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 描述实体的特征</li>
+                            <li>• 直接存储值（字符串、数字等）</li>
+                            <li>• 例: 身高、体重、姓名</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2">关系 (Relation)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 连接两个实体</li>
+                            <li>• 指向另一个实体</li>
+                            <li>• 例: 出生于、工作于、认识</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 6: 本体 (Ontology) -->
+        <div class="glass-card">
+            <h2 class="section-title">6. 本体 (Ontology)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">什么是本体?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>本体</strong>是知识图谱的<strong>模式</strong>或<strong>结构</strong>，定义了:
+                </p>
+                <ul class="text-gray-300 space-y-2">
+                    <li>• 存在哪些类型的<strong>实体</strong>（类）</li>
+                    <li>• 允许哪些<strong>关系</strong>和<strong>属性</strong></li>
+                    <li>• 实体之间的<strong>约束规则</strong></li>
+                </ul>
+                <p class="text-gray-400 mt-3">
+                    简单说，本体就像知识图谱的<strong>数据库模式</strong>或<strong>建筑蓝图</strong>。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    动画: 本体层次结构
+                </div>
+                <div id="ontology-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playOntologyAnimation()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="resetOntologyAnimation()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="expandOntology()">+ 展开更多</button>
+                </div>
+                <div id="ontology-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">本体的作用:</div>
+                    <ul class="text-gray-300 space-y-1 text-sm">
+                        <li>✅ <strong>类型约束</strong>: 人必须有出生日期</li>
+                        <li>✅ <strong>关系约束</strong>: CEO_of 只能连接人物和组织</li>
+                        <li>✅ <strong>推理规则</strong>: 如果 X 是 Y 的父类，Y的属性X也具有</li>
+                        <li>✅ <strong>数据一致性</strong>: 保证数据质量</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">本体示例</h3>
+                <div class="bg-black/30 p-4 rounded-lg font-mono text-sm">
+                    <div class="text-purple-400">类 (Class): 人物、地点、组织</div>
+                    <div class="text-green-400">属性: name, birth_date, gender</div>
+                    <div class="text-blue-400">关系: born_in(人物→地点), CEO_of(人物→组织)</div>
+                    <div class="text-yellow-400">约束: 人物必须有name和birth_date</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 7: 三元组 (Triple) -->
+        <div class="glass-card">
+            <h2 class="section-title">7. 三元组 (Triple) - 知识的基本单元</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-pink-300 mb-3">什么是三元组?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>三元组</strong>是知识图谱中<strong>最小的知识单元</strong>，由三个部分组成:
+                </p>
+                <div class="bg-black/30 p-4 rounded-lg text-center">
+                    <div class="text-2xl font-bold">
+                        <span class="text-blue-400">(主语 Subject)</span>
+                        <span class="text-gray-400"> - </span>
+                        <span class="text-green-400">[谓语 Predicate]</span>
+                        <span class="text-gray-400"> - </span>
+                        <span class="text-purple-400">(宾语 Object)</span>
+                    </div>
+                </div>
+                <p class="text-gray-400 mt-3">
+                    主语和宾语通常是实体，谓语是关系或属性。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="flex justify-between items-center mb-3">
+                    <div class="animation-title">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                        </svg>
+                        动画: 三元组的分步构建
+                    </div>
+                    <div id="triple-step-indicator" class="text-sm text-gray-400">
+                        步骤: <span class="text-pink-400 font-bold">0/3</span>
+                    </div>
+                </div>
+                <div id="triple-animation" class="animation-canvas"></div>
+                <div id="triple-explanation" class="info-panel mt-3">
+                    <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                    <div class="text-gray-300">点击"播放动画"查看三元组如何分步构建</div>
+                </div>
+                <div class="controls mt-4">
+                    <button class="btn btn-primary" onclick="playTripleAnimation()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="nextTripleStep()">→ 下一步</button>
+                    <button class="btn btn-secondary" onclick="resetTripleAnimation()">↺ 重置</button>
+                </div>
+                <div id="triple-info" class="info-panel mt-3">
+                    <div class="text-pink-400 font-bold mb-2">当前三元组:</div>
+                    <ul class="text-gray-300 space-y-1 text-sm" id="triple-list">
+                        <li>点击"播放动画"查看三元组的构建过程</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-pink-300 mb-3">为什么用三元组?</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>✅ <strong>简单</strong>: 易于理解和存储</li>
+                    <li>✅ <strong>灵活</strong>: 可以组合表示复杂的知识</li>
+                    <li>✅ <strong>可推理</strong>: 基于三元组可以推导出新知识</li>
+                    <li>✅ <strong>标准化</strong>: RDF标准采用三元组模型</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="glass-card">
+            <h2 class="section-title">模块总结</h2>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-400 mb-3">核心概念</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>🔵 <strong>实体 (Entity)</strong>: 知识图谱中的节点，表示对象</li>
+                        <li>🔗 <strong>关系 (Relation)</strong>: 连接实体的边，有方向</li>
+                        <li>📋 <strong>属性 (Property)</strong>: 实体的特征，存储值</li>
+                        <li>🏗️ <strong>本体 (Ontology)</strong>: 知识图谱的模式和约束</li>
+                        <li>📝 <strong>三元组 (Triple)</strong>: (主语, 谓语, 实语) - 最小知识单元</li>
+                    </ul>
+                </div>
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-400 mb-3">类比理解</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>• <strong>实体</strong> 就像句子中的"名词"</li>
+                        <li>• <strong>关系</strong> 就像句子中的"动词"</li>
+                        <li>• <strong>属性</strong> 就像形容词（描述特征）</li>
+                        <li>• <strong>本体</strong> 就像语法规则（定义什么句子是合法的）</li>
+                        <li>• <strong>三元组</strong> 就像一个完整的句子（主谓宾）</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-purple-400 mb-3">下一步学习</h3>
+                <p class="text-gray-300 mb-3">
+                    理解了这些核心概念后，建议继续学习:
+                </p>
+                <a href="22-knowledge-representation.html" class="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-2">
+                    模块 22: 知识表示理论 - 深入理解如何用计算机表示知识
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 21: 知识图谱基础概念</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 动画 1: 实体类型展示 - 改进版：分步骤演示 + 实时讲解
+        // ============================================================
+        let entitySvg, entityNodes = [];
+        let entityCurrentStep = 0;
+        let entityAnimationTimer = null;
+
+        // 实体构建步骤数据
+        const entitySteps = [
+            {
+                step: 1,
+                title: "第一步：出现一个节点",
+                explanation: "🎯 首先出现一个空白的圆形节点，就像一个空白的个人主页。",
+                action: "showNode",
+                data: { name: "?", type: "未知", color: "#6b7280", icon: "❓" }
+            },
+            {
+                step: 2,
+                title: "第二步：添加姓名",
+                explanation: "📝 给节点添加姓名 '埃隆·马斯克'。现在我们认识这是一个人了！",
+                action: "updateName",
+                data: { name: "埃隆·马斯克", type: "未知", color: "#3b82f6", icon: "👤" }
+            },
+            {
+                step: 3,
+                title: "第三步：确定类型",
+                explanation: "🏷️ 确定实体类型是 '人物'。类型帮助我们快速理解这是什么对象。",
+                action: "updateType",
+                data: { name: "埃隆·马斯克", type: "人物", color: "#3b82f6", icon: "👤" }
+            },
+            {
+                step: 4,
+                title: "第四步：添加属性",
+                explanation: "📋 添加更多属性：职业、出生日期、国籍等。这些属性描述了实体的特征。",
+                action: "showProperties",
+                data: {
+                    properties: [
+                        { name: "职业", value: "企业家" },
+                        { name: "出生", value: "1971年" },
+                        { name: "国籍", value: "美国" }
+                    ]
+                }
+            },
+            {
+                step: 5,
+                title: "第五步：完整实体",
+                explanation: "✅ 现在我们有一个完整的实体了！包含名称、类型、各种属性。这就是知识图谱中的一个节点。",
+                action: "complete",
+                data: {}
+            }
+        ];
+
+        function initEntityAnimation() {
+            const container = document.getElementById("entity-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            entitySvg = d3.select("#entity-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // 标题
+            entitySvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("认识一个新实体");
+
+            entityCurrentStep = 0;
+            updateEntityStepIndicator();
+        }
+
+        function playEntityAnimation() {
+            resetEntityAnimation();
+            entityCurrentStep = 0;
+
+            // 自动播放所有步骤
+            function playNextStep() {
+                if (entityCurrentStep < entitySteps.length) {
+                    showEntityStep(entityCurrentStep);
+                    entityCurrentStep++;
+                    updateEntityStepIndicator();
+                    entityAnimationTimer = setTimeout(playNextStep, 2500);
+                }
+            }
+
+            playNextStep();
+        }
+
+        function nextEntityStep() {
+            // 停止自动播放
+            if (entityAnimationTimer) {
+                clearTimeout(entityAnimationTimer);
+                entityAnimationTimer = null;
+            }
+
+            if (entityCurrentStep < entitySteps.length) {
+                showEntityStep(entityCurrentStep);
+                entityCurrentStep++;
+                updateEntityStepIndicator();
+            } else {
+                // 如果已经播放完，重置并重新开始
+                resetEntityAnimation();
+            }
+        }
+
+        function showEntityStep(stepIndex) {
+            if (stepIndex >= entitySteps.length) return;
+
+            const step = entitySteps[stepIndex];
+            const width = entitySvg.node().clientWidth;
+            const centerX = width / 2;
+            const centerY = 200;
+
+            // 更新讲解文字
+            const explanationDiv = document.getElementById("entity-explanation");
+            explanationDiv.innerHTML = `
+                <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                <div class="text-lg font-bold text-blue-300 mb-2">${step.title}</div>
+                <div class="text-gray-300">${step.explanation}</div>
+            `;
+
+            if (step.action === "showNode") {
+                // 显示空白节点
+                const g = entitySvg.append("g")
+                    .attr("transform", `translate(${centerX}, ${centerY})`)
+                    .style("opacity", 0);
+
+                g.append("circle")
+                    .attr("r", 60)
+                    .attr("fill", step.data.color)
+                    .attr("opacity", 0.3)
+                    .attr("stroke", step.data.color)
+                    .attr("stroke-width", 3);
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("y", 8)
+                    .attr("font-size", "40px")
+                    .text(step.data.icon);
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("y", 90)
+                    .attr("fill", "#9ca3af")
+                    .attr("font-size", "14px")
+                    .text("未知实体");
+
+                g.transition()
+                    .duration(500)
+                    .style("opacity", 1);
+
+                entityNodes = [g];
+
+            } else if (step.action === "updateName") {
+                // 更新名称
+                const node = entityNodes[0];
+
+                node.select("text:nth-child(2)")
+                    .text(step.data.icon);
+
+                node.select("circle")
+                    .attr("fill", step.data.color)
+                    .attr("stroke", step.data.color);
+
+                node.select("text:nth-child(3)")
+                    .text(step.data.name)
+                    .attr("fill", "#e2e8f0")
+                    .attr("font-size", "16px")
+                    .attr("font-weight", "bold")
+                    .attr("y", 90);
+
+                // 添加类型标签（暂时是未知）
+                node.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("y", 110)
+                    .attr("fill", "#9ca3af")
+                    .attr("font-size", "12px")
+                    .style("opacity", 0)
+                    .text("类型未知")
+                    .transition()
+                    .delay(300)
+                    .duration(500)
+                    .style("opacity", 1);
+
+            } else if (step.action === "updateType") {
+                // 更新类型
+                const node = entityNodes[0];
+
+                node.select("text:nth-child(4)")
+                    .text(`类型: ${step.data.type}`)
+                    .attr("fill", "#22c55e")
+                    .style("opacity", 1);
+
+            } else if (step.action === "showProperties") {
+                // 显示属性
+                const properties = step.data.properties;
+                const angles = [-60, -30, 0, 30, 60];
+
+                properties.forEach((prop, i) => {
+                    const angle = (angles[i] * Math.PI) / 180;
+                    const x = centerX + Math.cos(angle) * 180;
+                    const y = centerY + Math.sin(angle) * 150;
+
+                    // 连接线
+                    entitySvg.insert("line", ":first-child")
+                        .attr("x1", centerX)
+                        .attr("y1", centerY)
+                        .attr("x2", x)
+                        .attr("y2", y)
+                        .attr("stroke", "#22c55e")
+                        .attr("stroke-width", 2)
+                        .attr("stroke-dasharray", "5,5")
+                        .attr("opacity", 0)
+                        .transition()
+                        .delay(i * 200)
+                        .duration(500)
+                        .attr("opacity", 0.6);
+
+                    // 属性框
+                    const g = entitySvg.append("g")
+                        .attr("transform", `translate(${x}, ${y})`)
+                        .style("opacity", 0);
+
+                    g.append("rect")
+                        .attr("x", -60)
+                        .attr("y", -25)
+                        .attr("width", 120)
+                        .attr("height", 50)
+                        .attr("fill", "#22c55e")
+                        .attr("opacity", 0.2)
+                        .attr("rx", 8)
+                        .attr("stroke", "#22c55e")
+                        .attr("stroke-width", 2);
+
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("y", -5)
+                        .attr("fill", "#22c55e")
+                        .attr("font-size", "12px")
+                        .attr("font-weight", "bold")
+                        .text(prop.name);
+
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("y", 15)
+                        .attr("fill", "#e2e8f0")
+                        .attr("font-size", "11px")
+                        .text(prop.value);
+
+                    g.transition()
+                        .delay(i * 200 + 300)
+                        .duration(500)
+                        .style("opacity", 1);
+                });
+
+            } else if (step.action === "complete") {
+                // 完成动画，添加脉冲效果
+                const node = entityNodes[0];
+
+                node.select("circle")
+                    .transition()
+                    .duration(1000)
+                    .attr("r", 70)
+                    .attr("opacity", 0.5)
+                    .transition()
+                    .duration(1000)
+                    .attr("r", 60)
+                    .attr("opacity", 0.3);
+
+                // 添加完成标记
+                entitySvg.append("text")
+                    .attr("x", centerX)
+                    .attr("y", centerY - 100)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#22c55e")
+                    .attr("font-size", "18px")
+                    .attr("font-weight", "bold")
+                    .style("opacity", 0)
+                    .text("✅ 实体构建完成!")
+                    .transition()
+                    .delay(500)
+                    .duration(500)
+                    .style("opacity", 1);
+            }
+        }
+
+        function updateEntityStepIndicator() {
+            const indicator = document.getElementById("entity-step-indicator");
+            indicator.innerHTML = `步骤: <span class="text-blue-400 font-bold">${entityCurrentStep}/${entitySteps.length}</span>`;
+        }
+
+        function resetEntityAnimation() {
+            if (entityAnimationTimer) {
+                clearTimeout(entityAnimationTimer);
+                entityAnimationTimer = null;
+            }
+
+            if (entitySvg) {
+                entitySvg.selectAll("*").remove();
+                entityNodes = [];
+                initEntityAnimation();
+            }
+
+            entityCurrentStep = 0;
+            updateEntityStepIndicator();
+
+            // 重置讲解文字
+            document.getElementById("entity-explanation").innerHTML = `
+                <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                <div class="text-gray-300">点击"播放动画"开始演示如何认识一个新实体</div>
+            `;
+        }
+
+        function showEntityInfo() {
+            const infoPanel = document.getElementById("entity-info");
+            infoPanel.classList.toggle("hidden");
+        }
+
+        // ============================================================
+        // 动画 2: 关系连接实体
+        // ============================================================
+        let relationSvg, relationNodes = [], relationEdges = [];
+        let allLinks = [];
+        let relationCurrentStep = 0;
+        const relationData = [
+            { source: "埃隆·马斯克", target: "特斯拉", relation: "CEO_of" },
+            { source: "特斯拉", target: "电动汽车", relation: "industry" },
+            { source: "埃隆·马斯克", target: "SpaceX", relation: "founder_of" },
+        ];
+
+        function initRelationAnimation() {
+            const container = document.getElementById("relation-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            relationSvg = d3.select("#relation-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // 定义力导向模拟
+            const simulation = d3.forceSimulation()
+                .force("link", d3.forceLink().id(d => d.name).distance(150))
+                .force("charge", d3.forceManyBody().strength(-500))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            // 创建节点
+            const nodes = [
+                { name: "埃隆·马斯克", color: "#3b82f6" },
+                { name: "特斯拉", color: "#8b5cf6" },
+                { name: "电动汽车", color: "#22c55e" },
+                { name: "SpaceX", color: "#f59e0b" },
+            ];
+
+            // 创建边的容器
+            const linkGroup = relationSvg.append("g").attr("class", "links");
+
+            // 创建标签的容器
+            const labelGroup = relationSvg.append("g").attr("class", "labels");
+
+            // 绘制节点
+            const node = relationSvg.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .join("g")
+                .attr("class", "node-circle")
+                .call(d3.drag()
+                    .on("start", dragstarted)
+                    .on("drag", dragged)
+                    .on("end", dragended));
+
+            node.append("circle")
+                .attr("r", 40)
+                .attr("fill", d => d.color)
+                .attr("opacity", 0.6);
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 5)
+                .attr("fill", "white")
+                .attr("font-size", "12px")
+                .attr("font-weight", "bold")
+                .text(d => d.name);
+
+            node.on("click", function(event, d) {
+                showNodeDetails(d);
+            });
+
+            // 初始化空的链接数据
+            allLinks = [];
+
+            simulation.nodes(nodes).on("tick", ticked);
+            simulation.force("link").links([]);
+
+            function ticked() {
+                // 更新所有边的位置
+                linkGroup.selectAll("line")
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                // 更新所有标签的位置（放在边的中点）
+                labelGroup.selectAll("text")
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2);
+
+                node.attr("transform", d => `translate(${d.x},${d.y})`);
+            }
+
+            function dragstarted(event, d) {
+                if (!event.active) simulation.alphaTarget(0.3).restart();
+                d.fx = d.x;
+                d.fy = d.y;
+            }
+
+            function dragged(event, d) {
+                d.fx = event.x;
+                d.fy = event.y;
+            }
+
+            function dragended(event, d) {
+                if (!event.active) simulation.alphaTarget(0);
+                d.fx = null;
+                d.fy = null;
+            }
+
+            relationSvg.simulation = simulation;
+            relationSvg.nodeData = node;
+            relationSvg.nodes = nodes;
+            relationSvg.linkGroup = linkGroup;
+            relationSvg.labelGroup = labelGroup;
+
+            // 初始化步骤指示器
+            relationCurrentStep = 0;
+            updateRelationStepIndicator();
+        }
+
+        function updateRelationStepIndicator() {
+            const indicator = document.getElementById("relation-step-indicator");
+            indicator.innerHTML = `步骤: <span class="text-green-400 font-bold">${relationCurrentStep}/${relationData.length}</span>`;
+        }
+
+        function playRelationAnimation() {
+            // 重置步骤计数
+            relationCurrentStep = 0;
+            updateRelationStepIndicator();
+
+            // 重置链接
+            allLinks = [];
+            relationSvg.linkGroup.selectAll("*").remove();
+            relationSvg.labelGroup.selectAll("*").remove();
+
+            function addNextRelation() {
+                if (relationCurrentStep >= relationData.length) {
+                    // 动画完成
+                    document.getElementById("relation-explanation").innerHTML = `
+                        <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                        <div class="text-green-400 font-bold mb-2">✓ 知识图谱构建完成!</div>
+                        <div class="text-gray-300">实体数: ${relationSvg.nodes.length} | 关系数: ${allLinks.length}</div>
+                    `;
+                    return;
+                }
+
+                const rel = relationData[relationCurrentStep];
+                const source = relationSvg.nodes.find(n => n.name === rel.source);
+                const target = relationSvg.nodes.find(n => n.name === rel.target);
+
+                if (source && target) {
+                    // 添加新链接
+                    const newLink = { source, target, relation: rel.relation };
+                    allLinks.push(newLink);
+
+                    // 更新simulation的links
+                    relationSvg.simulation.force("link").links(allLinks);
+                    relationSvg.simulation.alpha(1).restart();
+
+                    // 在SVG中绘制新的线
+                    relationSvg.linkGroup.append("line")
+                        .datum(newLink)
+                        .attr("class", "edge-line")
+                        .attr("stroke", "#22c55e")
+                        .attr("stroke-width", 3)
+                        .attr("opacity", 0)
+                        .transition()
+                        .duration(500)
+                        .attr("opacity", 1);
+
+                    // 添加关系标签
+                    relationSvg.labelGroup.append("text")
+                        .datum(newLink)
+                        .attr("fill", "#22c55e")
+                        .attr("font-size", "11px")
+                        .attr("font-weight", "bold")
+                        .attr("text-anchor", "middle")
+                        .attr("opacity", 0)
+                        .text(rel.relation)
+                        .transition()
+                        .delay(250)
+                        .duration(500)
+                        .attr("opacity", 1);
+
+                    // 更新步骤指示器
+                    relationCurrentStep++;
+                    updateRelationStepIndicator();
+
+                    // 更新讲解文字
+                    document.getElementById("relation-explanation").innerHTML = `
+                        <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                        <div class="text-gray-300">
+                            添加关系 <span class="text-green-400 font-bold">${relationCurrentStep}/${relationData.length}</span>:<br>
+                            <span class="text-blue-400">${rel.source}</span>
+                            <span class="text-green-400"> [${rel.relation}] </span>
+                            <span class="text-purple-400">${rel.target}</span>
+                        </div>
+                    `;
+
+                    setTimeout(addNextRelation, 1500);
+                }
+            }
+
+            addNextRelation();
+        }
+
+        function nextRelationStep() {
+            if (relationCurrentStep < relationData.length) {
+                // 重置并播放到当前步骤
+                if (relationCurrentStep === 0) {
+                    allLinks = [];
+                    relationSvg.linkGroup.selectAll("*").remove();
+                    relationSvg.labelGroup.selectAll("*").remove();
+                }
+
+                const rel = relationData[relationCurrentStep];
+                const source = relationSvg.nodes.find(n => n.name === rel.source);
+                const target = relationSvg.nodes.find(n => n.name === rel.target);
+
+                if (source && target) {
+                    // 添加新链接
+                    const newLink = { source, target, relation: rel.relation };
+                    allLinks.push(newLink);
+
+                    // 更新simulation的links
+                    relationSvg.simulation.force("link").links(allLinks);
+                    relationSvg.simulation.alpha(1).restart();
+
+                    // 在SVG中绘制新的线
+                    relationSvg.linkGroup.append("line")
+                        .datum(newLink)
+                        .attr("class", "edge-line")
+                        .attr("stroke", "#22c55e")
+                        .attr("stroke-width", 3)
+                        .attr("opacity", 0)
+                        .transition()
+                        .duration(500)
+                        .attr("opacity", 1);
+
+                    // 添加关系标签
+                    relationSvg.labelGroup.append("text")
+                        .datum(newLink)
+                        .attr("fill", "#22c55e")
+                        .attr("font-size", "11px")
+                        .attr("font-weight", "bold")
+                        .attr("text-anchor", "middle")
+                        .attr("opacity", 0)
+                        .text(rel.relation)
+                        .transition()
+                        .delay(250)
+                        .duration(500)
+                        .attr("opacity", 1);
+
+                    // 更新步骤指示器
+                    relationCurrentStep++;
+                    updateRelationStepIndicator();
+
+                    // 更新讲解文字
+                    if (relationCurrentStep >= relationData.length) {
+                        document.getElementById("relation-explanation").innerHTML = `
+                            <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                            <div class="text-green-400 font-bold mb-2">✓ 知识图谱构建完成!</div>
+                            <div class="text-gray-300">实体数: ${relationSvg.nodes.length} | 关系数: ${allLinks.length}</div>
+                        `;
+                    } else {
+                        document.getElementById("relation-explanation").innerHTML = `
+                            <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                            <div class="text-gray-300">
+                                添加关系 <span class="text-green-400 font-bold">${relationCurrentStep}/${relationData.length}</span>:<br>
+                                <span class="text-blue-400">${rel.source}</span>
+                                <span class="text-green-400"> [${rel.relation}] </span>
+                                <span class="text-purple-400">${rel.target}</span>
+                            </div>
+                        `;
+                    }
+                }
+            } else {
+                // 如果已经播放完，重置
+                resetRelationAnimation();
+            }
+        }
+
+        function resetRelationAnimation() {
+            initRelationAnimation();
+            document.getElementById("relation-explanation").innerHTML = `
+                <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                <div class="text-gray-300">点击"播放动画"开始演示关系如何连接实体</div>
+            `;
+        }
+
+        function addRelation() {
+            alert("在真实应用中，这里会弹出一个表单让用户输入新的关系！");
+        }
+
+        function showNodeDetails(d) {
+            alert(`节点: ${d.name}\n颜色: ${d.color}`);
+        }
+
+        // ============================================================
+        // 动画 3: 属性展示
+        // ============================================================
+        let propertySvg;
+
+        function initPropertyAnimation() {
+            const container = document.getElementById("property-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            propertySvg = d3.select("#property-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            propertySvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#a855f7")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("实体的属性");
+        }
+
+        function playPropertyAnimation() {
+            resetPropertyAnimation();
+            const width = propertySvg.node().clientWidth;
+            const centerX = width / 2;
+            const centerY = 200;
+
+            // 中心节点
+            const centerNode = propertySvg.append("g")
+                .attr("transform", `translate(${centerX}, ${centerY})`)
+                .style("opacity", 0);
+
+            centerNode.append("circle")
+                .attr("r", 50)
+                .attr("fill", "#3b82f6")
+                .attr("opacity", 0.6);
+
+            centerNode.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", -5)
+                .attr("fill", "white")
+                .attr("font-size", "14px")
+                .attr("font-weight", "bold")
+                .text("埃隆·马斯克");
+
+            centerNode.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 15)
+                .attr("fill", "white")
+                .attr("font-size", "11px")
+                .text("实体");
+
+            centerNode.transition()
+                .duration(500)
+                .style("opacity", 1);
+
+            // 属性
+            const properties = [
+                { name: "birth_date", value: "1971-06-28", color: "#22c55e", angle: 0 },
+                { name: "nationality", value: "美国/南非/加拿大", color: "#8b5cf6", angle: 72 },
+                { name: "occupation", value: "企业家/工程师", color: "#f59e0b", angle: 144 },
+                { name: "net_worth", value: "$240B", color: "#ec4899", angle: 216 },
+                { name: "education", value: "宾夕法尼亚大学", color: "#06b6d4", angle: 288 },
+            ];
+
+            properties.forEach((prop, i) => {
+                setTimeout(() => {
+                    const angle = (prop.angle * Math.PI) / 180;
+                    const x = centerX + Math.cos(angle) * 180;
+                    const y = centerY + Math.sin(angle) * 130;
+
+                    const g = propertySvg.append("g")
+                        .attr("transform", `translate(${x}, ${y})`)
+                        .style("opacity", 0);
+
+                    // 连线
+                    propertySvg.insert("line", ":first-child")
+                        .attr("x1", centerX)
+                        .attr("y1", centerY)
+                        .attr("x2", x)
+                        .attr("y2", y)
+                        .attr("stroke", prop.color)
+                        .attr("stroke-width", 2)
+                        .attr("stroke-dasharray", "5,5")
+                        .attr("opacity", 0)
+                        .transition()
+                        .duration(500)
+                        .attr("opacity", 0.6);
+
+                    // 属性框
+                    g.append("rect")
+                        .attr("x", -70)
+                        .attr("y", -30)
+                        .attr("width", 140)
+                        .attr("height", 60)
+                        .attr("fill", prop.color)
+                        .attr("opacity", 0.2)
+                        .attr("rx", 8);
+
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("y", -8)
+                        .attr("fill", prop.color)
+                        .attr("font-size", "12px")
+                        .attr("font-weight", "bold")
+                        .text(prop.name);
+
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("y", 12)
+                        .attr("fill", "#e2e8f0")
+                        .attr("font-size", "11px")
+                        .text(prop.value.length > 15 ? prop.value.substring(0, 15) + "..." : prop.value);
+
+                    g.transition()
+                        .duration(500)
+                        .style("opacity", 1);
+                }, 800 + i * 400);
+            });
+        }
+
+        function resetPropertyAnimation() {
+            if (propertySvg) {
+                propertySvg.selectAll("*").remove();
+                initPropertyAnimation();
+            }
+        }
+
+        // ============================================================
+        // 动画 4: 本体层次结构
+        // ============================================================
+        let ontologySvg;
+        let ontologyExpanded = false;
+
+        const ontologyData = {
+            name: "实体",
+            children: [
+                {
+                    name: "人物",
+                    children: [
+                        { name: "科学家" },
+                        { name: "企业家" },
+                    ]
+                },
+                {
+                    name: "地点",
+                    children: [
+                        { name: "城市" },
+                        { name: "国家" },
+                    ]
+                },
+                {
+                    name: "组织",
+                    children: [
+                        { name: "公司" },
+                        { name: "大学" },
+                    ]
+                },
+            ]
+        };
+
+        function initOntologyAnimation() {
+            const container = document.getElementById("ontology-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            ontologySvg = d3.select("#ontology-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            ontologySvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 25)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#fbbf24")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("本体层次结构 (Ontology Hierarchy)");
+        }
+
+        function playOntologyAnimation() {
+            resetOntologyAnimation();
+            const width = ontologySvg.node().clientWidth;
+            const root = d3.hierarchy(ontologyData);
+            const treeLayout = d3.tree().size([width - 100, 300]);
+            treeLayout(root);
+
+            const g = ontologySvg.append("g")
+                .attr("transform", "translate(50, 50)");
+
+            // 绘制连接线
+            g.selectAll(".link")
+                .data(root.links())
+                .join("path")
+                .attr("class", "link")
+                .attr("fill", "none")
+                .attr("stroke", "#4b5563")
+                .attr("stroke-width", 2)
+                .attr("d", d3.linkVertical()
+                    .x(d => d.x)
+                    .y(d => d.y))
+                .style("opacity", 0)
+                .transition()
+                .delay(500)
+                .duration(1000)
+                .style("opacity", 1);
+
+            // 绘制节点
+            const node = g.selectAll(".node")
+                .data(root.descendants())
+                .join("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${d.x},${d.y})`)
+                .style("opacity", 0);
+
+            node.append("circle")
+                .attr("r", d => 20 - d.depth * 3)
+                .attr("fill", d => {
+                    const colors = ["#fbbf24", "#3b82f6", "#22c55e", "#8b5cf6"];
+                    return colors[d.depth];
+                })
+                .attr("opacity", 0.7);
+
+            node.append("text")
+                .attr("dy", 35)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#e2e8f0")
+                .attr("font-size", d => 14 - d.depth * 2)
+                .attr("font-weight", "bold")
+                .text(d => d.data.name);
+
+            node.transition()
+                .delay((d, i) => i * 200)
+                .duration(500)
+                .style("opacity", 1);
+        }
+
+        function resetOntologyAnimation() {
+            if (ontologySvg) {
+                ontologySvg.selectAll("*").remove();
+                initOntologyAnimation();
+            }
+            ontologyExpanded = false;
+        }
+
+        function expandOntology() {
+            if (ontologyExpanded) {
+                alert("已经展开到最深层次了！");
+            } else {
+                alert("在完整版本中，这里会展开更多子类！");
+                ontologyExpanded = true;
+            }
+        }
+
+        // ============================================================
+        // 动画 5: 三元组构建 - 改进版：分步骤演示
+        // ============================================================
+        let tripleSvg;
+        let tripleCurrentStep = 0;
+        let tripleAnimationTimer = null;
+        let tripleNodes = {};
+
+        // 三元组构建步骤
+        const tripleSteps = [
+            {
+                step: 1,
+                title: "第一步：主语出现",
+                explanation: "🔵 首先出现主语(Subject): '埃隆·马斯克'。这是三元组的起点，表示我们要描述的对象。",
+                action: "showSubject"
+            },
+            {
+                step: 2,
+                title: "第二步：谓语出现",
+                explanation: "🔗 然后出现谓语(Predicate): 'CEO_of'。这是关系或动作，说明主语和宾语之间有什么关系。",
+                action: "showPredicate"
+            },
+            {
+                step: 3,
+                title: "第三步：宾语出现并连接",
+                explanation: "🟣 最后出现宾语(Object): '特斯拉'。谓语将主语和宾语连接起来，形成完整的三元组！",
+                action: "showObject"
+            }
+        ];
+
+        function initTripleAnimation() {
+            const container = document.getElementById("triple-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            tripleSvg = d3.select("#triple-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // 定义箭头标记
+            tripleSvg.append("defs")
+                .append("marker")
+                .attr("id", "arrowhead")
+                .attr("viewBox", "0 0 10 10")
+                .attr("refX", 8)
+                .attr("refY", 5)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 4)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                .attr("fill", "#ec4899");
+
+            tripleSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#ec4899")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("三元组构建: (主语, 谓语, 宾语)");
+
+            tripleCurrentStep = 0;
+            updateTripleStepIndicator();
+        }
+
+        function playTripleAnimation() {
+            resetTripleAnimation();
+            tripleCurrentStep = 0;
+
+            // 自动播放所有步骤
+            function playNextStep() {
+                if (tripleCurrentStep < tripleSteps.length) {
+                    showTripleStep(tripleCurrentStep);
+                    tripleCurrentStep++;
+                    updateTripleStepIndicator();
+                    tripleAnimationTimer = setTimeout(playNextStep, 3000);
+                }
+            }
+
+            playNextStep();
+        }
+
+        function nextTripleStep() {
+            // 停止自动播放
+            if (tripleAnimationTimer) {
+                clearTimeout(tripleAnimationTimer);
+                tripleAnimationTimer = null;
+            }
+
+            if (tripleCurrentStep < tripleSteps.length) {
+                showTripleStep(tripleCurrentStep);
+                tripleCurrentStep++;
+                updateTripleStepIndicator();
+            } else {
+                // 如果已经播放完，重置并重新开始
+                resetTripleAnimation();
+            }
+        }
+
+        function showTripleStep(stepIndex) {
+            if (stepIndex >= tripleSteps.length) return;
+
+            const step = tripleSteps[stepIndex];
+            const width = tripleSvg.node().clientWidth;
+
+            // 更新讲解文字
+            const explanationDiv = document.getElementById("triple-explanation");
+            explanationDiv.innerHTML = `
+                <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                <div class="text-lg font-bold text-pink-300 mb-2">${step.title}</div>
+                <div class="text-gray-300">${step.explanation}</div>
+            `;
+
+            if (step.action === "showSubject") {
+                // 显示主语
+                const x = width * 0.25;
+                const y = 200;
+
+                const g = tripleSvg.append("g")
+                    .attr("transform", `translate(${x}, ${y})`)
+                    .style("opacity", 0);
+
+                g.append("circle")
+                    .attr("r", 50)
+                    .attr("fill", "#3b82f6")
+                    .attr("opacity", 0.6);
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", 5)
+                    .attr("fill", "white")
+                    .attr("font-size", "13px")
+                    .attr("font-weight", "bold")
+                    .text("埃隆·马斯克");
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("y", 80)
+                    .attr("fill", "#3b82f6")
+                    .attr("font-size", "14px")
+                    .attr("font-weight", "bold")
+                    .text("主语 Subject");
+
+                g.transition()
+                    .duration(500)
+                    .style("opacity", 1);
+
+                tripleNodes.subject = g;
+
+                // 更新三元组列表
+                document.getElementById("triple-list").innerHTML =
+                    '<li><span class="text-blue-400">埃隆·马斯克</span> <span class="text-gray-500">...</span></li>';
+
+            } else if (step.action === "showPredicate") {
+                // 显示谓语
+                const subjX = width * 0.25;
+                const objX = width * 0.75;
+                const y = 200;
+
+                // 绘制箭头线（动画）
+                const line = tripleSvg.insert("line", ":first-child")
+                    .attr("x1", subjX + 50)
+                    .attr("y1", y)
+                    .attr("x2", subjX + 50)
+                    .attr("y2", y)
+                    .attr("stroke", "#ec4899")
+                    .attr("stroke-width", 3)
+                    .attr("marker-end", "url(#arrowhead)");
+
+                line.transition()
+                    .duration(800)
+                    .attr("x2", objX - 50);
+
+                // 添加关系标签
+                setTimeout(() => {
+                    tripleSvg.append("text")
+                        .attr("x", width / 2)
+                        .attr("y", y - 20)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#ec4899")
+                        .attr("font-size", "16px")
+                        .attr("font-weight", "bold")
+                        .style("opacity", 0)
+                        .text("CEO_of")
+                        .transition()
+                        .duration(500)
+                        .style("opacity", 1);
+
+                    tripleSvg.append("text")
+                        .attr("x", width / 2)
+                        .attr("y", y - 45)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#ec4899")
+                        .attr("font-size", "12px")
+                        .attr("font-weight", "bold")
+                        .style("opacity", 0)
+                        .text("谓语 Predicate")
+                        .transition()
+                        .duration(500)
+                        .style("opacity", 1);
+                }, 400);
+
+                // 更新三元组列表
+                document.getElementById("triple-list").innerHTML =
+                    '<li><span class="text-blue-400">埃隆·马斯克</span> <span class="text-pink-400">[CEO_of]</span> <span class="text-gray-500">...</span></li>';
+
+            } else if (step.action === "showObject") {
+                // 显示宾语
+                const x = width * 0.75;
+                const y = 200;
+
+                const g = tripleSvg.append("g")
+                    .attr("transform", `translate(${x}, ${y})`)
+                    .style("opacity", 0);
+
+                g.append("circle")
+                    .attr("r", 50)
+                    .attr("fill", "#8b5cf6")
+                    .attr("opacity", 0.6);
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", 5)
+                    .attr("fill", "white")
+                    .attr("font-size", "13px")
+                    .attr("font-weight", "bold")
+                    .text("特斯拉");
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("y", 80)
+                    .attr("fill", "#8b5cf6")
+                    .attr("font-size", "14px")
+                    .attr("font-weight", "bold")
+                    .text("宾语 Object");
+
+                g.transition()
+                    .delay(500)
+                    .duration(500)
+                    .style("opacity", 1);
+
+                tripleNodes.object = g;
+
+                // 添加完成标记
+                setTimeout(() => {
+                    tripleSvg.append("text")
+                        .attr("x", width / 2)
+                        .attr("y", 320)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#22c55e")
+                        .attr("font-size", "18px")
+                        .attr("font-weight", "bold")
+                        .style("opacity", 0)
+                        .text("✅ 三元组构建完成!")
+                        .transition()
+                        .duration(500)
+                        .style("opacity", 1);
+                }, 1500);
+
+                // 更新三元组列表
+                document.getElementById("triple-list").innerHTML =
+                    '<li><span class="text-blue-400">埃隆·马斯克</span> <span class="text-pink-400">[CEO_of]</span> <span class="text-purple-400">特斯拉</span> <span class="text-green-400">✓</span></li>';
+            }
+        }
+
+        function updateTripleStepIndicator() {
+            const indicator = document.getElementById("triple-step-indicator");
+            indicator.innerHTML = `步骤: <span class="text-pink-400 font-bold">${tripleCurrentStep}/${tripleSteps.length}</span>`;
+        }
+
+        function resetTripleAnimation() {
+            if (tripleAnimationTimer) {
+                clearTimeout(tripleAnimationTimer);
+                tripleAnimationTimer = null;
+            }
+
+            if (tripleSvg) {
+                tripleSvg.selectAll("*").remove();
+                tripleNodes = {};
+                initTripleAnimation();
+            }
+
+            tripleCurrentStep = 0;
+            updateTripleStepIndicator();
+
+            // 重置讲解文字
+            document.getElementById("triple-explanation").innerHTML = `
+                <div class="text-yellow-400 font-bold mb-2">💡 实时讲解</div>
+                <div class="text-gray-300">点击"播放动画"查看三元组如何分步构建</div>
+            `;
+
+            document.getElementById("triple-list").innerHTML = '<li>点击"播放动画"查看三元组的构建过程</li>';
+        }
+
+        function addNewTriple() {
+            alert("在真实应用中，这里会弹出一个表单让用户输入新的三元组！");
+        }
+
+        // ============================================================
+        // 故事折叠/展开功能
+        // ============================================================
+        function toggleStory(index) {
+            const detail = document.getElementById(`story-detail-${index}`);
+            const arrow = document.getElementById(`story-arrow-${index}`);
+
+            if (detail.classList.contains('hidden')) {
+                // 展开
+                detail.classList.remove('hidden');
+                arrow.style.transform = 'rotate(180deg)';
+                arrow.style.transition = 'transform 0.3s ease';
+            } else {
+                // 折叠
+                detail.classList.add('hidden');
+                arrow.style.transform = 'rotate(0deg)';
+                arrow.style.transition = 'transform 0.3s ease';
+            }
+        }
+
+        // 默认展开第一个故事
+        document.addEventListener("DOMContentLoaded", function() {
+            setTimeout(() => {
+                toggleStory(0);
+            }, 500);
+        });
+
+        document.addEventListener("DOMContentLoaded", function() {
+            initEntityAnimation();
+            initRelationAnimation();
+            initPropertyAnimation();
+            initOntologyAnimation();
+            initTripleAnimation();
+            initHistoryAnimation();
+        });
+    </script>
+</body>
+</html>

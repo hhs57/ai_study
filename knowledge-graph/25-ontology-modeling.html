@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块25: 本体和语义建模 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+        .code-block code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            color: #e2e8f0;
+        }
+    </style>
+</head>
+<body>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                    <a href="24-rdf-basics.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        上一模块
+                    </a>
+                    <a href="26-graph-databases.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                        下一模块
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 25 / 33</div>
+            </div>
+        </div>
+
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 25: 本体和语义建模
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">掌握RDFS、OWL和本体工程设计</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30">进阶级别</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~60 分钟</span>
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">2 个交互动画</span>
+            </div>
+        </div>
+
+        <!-- Chapter 0: 本体语言深入对比 -->
+        <div class="glass-card">
+            <h2 class="section-title">0. 本体语言深入对比: RDFS vs OWL vs SHACL</h2>
+
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">为什么需要区分这些语言?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    RDFS、OWL和SHACL都是用于描述RDF数据的语言,但它们的设计目标、表达能力和适用场景完全不同。
+                    <strong>选择合适的语言</strong>对于知识图谱的成功至关重要。
+                </p>
+                <p class="text-gray-400">
+                    如果用错了语言,要么能力不足(需要更复杂的约束),要么性能太差(过度设计)。
+                </p>
+            </div>
+
+            <!-- 总体对照表 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-green-300 mb-4">RDFS vs OWL 2 vs SHACL 总体对比</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-white/20">
+                                <th class="p-3 text-blue-400">维度</th>
+                                <th class="p-3 text-green-400">RDFS</th>
+                                <th class="p-3 text-purple-400">OWL 2</th>
+                                <th class="p-3 text-pink-400">SHACL</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold">主要目的</td>
+                                <td class="p-3">基本的类型系统</td>
+                                <td class="p-3">强大的本体建模</td>
+                                <td class="p-3">数据验证</td>
+                            </tr>
+                            <tr class="border-b border-white/10 bg-white/5">
+                                <td class="p-3 font-bold">标准化时间</td>
+                                <td class="p-3">2004年(RDF 1.0)</td>
+                                <td class="p-3">2009年(OWL 2)</td>
+                                <td class="p-3">2017年</td>
+                            </tr>
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold">表达能力</td>
+                                <td class="p-3">低(简单层次)</td>
+                                <td class="p-3">高(复杂约束)</td>
+                                <td class="p-3">中(验证规则)</td>
+                            </tr>
+                            <tr class="border-b border-white/10 bg-white/5">
+                                <td class="p-3 font-bold">推理能力</td>
+                                <td class="p-3">简单推理</td>
+                                <td class="p-3">描述逻辑推理</td>
+                                <td class="p-3">无推理能力</td>
+                            </tr>
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold">计算复杂度</td>
+                                <td class="p-3">PTime(高效)</td>
+                                <td class="p-3">N2ExpTime(可能很慢)</td>
+                                <td class="p-3">PTime(高效)</td>
+                            </tr>
+                            <tr class="border-b border-white/10 bg-white/5">
+                                <td class="p-3 font-bold">适用规模</td>
+                                <td class="p-3">大规模数据</td>
+                                <td class="p-3">中小规模本体</td>
+                                <td class="p-3">大规模数据</td>
+                            </tr>
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold">工具支持</td>
+                                <td class="p-3">所有RDF工具</td>
+                                <td class="p-3">Protégé等</td>
+                                <td class="p-3">TopBraid, SHACL Playground</td>
+                            </tr>
+                            <tr class="bg-white/5">
+                                <td class="p-3 font-bold">典型应用</td>
+                                <td class="p-3">简单分类体系</td>
+                                <td class="p-3">复杂领域本体</td>
+                                <td class="p-3">数据质量检查</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- RDFS深入 -->
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">RDFS (RDF Schema) - 简单但够用</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <div class="font-bold text-gray-300 mb-2">核心特性</div>
+                        <ul class="text-gray-400 text-sm space-y-2">
+                            <li>✅ 定义类层次(rdfs:subClassOf)</li>
+                            <li>✅ 定义属性(rdf:Property)</li>
+                            <li>✅ 属性层次(rdfs:subPropertyOf)</li>
+                            <li>✅ 域和范围(rdfs:domain, rdfs:range)</li>
+                            <li>✅ 简单类型推理</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="font-bold text-gray-300 mb-2">限制</div>
+                        <ul class="text-gray-400 text-sm space-y-2">
+                            <li>❌ 无基数约束(不能限制数量)</li>
+                            <li>❌ 无枚举约束(不能列举值)</li>
+                            <li>❌ 无对称/传递属性</li>
+                            <li>❌ 无类表达式(如Person ∩ Employee)</li>
+                            <li>❌ 推理能力有限</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mt-4 p-3 bg-green-500/20 rounded-lg border-l-4 border-green-500">
+                    <div class="font-bold text-green-400 mb-1">✅ 何时使用RDFS?</div>
+                    <p class="text-gray-300 text-sm">
+                        需要简单的类型系统、大规模数据、快速推理,或者只是需要基本的层次结构。
+                        例如:简单的分类体系、标签系统、基础数据模型。
+                    </p>
+                </div>
+            </div>
+
+            <!-- OWL 2深入 -->
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-purple-300 mb-3">OWL 2 (Web Ontology Language) - 强大但复杂</h3>
+                <div class="grid md:grid-cols-2 gap-6 mb-4">
+                    <div>
+                        <div class="font-bold text-gray-300 mb-2">核心特性</div>
+                        <ul class="text-gray-400 text-sm space-y-2">
+                            <li>✅ 所有RDFS特性</li>
+                            <li>✅ 类表达式(交、并、补、存在性)</li>
+                            <li>✅ 属性特征(对称、传递、函数等)</li>
+                            <li>✅ 基数约束(精确、最小、最大)</li>
+                            <li>✅ 枚举、不相交类</li>
+                            <li>✅ 强大的推理能力</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="font-bold text-gray-300 mb-2">OWL 2子语言</div>
+                        <ul class="text-gray-400 text-sm space-y-2">
+                            <li><strong>OWL 2 EL</strong>: 快速推理,适合大本体</li>
+                            <li><strong>OWL 2 QL</strong>: 基于查询,适合数据库</li>
+                            <li><strong>OWL 2 RL</strong>: 规则实现,高效</li>
+                            <li><strong>OWL 2 DL</strong>: 完整功能,最强大</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="p-3 bg-purple-500/20 rounded-lg border-l-4 border-purple-500">
+                    <div class="font-bold text-purple-400 mb-1">✅ 何时使用OWL 2?</div>
+                    <p class="text-gray-300 text-sm">
+                        需要复杂的约束、自动推理、领域知识建模。例如:医疗本体、产品目录、
+                        复杂业务规则、知识推理应用。但要注意性能和复杂度权衡!
+                    </p>
+                </div>
+                <div class="mt-3 p-3 bg-orange-500/20 rounded-lg border-l-4 border-orange-500">
+                    <div class="font-bold text-orange-400 mb-1">⚠️ OWL的权衡</div>
+                    <p class="text-gray-300 text-sm">
+                        OWL推理的复杂度是N2ExpTime-complete,这意味着在最坏情况下,推理时间随本体大小指数增长。
+                        对于大规模数据(百万级三元组),OWL推理可能非常慢。
+                    </p>
+                </div>
+            </div>
+
+            <!-- SHACL深入 -->
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-pink-300 mb-3">SHACL (Shapes Constraint Language) - 专注于验证</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <div class="font-bold text-gray-300 mb-2">核心特性</div>
+                        <ul class="text-gray-400 text-sm space-y-2">
+                            <li>✅ 定义数据形状(Shape)</li>
+                            <li>✅ 约束类型丰富</li>
+                            <li>✅ 条件约束(sh:property)</li>
+                            <li>✅ 节点验证</li>
+                            <li>✅ 禁止约束(sh:not)</li>
+                            <li>✅ 验证报告</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="font-bold text-gray-300 mb-2">与OWL的区别</div>
+                        <ul class="text-gray-400 text-sm space-y-2">
+                            <li>🔹 专门用于验证,不是推理</li>
+                            <li>🔹 更直观的约束语法</li>
+                            <li>🔹 支持复杂的验证逻辑</li>
+                            <li>🔹 不会使推理变慢</li>
+                            <li>🔹 可与OWL结合使用</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mt-4 p-3 bg-pink-500/20 rounded-lg border-l-4 border-pink-500">
+                    <div class="font-bold text-pink-400 mb-1">✅ 何时使用SHACL?</div>
+                    <p class="text-gray-300 text-sm">
+                        需要验证数据质量、确保数据完整性、检查业务规则。例如:
+                        数据导入验证、API输入校验、数据质量监控。
+                    </p>
+                </div>
+            </div>
+
+            <!-- 选择决策树 -->
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-cyan-300 mb-3">🌳 决策指南: 应该用哪个?</h3>
+                <div class="space-y-4">
+                    <div class="flex items-start gap-3">
+                        <span class="text-blue-400 text-xl">1️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">第一步: 确定目标</div>
+                            <p class="text-gray-400 text-sm">
+                                如果目标是<strong>推理</strong>(从已知推导新知识)→ 考虑RDFS或OWL<br>
+                                如果目标是<strong>验证</strong>(检查数据是否符合规则)→ 使用SHACL
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 text-xl">2️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">第二步: 评估复杂度</div>
+                            <p class="text-gray-400 text-sm">
+                                只需要简单的层次和类型?→ <strong>RDFS足够</strong><br>
+                                需要复杂的约束和推理?→ <strong>使用OWL 2</strong><br>
+                                需要严格的数据验证?→ <strong>使用SHACL</strong>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-purple-400 text-xl">3️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">第三步: 考虑性能</div>
+                            <p class="text-gray-400 text-sm">
+                                大规模数据(百万级三元组)且需要快速查询?→ <strong>避免OWL DL,用RDFS或OWL RL/EL</strong><br>
+                                数据量不大但需要复杂推理?→ <strong>OWL 2 DL是合适选择</strong><br>
+                                需要实时验证?→ <strong>SHACL性能最佳</strong>
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-pink-400 text-xl">4️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">第四步: 混合使用(推荐!)</div>
+                            <p class="text-gray-400 text-sm">
+                                <strong>最佳实践</strong>: RDFS/OWL用于建模 + SHACL用于验证<br>
+                                例如: 用OWL定义本体结构,用SHACL验证数据质量<br>
+                                这样既能利用OWL的推理能力,又能用SHACL保证数据质量
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 0.5: 核心概念澄清 -->
+        <div class="glass-card">
+            <h2 class="section-title">0.5 核心概念澄清: 类 vs 实例、对象属性 vs 数据属性</h2>
+
+            <!-- 类 vs 实例 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">类(Class) vs 实例(Instance)</h3>
+                <p class="text-gray-300 mb-4">
+                    这是知识图谱中最基本也是最容易混淆的概念!
+                </p>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-blue-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">🏛️ 类(Class)</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            <strong>抽象概念</strong>,描述一类事物的共同特征。
+                        </p>
+                        <div class="space-y-1 text-sm">
+                            <div class="text-gray-400"><strong>特点:</strong></div>
+                            <ul class="text-gray-400 text-sm ml-4">
+                                <li>• 抽象的,不是具体实体</li>
+                                <li>• 定义属性和约束</li>
+                                <li>• 用于建模、推理、查询</li>
+                            </ul>
+                        </div>
+                        <div class="code-block text-sm mt-2">
+<code><span class="uri">ex:Person</span> <span class="uri">rdf:type</span> <span class="uri">rdfs:Class</span> .
+<span class="uri">ex:Person</span> <span class="uri">rdfs:subClassOf</span> <span class="uri">ex:Agent</span> .</code>
+                        </div>
+                    </div>
+                    <div class="bg-green-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">👤 实例(Instance)</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            <strong>具体的实体</strong>,实际存在的对象。
+                        </p>
+                        <div class="space-y-1 text-sm">
+                            <div class="text-gray-400"><strong>特点:</strong></div>
+                            <ul class="text-gray-400 text-sm ml-4">
+                                <li>• 具体的,真实存在</li>
+                                <li>• 是类的成员</li>
+                                <li>• 用于数据存储、查询结果</li>
+                            </ul>
+                        </div>
+                        <div class="code-block text-sm mt-2">
+<code><span class="uri">ex:alice</span> <span class="uri">rdf:type</span> <span class="uri">ex:Person</span> .
+<span class="uri">ex:alice</span> <span class="uri">ex:name</span> <span class="string">"Alice"</span> .</code>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 p-3 bg-yellow-500/20 rounded-lg border-l-4 border-yellow-500">
+                    <div class="font-bold text-yellow-400 mb-1">⚠️ 常见错误</div>
+                    <p class="text-gray-300 text-sm">
+                        ❌ 把"美国"既当作类又当作实例(应该是: Country是类,美国是实例)<br>
+                        ❌ 类和实例界限模糊(应该明确: 哪些是抽象概念,哪些是具体实体)<br>
+                        ✅ 记住: 类通过rdf:type连接到实例
+                    </p>
+                </div>
+            </div>
+
+            <!-- 对象属性 vs 数据属性 -->
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-purple-300 mb-3">对象属性(Object Property) vs 数据属性(Datatype Property)</h3>
+                <p class="text-gray-300 mb-4">
+                    在RDFS和OWL中,属性分为两种,理解它们的区别至关重要!
+                </p>
+                <div class="overflow-x-auto mb-4">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-white/20">
+                                <th class="p-3 text-blue-400">维度</th>
+                                <th class="p-3 text-green-400">对象属性</th>
+                                <th class="p-3 text-purple-400">数据属性</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold">RDFS类型</td>
+                                <td class="p-3">rdf:Property(一般)</td>
+                                <td class="p-3">rdf:Property(一般)</td>
+                            </tr>
+                            <tr class="border-b border-white/10 bg-white/5">
+                                <td class="p-3 font-bold">OWL类型</td>
+                                <td class="p-3">owl:ObjectProperty</td>
+                                <td class="p-3">owl:DatatypeProperty</td>
+                            </tr>
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold">值域类型</td>
+                                <td class="p-3">实体(URI或空白节点)</td>
+                                <td class="p-3">字面量(字符串、数字等)</td>
+                            </tr>
+                            <tr class="border-b border-white/10 bg-white/5">
+                                <td class="p-3 font-bold">连接关系</td>
+                                <td class="p-3">实体 → 实体</td>
+                                <td class="p-3">实体 → 值</td>
+                            </tr>
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold">可以有逆属性?</td>
+                                <td class="p-3">✅ 是(owl:inverseOf)</td>
+                                <td class="p-3">❌ 否</td>
+                            </tr>
+                            <tr class="border-b border-white/10 bg-white/5">
+                                <td class="p-3 font-bold">可以是函数属性?</td>
+                                <td class="p-3">✅ 是(owl:FunctionalProperty)</td>
+                                <td class="p-3">✅ 是</td>
+                            </tr>
+                            <tr class="bg-white/5">
+                                <td class="p-3 font-bold">典型例子</td>
+                                <td class="p-3">knows, worksFor, parentOf</td>
+                                <td class="p-3">name, age, birthDate</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-green-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">✅ 使用对象属性的情况</div>
+                        <p class="text-gray-300 text-sm">
+                            - 需要进一步查询或推理<br>
+                            - 属性值也是领域实体<br>
+                            - 需要表达实体间关系<br>
+                            - 需要逆属性或传递性
+                        </p>
+                        <div class="code-block text-sm mt-2">
+<code><span class="comment"># 对象属性: 连接两个人</span>
+<span class="uri">ex:alice</span> <span class="uri">ex:knows</span> <span class="uri">ex:bob</span> .
+
+<span class="uri">ex:knows</span> <span class="uri">rdf:type</span> <span class="uri">owl:ObjectProperty</span> .</code>
+                        </div>
+                    </div>
+                    <div class="bg-purple-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">✅ 使用数据属性的情况</div>
+                        <p class="text-gray-300 text-sm">
+                            - 只是简单的数据值<br>
+                            - 不需要进一步查询<br>
+                            - 值是基本类型(字符串/数字)<br>
+                            - 不参与推理
+                        </p>
+                        <div class="code-block text-sm mt-2">
+<code><span class="comment"># 数据属性: 简单的字符串值</span>
+<span class="uri">ex:alice</span> <span class="uri">ex:name</span> <span class="string">"Alice"</span> .
+
+<span class="uri">ex:name</span> <span class="uri">rdf:type</span> <span class="uri">owl:DatatypeProperty</span> .</code>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 p-3 bg-orange-500/20 rounded-lg border-l-4 border-orange-500">
+                    <div class="font-bold text-orange-400 mb-1">⚠️ 选择标准</div>
+                    <p class="text-gray-300 text-sm">
+                        <strong>问自己</strong>: "这个属性值本身需要被进一步描述或查询吗?"<br>
+                        - 如果是 → 使用<strong>对象属性</strong><br>
+                        - 如果否(只是基本数据) → 使用<strong>数据属性</strong><br>
+                        例如: 地址中的城市 → 对象属性(可能需要查询城市的人口、位置等)<br>
+                        人的年龄 → 数据属性(只是一个数字,不需要进一步描述)
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 1: RDFS -->
+        <div class="glass-card">
+            <h2 class="section-title">1. RDFS (RDF Schema)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是RDFS?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>RDFS (RDF Schema)</strong> 是RDF的模式语言,用于定义类、属性和层次结构。
+                    它提供了基本的建模原语,让我们能够创建<strong>类(Class)</strong>、<strong>属性(Property)</strong>和<strong>层次关系</strong>。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">RDFS核心词汇</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">rdfs:Class</div>
+                        <p class="text-gray-300 text-sm">定义一个类,例如: Person, Organization</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">rdf:type</div>
+                        <p class="text-gray-300 text-sm">实例关系,将实体关联到类</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">rdfs:subClassOf</div>
+                        <p class="text-gray-300 text-sm">定义类的层次结构</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-pink-400 mb-2">rdfs:subPropertyOf</div>
+                        <p class="text-gray-300 text-sm">定义属性的层次结构</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-yellow-400 mb-2">rdfs:domain</div>
+                        <p class="text-gray-300 text-sm">属性的定义域(主语的类型)</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-red-400 mb-2">rdfs:range</div>
+                        <p class="text-gray-300 text-sm">属性的值域(宾语的类型)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">RDFS示例</h3>
+                <div class="code-block">
+<code><span class="comment"># 定义类层次</span>
+ex:Person rdfs:subClassOf ex:Agent .
+ex:Employee rdfs:subClassOf ex:Person .
+
+<span class="comment"># 定义属性</span>
+ex:worksFor rdfs:domain ex:Person ;
+            rdfs:range ex:Company .
+
+<span class="comment"># 实例数据</span>
+ex:alice rdf:type ex:Employee ;
+        ex:worksFor ex:myCompany .</code>
+                </div>
+            </div>
+
+            <!-- 动画: RDFS层次结构 -->
+            <div class="animation-container">
+                <div class="animation-title">动画: RDFS类层次结构</div>
+                <div id="rdfs-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playRDFSAnimation()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="resetRDFSAnimation()">↺ 重置</button>
+                </div>
+                <div class="info-panel">
+                    <div class="text-blue-400 font-bold mb-2">RDFS推理:</div>
+                    <div class="text-gray-300 text-sm">由于Employee subClassOf Person,所以alice也是Person实例</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: OWL 2 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. OWL 2 (Web本体语言)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是OWL?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>OWL (Web Ontology Language)</strong> 是比RDFS更强大的本体语言。
+                    OWL 2提供了丰富的表达能力,支持复杂的约束和推理。
+                </p>
+                <p class="text-gray-400">
+                    OWL有三个子语言:<strong>OWL EL</strong>(快速推理)、<strong>OWL QL</strong>(查询)、<strong>OWL RL</strong>(规则)。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">OWL 2核心构造</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">类表达式</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• owl:intersectionOf (交)</li>
+                            <li>• owl:unionOf (并)</li>
+                            <li>• owl:complementOf (补)</li>
+                            <li>• owl:oneOf (枚举)</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">属性约束</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• owl:FunctionalProperty</li>
+                            <li>• owl:InverseFunctionalProperty</li>
+                            <li>• owl:SymmetricProperty</li>
+                            <li>• owl:TransitiveProperty</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">基数约束</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• owl:cardinality</li>
+                            <li>• owl:minCardinality</li>
+                            <li>• owl:maxCardinality</li>
+                            <li>• owl:qualifiedCardinality</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">OWL 2示例</h3>
+                <div class="code-block">
+<code><span class="comment"># 定义Person类</span>
+ex:Person rdf:type owl:Class .
+
+<span class="comment"># 定义属性约束</span>
+ex:hasParent rdf:type owl:ObjectProperty ;
+             rdfs:domain ex:Person ;
+             rdfs:range ex:Person .
+
+<span class="comment"># hasParent是反对称的</span>
+ex:hasParent rdf:type owl:AsymmetricProperty .
+
+<span class="comment"># 每个人最多有2个父母</span>
+ex:Person rdfs:subClassOf [
+    rdf:type owl:Restriction ;
+    owl:onProperty ex:hasParent ;
+    owl:maxCardinality "2"^^xsd:integer
+] .</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 3: SHACL -->
+        <div class="glass-card">
+            <h2 class="section-title">3. SHACL (Shapes约束语言)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是SHACL?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>SHACL (Shapes Constraints Language)</strong> 是W3C推荐的数据验证语言。
+                    与RDFS/OWL不同,SHACL专门用于<strong>验证RDF数据</strong>是否符合约束。
+                </p>
+                <p class="text-gray-400">
+                    SHACL使用<strong>Shape</strong>定义约束,使用<strong>Target</strong>指定要验证哪些节点。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">SHACL核心概念</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">sh:NodeShape</div>
+                        <p class="text-gray-300 text-sm">节点的约束定义</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">sh:PropertyShape</div>
+                        <p class="text-gray-300 text-sm">属性的约束定义</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">sh:targetClass</div>
+                        <p class="text-gray-300 text-sm">约束应用到特定类的所有实例</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-pink-400 mb-2">sh:NodeKind</div>
+                        <p class="text-gray-300 text-sm">指定节点类型(IRI、字面量、空白节点)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">SHACL示例</h3>
+                <div class="code-block">
+<code><span class="comment"># 定义Person Shape</span>
+ex:PersonShape
+    a sh:NodeShape ;
+    sh:targetClass ex:Person ;
+    sh:property [
+        sh:path ex:name ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+    ] ;
+    sh:property [
+        sh:path ex:age ;
+        sh:datatype xsd:integer ;
+        sh:minInclusive 0 ;
+        sh:maxInclusive 150 ;
+    ] .</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 其他语义标准 -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 其他语义标准</h2>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-300 mb-3">SKOS</h3>
+                    <p class="text-gray-400 text-sm mb-3">简单知识组织系统</p>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>• 用于表示受控词表、分类系统</li>
+                        <li>• skos:Concept (概念)</li>
+                        <li>• skos:broader/narrower (层次关系)</li>
+                        <li>• skos:related (关联关系)</li>
+                        <li>• skos:prefLabel (首选标签)</li>
+                        <li>• 应用: 图书主题分类、产品分类</li>
+                    </ul>
+                </div>
+
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-300 mb-3">Schema.org</h3>
+                    <p class="text-gray-400 text-sm mb-3">搜索引擎友好的词汇表</p>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>• 由Google、Microsoft、Yahoo等发起</li>
+                        <li>• 提供常用的类和属性</li>
+                        <li>• 使用JSON-LD格式</li>
+                        <li>• 应用: 结构化数据、富媒体搜索结果</li>
+                        <li>• 示例: Person、Organization、Product</li>
+                    </ul>
+                </div>
+
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-purple-300 mb-3">FOAF</h3>
+                    <p class="text-gray-400 text-sm mb-3">朋友-of-a-friend</p>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>• 描述人物、关系、活动</li>
+                        <li>• foaf:Person (人物)</li>
+                        <li>• foaf:knows (认识关系)</li>
+                        <li>• foaf:name、foaf:mbox</li>
+                        <li>• 早期语义网项目,影响广泛</li>
+                    </ul>
+                </div>
+
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-pink-300 mb-3">Dublin Core</h3>
+                    <p class="text-gray-400 text-sm mb-3">元数据标准</p>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>• 描述文档和资源</li>
+                        <li>• dc:title、dc:creator、dc:date</li>
+                        <li>• 图书馆、出版行业广泛使用</li>
+                        <li>• 15个核心元数据元素</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 5: Protégé -->
+        <div class="glass-card">
+            <h2 class="section-title">5. Protégé本体编辑工具</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是Protégé?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>Protégé</strong>是斯坦福大学开发的开源本体编辑器,是最流行的本体工程工具。
+                    它提供图形化界面,支持OWL 2、RDFS等标准。
+                </p>
+                <p class="text-gray-400">
+                    下载地址: <a href="https://protege.stanford.edu" class="text-blue-400 hover:text-blue-300">https://protege.stanford.edu</a>
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">Protégé主要功能</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🎨</div>
+                        <div class="font-bold text-blue-400 mb-2">类层次编辑器</div>
+                        <p class="text-gray-300 text-sm">可视化创建和管理类层次结构</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🔗</div>
+                        <div class="font-bold text-green-400 mb-2">对象属性编辑器</div>
+                        <p class="text-gray-300 text-sm">定义对象属性及其约束</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">📊</div>
+                        <div class="font-bold text-purple-400 mb-2">数据属性编辑器</div>
+                        <p class="text-gray-300 text-sm">管理数据类型属性</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🔍</div>
+                        <div class="font-bold text-pink-400 mb-2">DL Query</div>
+                        <p class="text-gray-300 text-sm">使用描述逻辑查询本体</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">⚡</div>
+                        <div class="font-bold text-yellow-400 mb-2">推理机集成</div>
+                        <p class="text-gray-300 text-sm">内置FaCT++、Pellet等推理机</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">📁</div>
+                        <div class="font-bold text-red-400 mb-2">导入导出</div>
+                        <p class="text-gray-300 text-sm">支持多种格式(OWL/RDF/XML、Turtle等)</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">使用Protégé的典型工作流</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <span class="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">1</span>
+                        <div>
+                            <div class="font-bold text-gray-300">创建新项目</div>
+                            <p class="text-gray-400 text-sm">选择OWL 2格式</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="bg-green-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">2</span>
+                        <div>
+                            <div class="font-bold text-gray-300">定义类层次</div>
+                            <p class="text-gray-400 text-sm">创建类,使用subClassOf建立层次</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="bg-purple-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">3</span>
+                        <div>
+                            <div class="font-bold text-gray-300">定义属性</div>
+                            <p class="text-gray-400 text-sm">创建对象属性和数据属性</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="bg-pink-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">4</span>
+                        <div>
+                            <div class="font-bold text-gray-300">添加约束</div>
+                            <p class="text-gray-400 text-sm">使用Exists、Cardinality等约束</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="bg-yellow-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">5</span>
+                        <div>
+                            <div class="font-bold text-gray-300">运行推理机</div>
+                            <p class="text-gray-400 text-sm">检查一致性,计算分类</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold flex-shrink-0">6</span>
+                        <div>
+                            <div class="font-bold text-gray-300">导出本体</div>
+                            <p class="text-gray-400 text-sm">保存为Turtle或其他格式</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="glass-card">
+            <h2 class="section-title">模块总结</h2>
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-green-400 mb-3">核心要点</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>✅ <strong>RDFS</strong>: 基本的模式语言,支持类层次和属性约束</li>
+                    <li>✅ <strong>OWL 2</strong>: 强大的本体语言,支持复杂的约束和推理</li>
+                    <li>✅ <strong>SHACL</strong>: 专门用于数据验证的约束语言</li>
+                    <li>✅ <strong>SKOS/Schema.org</strong>: 特定领域的词汇表</li>
+                    <li>✅ <strong>Protégé</strong>: 流行的本体编辑工具</li>
+                </ul>
+            </div>
+
+            <div class="concept-card mt-4">
+                <h3 class="text-xl font-bold text-blue-400 mb-3">下一步学习</h3>
+                <a href="26-graph-databases.html" class="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-2">
+                    模块 26: 图数据库基础 - 学习Neo4j和Cypher查询语言
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 25: 本体和语义建模</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 动画: RDFS层次结构
+        // ============================================================
+        let rdfsSvg;
+
+        function initRDFSAnimation() {
+            const container = document.getElementById("rdfs-animation");
+            if (container.children.length > 0) return;
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            rdfsSvg = d3.select("#rdfs-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+        }
+
+        function playRDFSAnimation() {
+            initRDFSAnimation();
+            const width = rdfsSvg.attr("width");
+            const root = d3.hierarchy({
+                name: "Agent",
+                children: [
+                    {
+                        name: "Person",
+                        children: [
+                            { name: "Employee" },
+                            { name: "Customer" }
+                        ]
+                    },
+                    {
+                        name: "Organization",
+                        children: [
+                            { name: "Company" }
+                        ]
+                    }
+                ]
+            });
+
+            const treeLayout = d3.tree().size([width - 100, 300]);
+            treeLayout(root);
+
+            const g = rdfsSvg.append("g").attr("transform", "translate(50, 50)");
+
+            // 连接线
+            g.selectAll(".link")
+                .data(root.links())
+                .join("path")
+                .attr("class", "link")
+                .attr("fill", "none")
+                .attr("stroke", "#4b5563")
+                .attr("stroke-width", 2)
+                .attr("d", d3.linkVertical().x(d => d.x).y(d => d.y))
+                .style("opacity", 0)
+                .transition()
+                .delay(500)
+                .duration(1000)
+                .style("opacity", 1);
+
+            // 节点
+            const node = g.selectAll(".node")
+                .data(root.descendants())
+                .join("g")
+                .attr("class", "node")
+                .attr("transform", d => `translate(${d.x},${d.y})`)
+                .style("opacity", 0);
+
+            node.append("circle")
+                .attr("r", 20 - root.descendants().find(d => d === node.datum()).depth * 3)
+                .attr("fill", d => {
+                    const colors = ["#fbbf24", "#3b82f6", "#22c55e", "#8b5cf6"];
+                    return colors[d.depth];
+                })
+                .attr("opacity", 0.7);
+
+            node.append("text")
+                .attr("dy", 35)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#e2e8f0")
+                .attr("font-size", d => 14 - d.depth * 2)
+                .attr("font-weight", "bold")
+                .text(d => d.data.name);
+
+            node.transition()
+                .delay((d, i) => i * 200)
+                .duration(500)
+                .style("opacity", 1);
+        }
+
+        function resetRDFSAnimation() {
+            if (rdfsSvg) {
+                rdfsSvg.selectAll("*").remove();
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            initRDFSAnimation();
+        });
+    </script>
+</body>
+</html>

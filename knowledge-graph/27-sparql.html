@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块27: SPARQL和知识图谱查询 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .animation-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 8px;
+            padding: 20px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            overflow-x: auto;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .query-editor {
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'JetBrains Mono', monospace;
+            color: #e2e8f0;
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        .query-editor:focus {
+            outline: none;
+            border-color: #3b82f6;
+        }
+
+        .result-box {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        .result-table th,
+        .result-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .result-table th {
+            background: rgba(59, 130, 246, 0.2);
+            font-weight: 600;
+            color: #60a5fa;
+        }
+
+        .result-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .keyword {
+            color: #f59e0b;
+            font-weight: bold;
+        }
+
+        .variable {
+            color: #22c55e;
+        }
+
+        .uri {
+            color: #8b5cf6;
+        }
+
+        .literal {
+            color: #ec4899;
+        }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2em;
+            }
+            .glass-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <a href="26-graph-databases.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一模块
+                </a>
+                <a href="28-knowledge-extraction.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 27 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 27: SPARQL和知识图谱查询
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">掌握RDF知识图谱的标准查询语言SPARQL</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">中级级别</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~90 分钟</span>
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">6 个交互示例</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: SPARQL 基础 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. SPARQL 基础</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是 SPARQL?</h3>
+                <p class="text-gray-300 leading-relaxed text-lg mb-3">
+                    <strong>SPARQL</strong> (SPARQL Protocol and RDF Query Language) 是W3C推荐的<strong>RDF数据查询语言</strong>，
+                    类似于关系型数据库的SQL，但专门用于查询图数据。
+                </p>
+                <p class="text-gray-400">
+                    SPARQL可以查询任何RDF格式的知识图谱，包括DBpedia、Wikidata等大规模知识库。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">SPARQL 的核心特点</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">基本查询能力</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 模式匹配（三元组模式）</li>
+                            <li>✅ 过滤（FILTER）</li>
+                            <li>✅ 排序（ORDER BY）</li>
+                            <li>✅ 限制结果数量（LIMIT）</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">高级特性</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 路径查询（Property Paths）</li>
+                            <li>✅ 聚合函数（COUNT, SUM, AVG）</li>
+                            <li>✅ 子查询</li>
+                            <li>✅ Federated查询（跨数据源）</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4"/>
+                    </svg>
+                    动画: SPARQL 查询执行流程
+                </div>
+                <div id="sparql-flow-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playSparqlFlow()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="resetSparqlFlow()">↺ 重置</button>
+                </div>
+                <div id="sparql-flow-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">查询流程:</div>
+                    <div id="sparql-flow-description" class="text-gray-300">
+                        点击"播放动画"查看SPARQL查询的执行流程
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: SELECT 查询 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. SELECT 查询</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">SELECT 基础语法</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    SELECT是最常用的SPARQL查询形式，用于从RDF图中提取数据。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">示例 1: 基础三元组查询</h3>
+                <p class="text-gray-300 text-sm mb-3">
+                    查询所有人物的姓名:
+                </p>
+                <div class="code-block">
+                    <div><span class="keyword">SELECT</span> ?name <span class="keyword">WHERE</span> {</div>
+                    <div class="ml-4">?person <span class="uri">&lt;http://xmlns.com/foaf/0.1/name&gt;</span> ?name .</div>
+                    <div>}</div>
+                </div>
+                <div class="result-box mt-3">
+                    <div class="text-green-400 font-bold mb-2">查询结果:</div>
+                    <table class="result-table text-sm">
+                        <thead>
+                            <tr>
+                                <th>name</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr><td>"埃隆·马斯克"</td></tr>
+                            <tr><td>"蒂姆·库克"</td></tr>
+                            <tr><td>"马克·扎克伯格"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-4">
+                <h3 class="text-xl font-bold text-green-300 mb-3">示例 2: 多三元组模式查询</h3>
+                <p class="text-gray-300 text-sm mb-3">
+                    查询人物及其任职公司:
+                </p>
+                <div class="code-block">
+                    <div><span class="keyword">SELECT</span> ?personName ?companyName <span class="keyword">WHERE</span> {</div>
+                    <div class="ml-4">?person <span class="uri">&lt;http://xmlns.com/foaf/0.1/name&gt;</span> ?personName .</div>
+                    <div class="ml-4">?person <span class="uri">&lt;http://example.org/ceo_of&gt;</span> ?company .</div>
+                    <div class="ml-4">?company <span class="uri">&lt;http://xmlns.com/foaf/0.1/name&gt;</span> ?companyName .</div>
+                    <div>}</div>
+                </div>
+                <div class="result-box mt-3">
+                    <div class="text-green-400 font-bold mb-2">查询结果:</div>
+                    <table class="result-table text-sm">
+                        <thead>
+                            <tr>
+                                <th>personName</th>
+                                <th>companyName</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr><td>"埃隆·马斯克"</td><td>"特斯拉"</td></tr>
+                            <tr><td>"埃隆·马斯克"</td><td>"SpaceX"</td></tr>
+                            <tr><td>"蒂姆·库克"</td><td>"苹果"</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 3: FILTER 过滤 -->
+        <div class="glass-card">
+            <h2 class="section-title">3. FILTER 过滤</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">FILTER 子句</h3>
+                <p class="text-gray-300 leading-relaxed">
+                    FILTER用于对查询结果进行条件过滤，类似于SQL中的WHERE子句。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">示例 3: 使用 FILTER</h3>
+                <p class="text-gray-300 text-sm mb-3">
+                    查询出生年份晚于1980年的人物:
+                </p>
+                <div class="code-block">
+                    <div><span class="keyword">SELECT</span> ?name ?birthYear <span class="keyword">WHERE</span> {</div>
+                    <div class="ml-4">?person <span class="uri">&lt;http://xmlns.com/foaf/0.1/name&gt;</span> ?name .</div>
+                    <div class="ml-4">?person <span class="uri">&lt;http://example.org/birth_year&gt;</span> ?birthYear .</div>
+                    <div class="ml-4"><span class="keyword">FILTER</span> (?birthYear &gt; 1980)</div>
+                    <div>}</div>
+                </div>
+                <div class="result-box mt-3">
+                    <div class="text-green-400 font-bold mb-2">查询结果:</div>
+                    <table class="result-table text-sm">
+                        <thead>
+                            <tr>
+                                <th>name</th>
+                                <th>birthYear</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr><td>"马克·扎克伯格"</td><td>1984</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-4">
+                <h3 class="text-xl font-bold text-green-300 mb-3">示例 4: 多条件 FILTER</h3>
+                <p class="text-gray-300 text-sm mb-3">
+                    查询1980-1990年出生的人物:
+                </p>
+                <div class="code-block">
+                    <div><span class="keyword">SELECT</span> ?name ?birthYear <span class="keyword">WHERE</span> {</div>
+                    <div class="ml-4">?person <span class="uri">&lt;http://xmlns.com/foaf/0.1/name&gt;</span> ?name .</div>
+                    <div class="ml-4">?person <span class="uri">&lt;http://example.org/birth_year&gt;</span> ?birthYear .</div>
+                    <div class="ml-4"><span class="keyword">FILTER</span> (?birthYear &gt;= 1980 &amp;&amp; ?birthYear &lt;= 1990)</div>
+                    <div>}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: Property Paths -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 路径查询 (Property Paths)</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是路径查询?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>Property Paths</strong>允许你通过属性的路径来导航图，而不需要明确指定中间节点。
+                </p>
+                <p class="text-gray-400">
+                    这是SPARQL 1.1引入的强大功能，类似于正则表达式，但用于图路径。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                    </svg>
+                    动画: Property Paths 可视化
+                </div>
+                <div id="property-path-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="showDirectPath()">直接路径</button>
+                    <button class="btn btn-secondary" onclick="showInversePath()">反向路径</button>
+                    <button class="btn btn-secondary" onclick="showSequencePath()">序列路径</button>
+                    <button class="btn btn-secondary" onclick="showAlternativePath()">可选路径</button>
+                </div>
+                <div id="path-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">路径语法:</div>
+                    <div id="path-description" class="text-gray-300 text-sm">
+                        点击按钮查看不同的路径查询模式
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">常用路径语法</h3>
+                <table class="result-table text-sm">
+                    <thead>
+                        <tr>
+                            <th>语法</th>
+                            <th>含义</th>
+                            <th>示例</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr>
+                            <td><code class="text-purple-400">?x :pred ?y</code></td>
+                            <td>直接路径</td>
+                            <td>?x :ceo_of ?y</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-purple-400">?x ^:pred ?y</code></td>
+                            <td>反向路径</td>
+                            <td>?x ^:ceo_of ?y</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-purple-400">?x :pred1/:pred2 ?y</code></td>
+                            <td>序列路径</td>
+                            <td>?x :born_in/:located_in ?y</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-purple-400">?x :pred1|:pred2 ?y</code></td>
+                            <td>可选路径</td>
+                            <td>?x :friend_of|:colleague ?y</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-purple-400">?x :pred+ ?y</code></td>
+                            <td>一次或多次</td>
+                            <td>?x :friend_of+ ?y</td>
+                        </tr>
+                        <tr>
+                            <td><code class="text-purple-400">?x :pred* ?y</code></td>
+                            <td>零次或多次</td>
+                            <td>?x :part_of* ?y</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Chapter 5: SPARQL UPDATE -->
+        <div class="glass-card">
+            <h2 class="section-title">5. SPARQL UPDATE</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">数据更新操作</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    SPARQL不仅支持查询，还支持<strong>数据更新</strong>（INSERT、DELETE、UPDATE）。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">示例 5: INSERT DATA</h3>
+                <p class="text-gray-300 text-sm mb-3">
+                    添加新的三元组:
+                </p>
+                <div class="code-block">
+                    <div><span class="keyword">INSERT DATA</span> {</div>
+                    <div class="ml-4"><span class="uri">&lt;http://example.org/sam</span></div>
+                    <div class="ml-8"><span class="uri">&lt;http://xmlns.com/foaf/0.1/name&gt;</span></div>
+                    <div class="ml-8"><span class="literal">"Sam Altman"</span></div>
+                    <div class="ml-8"><span class="uri">&lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt;</span></div>
+                    <div class="ml-8"><span class="uri">&lt;http://xmlns.com/foaf/0.1/Person&gt;</span> .</div>
+                    <div>}</div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-4">
+                <h3 class="text-xl font-bold text-green-300 mb-3">示例 6: DELETE WHERE</h3>
+                <p class="text-gray-300 text-sm mb-3">
+                    删除特定的三元组:
+                </p>
+                <div class="code-block">
+                    <div><span class="keyword">DELETE WHERE</span> {</div>
+                    <div class="ml-4"><span class="uri">&lt;http://example.org/sam</span> <span class="variable">?p</span> <span class="variable">?o</span> .</div>
+                    <div>}</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 6: 交互式查询编辑器 -->
+        <div class="glass-card">
+            <h2 class="section-title">6. 交互式 SPARQL 查询编辑器</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">实战练习</h3>
+                <p class="text-gray-300 leading-relaxed">
+                    使用下方的编辑器编写SPARQL查询，并查看实时结果。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                    </svg>
+                    SPARQL 查询编辑器
+                </div>
+                <div class="mb-3">
+                    <textarea id="sparql-editor" class="query-editor w-full" placeholder="输入 SPARQL 查询...">PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX ex: <http://example.org/>
+
+SELECT ?personName ?companyName
+WHERE {
+  ?person a foaf:Person ;
+         foaf:name ?personName ;
+         ex:ceo_of ?company .
+  ?company foaf:name ?companyName .
+}
+LIMIT 10</textarea>
+                </div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="runSparqlQuery()">▶ 执行查询</button>
+                    <button class="btn btn-secondary" onclick="loadSparqlExample(1)">示例 1</button>
+                    <button class="btn btn-secondary" onclick="loadSparqlExample(2)">示例 2</button>
+                    <button class="btn btn-secondary" onclick="loadSparqlExample(3)">示例 3</button>
+                    <button class="btn btn-secondary" onclick="loadSparqlExample(4)">示例 4</button>
+                </div>
+                <div id="sparql-result" class="result-box mt-4">
+                    <div class="text-gray-400">点击"执行查询"查看结果...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="glass-card">
+            <h2 class="section-title">模块总结</h2>
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-400 mb-3">核心知识点</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>🔍 <strong>SPARQL</strong>: W3C标准的RDF查询语言</li>
+                        <li>📊 <strong>SELECT</strong>: 最常用的查询形式</li>
+                        <li>🎯 <strong>FILTER</strong>: 条件过滤子句</li>
+                        <li>🛤️ <strong>Property Paths</strong>: 强大的路径查询语法</li>
+                        <li>✏️ <strong>UPDATE</strong>: 数据更新操作</li>
+                    </ul>
+                </div>
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-400 mb-3">实践建议</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>✅ 掌握基本的SELECT查询模式</li>
+                        <li>✅ 学会使用FILTER过滤数据</li>
+                        <li>✅ 理解Property Paths的语法</li>
+                        <li>✅ 尝试查询真实的SPARQL端点（如DBpedia）</li>
+                        <li>✅ 练习编写复杂的嵌套查询</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-purple-400 mb-3">实际SPARQL端点</h3>
+                <ul class="text-gray-300 space-y-2 text-sm">
+                    <li>🌐 <a href="https://dbpedia.org/sparql" target="_blank" class="text-blue-400 hover:text-blue-300">DBpedia SPARQL端点</a> - 维基百科的结构化数据</li>
+                    <li>🌐 <a href="https://query.wikidata.org/" target="_blank" class="text-blue-400 hover:text-blue-300">Wikidata Query Service</a> - 维基数据的查询服务</li>
+                    <li>🌐 <a href="https://lod.labpid.org/sparql" target="_blank" class="text-blue-400 hover:text-blue-300">Linked Open Data cloud</a></li>
+                </ul>
+                <p class="text-gray-400 mt-3">
+                    下一步学习:
+                    <a href="28-knowledge-extraction.html" class="text-blue-400 hover:text-blue-300 ml-2">
+                        模块 28: 知识抽取与构建 →
+                    </a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 27: SPARQL和知识图谱查询</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 动画 1: SPARQL 查询执行流程
+        // ============================================================
+        let sparqlFlowSvg;
+
+        function initSparqlFlowAnimation() {
+            const container = document.getElementById("sparql-flow-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            sparqlFlowSvg = d3.select("#sparql-flow-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            sparqlFlowSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height / 2)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#6b7280")
+                .attr("font-size", "14px")
+                .text("点击\"播放动画\"查看SPARQL查询执行流程");
+        }
+
+        function playSparqlFlow() {
+            if (!sparqlFlowSvg) {
+                initSparqlFlowAnimation();
+            }
+            sparqlFlowSvg.selectAll("*").remove();
+
+            const width = sparqlFlowSvg.attr("width");
+            const height = 400;
+            const steps = [
+                { x: width * 0.15, y: height / 2, text: "SPARQL查询", color: "#3b82f6" },
+                { x: width * 0.38, y: height / 2, text: "解析查询", color: "#8b5cf6" },
+                { x: width * 0.61, y: height / 2, text: "模式匹配", color: "#22c55e" },
+                { x: width * 0.84, y: height / 2, text: "返回结果", color: "#f59e0b" }
+            ];
+
+            const descriptions = [
+                "1. SPARQL查询: 用户编写SELECT查询语句",
+                "2. 解析查询: SPARQL引擎解析查询语法",
+                "3. 模式匹配: 在RDF图中匹配三元组模式",
+                "4. 返回结果: 格式化结果并返回给用户"
+            ];
+
+            // 绘制流程步骤
+            steps.forEach((step, i) => {
+                setTimeout(() => {
+                    const g = sparqlFlowSvg.append("g")
+                        .attr("transform", `translate(${step.x}, ${step.y})`)
+                        .style("opacity", 0);
+
+                    // 步骤框
+                    g.append("rect")
+                        .attr("x", -50)
+                        .attr("y", -25)
+                        .attr("width", 100)
+                        .attr("height", 50)
+                        .attr("rx", 8)
+                        .attr("fill", step.color)
+                        .attr("opacity", 0.3);
+
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", 5)
+                        .attr("fill", "white")
+                        .attr("font-size", "12px")
+                        .attr("font-weight", "bold")
+                        .text(step.text);
+
+                    g.transition()
+                        .duration(500)
+                        .style("opacity", 1);
+
+                    // 绘制箭头（如果不是第一步）
+                    if (i > 0) {
+                        sparqlFlowSvg.append("line")
+                            .attr("x1", steps[i-1].x + 50)
+                            .attr("y1", height / 2)
+                            .attr("x2", step.x - 50)
+                            .attr("y2", height / 2)
+                            .attr("stroke", "#60a5fa")
+                            .attr("stroke-width", 2)
+                            .attr("marker-end", "url(#arrow)")
+                            .attr("opacity", 0)
+                            .transition()
+                            .duration(500)
+                            .attr("opacity", 1);
+                    }
+
+                    // 更新说明
+                    document.getElementById("sparql-flow-description").innerHTML = descriptions[i];
+
+                }, i * 1000);
+            });
+        }
+
+        function resetSparqlFlow() {
+            initSparqlFlowAnimation();
+            document.getElementById("sparql-flow-description").innerHTML = "点击\"播放动画\"查看SPARQL查询执行流程";
+        }
+
+        // ============================================================
+        // 动画 2: Property Paths 可视化
+        // ============================================================
+        let pathSvg;
+
+        function initPathAnimation() {
+            const container = document.getElementById("property-path-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            pathSvg = d3.select("#property-path-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            pathSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height / 2)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#6b7280")
+                .attr("font-size", "14px")
+                .text("点击按钮查看不同的路径查询模式");
+        }
+
+        function showDirectPath() {
+            resetPathAnimation();
+            const width = pathSvg.attr("width");
+            const height = 400;
+
+            // 标题
+            pathSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 40)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("直接路径: ?x :ceo_of ?y");
+
+            const nodes = [
+                { name: "埃隆·马斯克", x: width * 0.25, y: height / 2 },
+                { name: "特斯拉", x: width * 0.75, y: height / 2 }
+            ];
+
+            drawPathGraph(nodes, "?x :ceo_of ?y", "直接路径");
+        }
+
+        function showInversePath() {
+            resetPathAnimation();
+            const width = pathSvg.attr("width");
+            const height = 400;
+
+            pathSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 40)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#8b5cf6")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("反向路径: ?x ^:ceo_of ?y");
+
+            const nodes = [
+                { name: "特斯拉", x: width * 0.25, y: height / 2 },
+                { name: "埃隆·马斯克", x: width * 0.75, y: height / 2 }
+            ];
+
+            drawPathGraph(nodes, "?x ^:ceo_of ?y", "反向路径 (箭头反向)");
+        }
+
+        function showSequencePath() {
+            resetPathAnimation();
+            const width = pathSvg.attr("width");
+            const height = 400;
+
+            pathSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 40)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#22c55e")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("序列路径: ?x :born_in/:located_in ?y");
+
+            const nodes = [
+                { name: "埃隆·马斯克", x: width * 0.2, y: height / 2 },
+                { name: "南非", x: width * 0.5, y: height / 2 },
+                { name: "非洲", x: width * 0.8, y: height / 2 }
+            ];
+
+            // 绘制多个节点和边
+            nodes.forEach((node, i) => {
+                const g = pathSvg.append("g")
+                    .attr("transform", `translate(${node.x}, ${node.y})`)
+                    .style("opacity", 0);
+
+                g.append("circle")
+                    .attr("r", 35)
+                    .attr("fill", ["#3b82f6", "#22c55e", "#8b5cf6"][i])
+                    .attr("opacity", 0.6);
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", 5)
+                    .attr("fill", "white")
+                    .attr("font-size", "11px")
+                    .attr("font-weight", "bold")
+                    .text(node.name);
+
+                g.transition()
+                    .delay(i * 300)
+                    .duration(500)
+                    .style("opacity", 1);
+            });
+
+            // 绘制边
+            setTimeout(() => {
+                pathSvg.insert("line", ":first-child")
+                    .attr("x1", nodes[0].x)
+                    .attr("y1", nodes[0].y)
+                    .attr("x2", nodes[1].x)
+                    .attr("y2", nodes[1].y)
+                    .attr("stroke", "#22c55e")
+                    .attr("stroke-width", 3)
+                    .attr("opacity", 0)
+                    .transition()
+                    .duration(500)
+                    .attr("opacity", 1);
+
+                pathSvg.insert("line", ":first-child")
+                    .attr("x1", nodes[1].x)
+                    .attr("y1", nodes[1].y)
+                    .attr("x2", nodes[2].x)
+                    .attr("y2", nodes[2].y)
+                    .attr("stroke", "#22c55e")
+                    .attr("stroke-width", 3)
+                    .attr("opacity", 0)
+                    .transition()
+                    .delay(500)
+                    .duration(500)
+                    .attr("opacity", 1);
+
+                pathSvg.append("text")
+                    .attr("x", (nodes[0].x + nodes[1].x) / 2)
+                    .attr("y", (nodes[0].y + nodes[1].y) / 2 - 15)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#22c55e")
+                    .attr("font-size", "10px")
+                    .style("opacity", 0)
+                    .text(":born_in")
+                    .transition()
+                    .delay(250)
+                    .duration(500)
+                    .style("opacity", 1);
+
+                pathSvg.append("text")
+                    .attr("x", (nodes[1].x + nodes[2].x) / 2)
+                    .attr("y", (nodes[1].y + nodes[2].y) / 2 - 15)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#22c55e")
+                    .attr("font-size", "10px")
+                    .style("opacity", 0)
+                    .text(":located_in")
+                    .transition()
+                    .delay(750)
+                    .duration(500)
+                    .style("opacity", 1);
+            }, 1000);
+
+            document.getElementById("path-description").innerHTML =
+                "<strong>序列路径</strong>: 通过多个属性连接，如 ?x :born_in/:located_in ?y 表示'出生在位于...'";
+        }
+
+        function showAlternativePath() {
+            resetPathAnimation();
+            const width = pathSvg.attr("width");
+            const height = 400;
+
+            pathSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 40)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#f59e0b")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("可选路径: ?x :friend_of|:colleague ?y");
+
+            const nodes = [
+                { name: "Alice", x: width * 0.25, y: height / 2 },
+                { name: "Bob", x: width * 0.75, y: height / 2 }
+            ];
+
+            drawPathGraph(nodes, "?x :friend_of|:colleague ?y", "可选路径 (friend或colleague)");
+        }
+
+        function drawPathGraph(nodes, label, description) {
+            const width = pathSvg.attr("width");
+            const height = 400;
+
+            nodes.forEach((node, i) => {
+                const g = pathSvg.append("g")
+                    .attr("transform", `translate(${node.x}, ${node.y})`)
+                    .style("opacity", 0);
+
+                g.append("circle")
+                    .attr("r", 40)
+                    .attr("fill", i === 0 ? "#3b82f6" : "#8b5cf6")
+                    .attr("opacity", 0.6);
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", 5)
+                    .attr("fill", "white")
+                    .attr("font-size", "12px")
+                    .attr("font-weight", "bold")
+                    .text(node.name);
+
+                g.transition()
+                    .delay(i * 300)
+                    .duration(500)
+                    .style("opacity", 1);
+            });
+
+            setTimeout(() => {
+                pathSvg.insert("line", ":first-child")
+                    .attr("x1", nodes[0].x)
+                    .attr("y1", nodes[0].y)
+                    .attr("x2", nodes[1].x)
+                    .attr("y2", nodes[1].y)
+                    .attr("stroke", "#22c55e")
+                    .attr("stroke-width", 3)
+                    .attr("opacity", 0)
+                    .transition()
+                    .duration(500)
+                    .attr("opacity", 1);
+
+                pathSvg.append("text")
+                    .attr("x", (nodes[0].x + nodes[1].x) / 2)
+                    .attr("y", (nodes[0].y + nodes[1].y) / 2 - 15)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#22c55e")
+                    .attr("font-size", "11px")
+                    .style("opacity", 0)
+                    .text(label)
+                    .transition()
+                    .delay(250)
+                    .duration(500)
+                    .style("opacity", 1);
+            }, 600);
+
+            document.getElementById("path-description").innerHTML = `<strong>${description}</strong>`;
+        }
+
+        function resetPathAnimation() {
+            if (pathSvg) {
+                pathSvg.selectAll("*").remove();
+                initPathAnimation();
+            }
+        }
+
+        // ============================================================
+        // SPARQL 查询编辑器
+        // ============================================================
+        function runSparqlQuery() {
+            const query = document.getElementById("sparql-editor").value;
+            const resultDiv = document.getElementById("sparql-result");
+
+            // 模拟查询结果
+            const mockResults = [
+                {
+                    table: `
+                        <table class="result-table text-sm">
+                            <thead>
+                                <tr>
+                                    <th>personName</th>
+                                    <th>companyName</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-gray-300">
+                                <tr><td>"埃隆·马斯克"</td><td>"特斯拉"</td></tr>
+                                <tr><td>"埃隆·马斯克"</td><td>"SpaceX"</td></tr>
+                                <tr><td>"蒂姆·库克"</td><td>"苹果"</td></tr>
+                            </tbody>
+                        </table>
+                    `,
+                    stats: "3 行结果, 耗时: 3ms"
+                }
+            ];
+
+            resultDiv.innerHTML = `
+                <div class="text-green-400 font-bold mb-2">✓ 查询成功</div>
+                ${mockResults[0].table}
+                <div class="text-gray-400 text-xs mt-3">${mockResults[0].stats}</div>
+            `;
+        }
+
+        function loadSparqlExample(num) {
+            const queries = {
+                1: `PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX ex: <http://example.org/>
+
+SELECT ?personName ?companyName
+WHERE {
+  ?person a foaf:Person ;
+         foaf:name ?personName ;
+         ex:ceo_of ?company .
+  ?company foaf:name ?companyName .
+}
+LIMIT 10`,
+                2: `PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX ex: <http://example.org/>
+
+SELECT ?name ?birthYear
+WHERE {
+  ?person foaf:name ?name ;
+          ex:birth_year ?birthYear .
+  FILTER (?birthYear > 1980)
+}
+ORDER BY DESC(?birthYear)`,
+                3: `PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX ex: <http://example.org/>
+
+SELECT ?personName ?countryName
+WHERE {
+  ?person foaf:name ?personName ;
+          ex:born_in/ex:located_in ?country .
+  ?country foaf:name ?countryName .
+}`,
+                4: `PREFIX foaf: <http://xmlns.com/foaf/0.1/>
+PREFIX ex: <http://example.org/>
+
+SELECT (COUNT(?person) AS ?count)
+WHERE {
+  ?person a foaf:Person .
+}`
+            };
+
+            document.getElementById("sparql-editor").value = queries[num];
+        }
+
+        // ============================================================
+        // 初始化
+        // ============================================================
+        document.addEventListener("DOMContentLoaded", function() {
+            initSparqlFlowAnimation();
+            initPathAnimation();
+        });
+    </script>
+</body>
+</html>

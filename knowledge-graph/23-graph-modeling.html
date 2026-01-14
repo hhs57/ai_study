@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块23: 图数据建模原则 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subsection-title {
+            font-size: 1.8em;
+            margin: 30px 0 20px 0;
+            color: #60a5fa;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .warning-box {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .animation-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            color: #e2e8f0;
+        }
+
+        .keyword { color: #f472b6; }
+        .string { color: #a5f3fc; }
+        .comment { color: #94a3b8; }
+        .function { color: #fbbf24; }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2em;
+            }
+            .glass-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <a href="22-knowledge-representation.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一模块
+                </a>
+                <a href="24-rdf-basics.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 23 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 23: 图数据建模原则
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">掌握如何将现实世界的问题转化为图数据模型</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30">进阶级别</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~50 分钟</span>
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">2 个交互动画</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: 什么是图数据建模 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. 什么是图数据建模?</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">定义</h3>
+                <p class="text-gray-300 leading-relaxed text-lg">
+                    <strong>图数据建模</strong>是将现实世界的问题和关系转换为<strong>图结构</strong>的过程。
+                </p>
+                <p class="text-gray-400 mt-3">
+                    它决定了如何将实体表示为节点、关系表示为边、以及如何组织属性。好的图建模能让查询更高效、数据更易于维护。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">图建模的核心任务</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🔵</div>
+                        <div class="font-bold text-blue-400 mb-2">确定节点类型</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 识别实体类型(用户、商品、订单...)</li>
+                            <li>• 为每种类型定义标签</li>
+                            <li>• 设计节点的属性结构</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🔗</div>
+                        <div class="font-bold text-green-400 mb-2">确定关系类型</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 识别实体间的关联</li>
+                            <li>• 定义关系的方向和类型</li>
+                            <li>• 设计关系的属性</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="warning-box mt-6">
+                <h3 class="text-xl font-bold text-red-300 mb-3">⚠️ 为什么图建模很重要?</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>• <strong>性能影响</strong>: 好的建模能让查询快10-100倍</li>
+                    <li>• <strong>可扩展性</strong>: 好的建模便于后续扩展</li>
+                    <li>• <strong>维护成本</strong>: 糟糕的建模会导致数据冗余和更新异常</li>
+                    <li>• <strong>查询复杂度</strong>: 建模不当会导致查询变得极其复杂</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Chapter 2: 图建模的基本原则 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. 图建模的基本原则</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">原则1: 保持简洁 (Keep It Simple)</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    不要过度建模。只在必要时引入节点和关系。
+                </p>
+                <div class="bg-black/30 p-4 rounded-lg">
+                    <div class="text-sm text-gray-400 mb-2">❌ 过度建模:</div>
+                    <div class="text-gray-300">用户 → 性别 → 性别类型</div>
+                    <div class="text-sm text-gray-400 mt-3 mb-2">✅ 合理建模:</div>
+                    <div class="text-gray-300">用户 (属性: gender)</div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-4">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">原则2: 避免冗余 (Avoid Redundancy)</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    不要存储可推导的信息。如果A→B→C,就不需要存储A→C(除非需要性能优化)。
+                </p>
+                <div class="bg-black/30 p-4 rounded-lg">
+                    <div class="text-sm text-gray-400 mb-2">❌ 冗余存储:</div>
+                    <div class="text-gray-300">张三 → 父亲 → 李四</div>
+                    <div class="text-gray-300">张三 → 祖父 → 王五 (可通过李四推导)</div>
+                    <div class="text-sm text-gray-400 mt-3 mb-2">✅ 非冗余:</div>
+                    <div class="text-gray-300">张三 → 父亲 → 李四</div>
+                    <div class="text-gray-300">李四 → 父亲 → 王五</div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-4">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">原则3: 使用密集节点 (Use Dense Nodes)</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    对于高基数的属性值,考虑将其转换为节点而不是属性。
+                </p>
+                <div class="bg-black/30 p-4 rounded-lg">
+                    <div class="text-sm text-gray-400 mb-2">❌ 使用属性:</div>
+                    <div class="text-gray-300">用户 (属性: country="中国")</div>
+                    <div class="text-gray-300">用户 (属性: country="美国")</div>
+                    <div class="text-sm text-gray-400 mt-3 mb-2">✅ 使用节点:</div>
+                    <div class="text-gray-300">用户 → LOCATED_IN → 国家节点</div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-4">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">原则4: 时间建模 (Time Modeling)</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    对于有时间维度的关系,考虑使用时间戳或时间节点。
+                </p>
+                <div class="bg-black/30 p-4 rounded-lg">
+                    <div class="text-sm text-gray-400 mb-2">方案1: 关系属性</div>
+                    <div class="text-gray-300">用户 → WORKS_AT {since: 2020} → 公司</div>
+                    <div class="text-sm text-gray-400 mt-3 mb-2">方案2: 时间节点</div>
+                    <div class="text-gray-300">用户 → WORKS_AT → 职位 → AT_YEAR → 2020</div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">📋 建模决策检查清单</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>✅ 这个节点/关系是否必要?</li>
+                    <li>✅ 是否有更简单的建模方式?</li>
+                    <li>✅ 查询路径是否清晰?</li>
+                    <li>✅ 是否会导致数据冗余?</li>
+                    <li>✅ 未来是否易于扩展?</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Chapter 3: 动画 - 从ER图到图模型 -->
+        <div class="glass-card">
+            <h2 class="section-title">3. 动画演示: 从ER图到图模型</h2>
+
+            <p class="text-gray-300 mb-4">
+                通过这个动画,我们将看到如何将传统的关系型数据库ER图转换为图数据模型。
+            </p>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                    </svg>
+                    动画: ER图到图模型的转换
+                </div>
+                <div id="er-animation" class="animation-canvas" style="min-height: 500px;"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playERAnimation()">▶ 播放转换</button>
+                    <button class="btn btn-secondary" onclick="resetERAnimation()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="toggleView()">🔄 切换视图</button>
+                </div>
+                <div class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">转换说明:</div>
+                    <div id="er-description" class="text-gray-300">
+                        点击"播放转换"查看ER图如何逐步转换为图数据模型
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">转换对应关系</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">ER图元素</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 实体 (Entity)</li>
+                            <li>• 属性 (Attribute)</li>
+                            <li>• 关系 (Relationship)</li>
+                            <li>• 外键 (Foreign Key)</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">图模型元素</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>→ 节点 (Node)</li>
+                            <li>→ 节点属性 (Properties)</li>
+                            <li>→ 边 (Edge/Relationship)</li>
+                            <li>→ 边 (无需外键)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 常见建模模式 -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 常见建模模式</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">模式1: 时间树 (Time Tree)</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    将时间表示为层级节点:年→月→日→小时
+                </p>
+                <div class="code-block">
+<code><span class="comment">// 时间树结构示例</span>
+2024
+  └── 2024-01
+        └── 2024-01-15
+              └── 2024-01-15T14:30
+
+<span class="comment">// 使用方式</span>
+Event → ON_DATE → 2024-01-15</code>
+                </div>
+                <div class="text-sm text-gray-400 mt-3">
+                    <strong>优点:</strong> 便于时间范围查询、聚合分析<br>
+                    <strong>缺点:</strong> 节点数量多
+                </div>
+            </div>
+
+            <div class="concept-card mt-4">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">模式2: 层次结构 (Hierarchy)</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    使用自引用关系表示树形结构
+                </p>
+                <div class="code-block">
+<code><span class="comment">// 组织架构示例</span>
+CEO → MANAGES → CTO
+CTO → MANAGES → Tech Lead
+Tech Lead → MANAGES → Developer
+
+<span class="comment">// 查询: 查找CEO的所有下属</span>
+MATCH (ceo:Person {name: "CEO"})-[:MANAGES*]->(subordinate)
+RETURN subordinate</code>
+                </div>
+            </div>
+
+            <div class="concept-card mt-4">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">模式3: 多对多关系 (Many-to-Many)</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    图模型天然支持多对多,无需中间表
+                </p>
+                <div class="code-block">
+<code><span class="comment">// 学生和课程关系</span>
+学生1 → ENROLLED_IN → 课程A
+学生1 → ENROLLED_IN → 课程B
+学生2 → ENROLLED_IN → 课程A
+
+<span class="comment">// 可直接查询,无需关联表</span>
+MATCH (s:Student)-[:ENROLLED_IN]->(c:Course)
+RETURN s.name, c.name</code>
+                </div>
+            </div>
+
+            <div class="concept-card mt-4">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">模式4: 权重边 (Weighted Relationships)</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    在边上存储权重、分数等属性
+                </p>
+                <div class="code-block">
+<code><span class="comment">社交网络关系强度</span>
+用户A → KNOWS {strength: 0.8, since: 2020} → 用户B
+用户A → KNOWS {strength: 0.3, since: 2023} → 用户C
+
+<span class="comment">// 查询: 找强关系</span>
+MATCH (a:Person)-[k:KNOWS]->(b:Person)
+WHERE k.strength > 0.5
+RETURN a, b, k.strength</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 5: Property Graph vs RDF Graph建模 -->
+        <div class="glass-card">
+            <h2 class="section-title">5. Property Graph vs RDF Graph 建模差异</h2>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">核心区别</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-600">
+                            <th class="text-left py-3 px-4 text-blue-400">特性</th>
+                            <th class="text-left py-3 px-4 text-green-400">Property Graph (LPG)</th>
+                            <th class="text-left py-3 px-4 text-purple-400">RDF Graph</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-700">
+                            <td class="py-3 px-4">节点标识</td>
+                            <td class="py-3 px-4">内部ID</td>
+                            <td class="py-3 px-4">URI/IRI</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-3 px-4">属性</td>
+                            <td class="py-3 px-4">节点和边的属性</td>
+                            <td class="py-3 px-4">仅节点有属性</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-3 px-4">Schema</td>
+                            <td class="py-3 px-4">可选,灵活</td>
+                            <td class="py-3 px-4">本体(RDFS/OWL)</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-3 px-4">数据类型</td>
+                            <td class="py-3 px-4">任意类型</td>
+                            <td class="py-3 px-4">需要显式类型</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4">查询语言</td>
+                            <td class="py-3 px-4">Cypher, Gremlin</td>
+                            <td class="py-3 px-4">SPARQL</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">Property Graph建模示例 (Neo4j)</h3>
+                <div class="code-block">
+<code><span class="comment">// 创建节点和关系</span>
+CREATE (e:Person {
+  name: "埃隆·马斯克",
+  birthDate: "1971-06-28",
+  nationality: "美国"
+})
+CREATE (t:Company {
+  name: "特斯拉",
+  founded: "2003",
+  industry: "电动汽车"
+})
+CREATE (e)-[:CEO_OF {
+  since: "2008"
+}]->(t)</code>
+                </div>
+            </div>
+
+            <div class="concept-card mt-4">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">RDF Graph建模示例</h3>
+                <div class="code-block">
+<code><span class="comment"># Turtle格式</span>
+@prefix ex: <http://example.org/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:elon rdf:type ex:Person ;
+    ex:name "埃隆·马斯克" ;
+    ex:birthDate "1971-06-28"^^xsd:date ;
+    ex:nationality "美国" ;
+    ex:ceoOf ex:tesla .
+
+ex:tesla rdf:type ex:Company ;
+    ex:name "特斯拉" ;
+    ex:founded "2003"^^xsd:gYear ;
+    ex:industry "电动汽车" .</code>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">如何选择?</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2">选择Property Graph如果:</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 需要灵活的Schema</li>
+                            <li>• 应用导向(如社交网络)</li>
+                            <li>• 需要高性能查询</li>
+                            <li>• 团队熟悉图数据库</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2">选择RDF Graph如果:</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 需要数据互操作性</li>
+                            <li>• 遵循语义网标准</li>
+                            <li>• 需要复杂的推理</li>
+                            <li>• 与开放数据集成</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 6: 动画 - 电商领域建模案例 -->
+        <div class="glass-card">
+            <h2 class="section-title">6. 案例演示: 电商知识图谱建模</h2>
+
+            <p class="text-gray-300 mb-4">
+                通过电商领域的实际案例,学习如何设计一个完整的图数据模型。
+            </p>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                    </svg>
+                    动画: 电商知识图谱构建
+                </div>
+                <div id="ecommerce-animation" class="animation-canvas" style="min-height: 500px;"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playEcommerceAnimation()">▶ 播放构建</button>
+                    <button class="btn btn-secondary" onclick="resetEcommerceAnimation()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="addEntity()">+ 添加实体</button>
+                </div>
+                <div class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">当前图谱:</div>
+                    <div id="ecommerce-stats" class="text-gray-300">
+                        点击"播放构建"开始演示电商知识图谱的建模过程
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">电商知识图谱模型设计</h3>
+                <div class="space-y-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">👤 节点类型</div>
+                        <div class="grid md:grid-cols-3 gap-3 text-sm">
+                            <div class="text-gray-300">• User (用户)</div>
+                            <div class="text-gray-300">• Product (商品)</div>
+                            <div class="text-gray-300">• Category (分类)</div>
+                            <div class="text-gray-300">• Order (订单)</div>
+                            <div class="text-gray-300">• Review (评价)</div>
+                            <div class="text-gray-300">• Brand (品牌)</div>
+                        </div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">🔗 关系类型</div>
+                        <div class="grid md:grid-cols-2 gap-3 text-sm">
+                            <div class="text-gray-300">• BOUGHT (用户购买商品)</div>
+                            <div class="text-gray-300">• REVIEWED (用户评价商品)</div>
+                            <div class="text-gray-300">• BELONGS_TO (商品属于分类)</div>
+                            <div class="text-gray-300">• CONTAINS (订单包含商品)</div>
+                            <div class="text-gray-300">• PRODUCED_BY (商品由品牌生产)</div>
+                            <div class="text-gray-300">• SIMILAR_TO (相似商品)</div>
+                        </div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-yellow-400 mb-2">💡 典型查询场景</div>
+                        <ul class="text-gray-300 text-sm space-y-2">
+                            <li>• <strong>个性化推荐</strong>: 找与用户购买过的商品相似的其他商品</li>
+                            <li>• <strong>关联销售</strong>: 购买商品A的用户还购买了商品B</li>
+                            <li>• <strong>用户画像</strong>: 基于购买行为分析用户偏好</li>
+                            <li>• <strong>热门商品</strong>: 统计购买次数最多的商品</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 7: 建模最佳实践 -->
+        <div class="glass-card">
+            <h2 class="section-title">7. 图建模最佳实践</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">✅ DO - 推荐做法</h3>
+                <ul class="text-gray-300 space-y-3">
+                    <li><strong>1. 从查询出发设计</strong>
+                        <div class="text-sm text-gray-400 mt-1">先考虑要查询什么,再设计图结构</div>
+                    </li>
+                    <li><strong>2. 使用有意义的标签</strong>
+                        <div class="text-sm text-gray-400 mt-1">标签名要能清晰表达实体的类型</div>
+                    </li>
+                    <li><strong>3. 建立索引</strong>
+                        <div class="text-sm text-gray-400 mt-1">为常用查询的属性建立索引</div>
+                    </li>
+                    <li><strong>4. 控制节点度数</strong>
+                        <div class="text-sm text-gray-400 mt-1">避免超级节点(超过10万条边),考虑拆分</div>
+                    </li>
+                    <li><strong>5. 文档化模型</strong>
+                        <div class="text-sm text-gray-400 mt-1">维护清晰的数据模型文档</div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="warning-box mt-6">
+                <h3 class="text-xl font-bold text-red-300 mb-3">❌ DON'T - 避免做法</h3>
+                <ul class="text-gray-300 space-y-3">
+                    <li><strong>1. 不要直接迁移关系模型</strong>
+                        <div class="text-sm text-gray-400 mt-1">图建模需要不同的思维方式</div>
+                    </li>
+                    <li><strong>2. 不要过度规范化</strong>
+                        <div class="text-sm text-gray-400 mt-1">适当冗余可以提升查询性能</div>
+                    </li>
+                    <li><strong>3. 不要忽视查询性能</strong>
+                        <div class="text-sm text-gray-400 mt-1">某些复杂的图模式可能难以高效查询</div>
+                    </li>
+                    <li><strong>4. 不要创建太多的关系类型</strong>
+                        <div class="text-sm text-gray-400 mt-1">保持关系类型数量可控</div>
+                    </li>
+                    <li><strong>5. 不要忘记测试</strong>
+                        <div class="text-sm text-gray-400 mt-1">用真实数据测试模型的性能</div>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">🔍 建模验证方法</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 text-2xl">1</span>
+                        <div>
+                            <div class="font-bold text-gray-300">查询路径测试</div>
+                            <div class="text-sm text-gray-400">检查常见查询是否可以通过简短的图路径完成</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 text-2xl">2</span>
+                        <div>
+                            <div class="font-bold text-gray-300">性能基准测试</div>
+                            <div class="text-sm text-gray-400">测试典型查询的响应时间</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 text-2xl">3</span>
+                        <div>
+                            <div class="font-bold text-gray-300">数据一致性检查</div>
+                            <div class="text-sm text-gray-400">验证是否有孤立节点或不一致的连接</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 text-2xl">4</span>
+                        <div>
+                            <div class="font-bold text-gray-300">可扩展性评估</div>
+                            <div class="text-sm text-gray-400">考虑数据增长10倍、100倍后的性能</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="glass-card">
+            <h2 class="section-title">下一步学习</h2>
+            <p class="text-gray-300 mb-4">
+                理解了图数据建模原则后,建议继续学习:
+            </p>
+            <div class="space-y-3">
+                <a href="24-rdf-semantic-web.html" class="block bg-black/30 p-4 rounded-lg hover:bg-black/40 transition-colors">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <div class="font-bold text-blue-400">模块 24: RDF 和语义网基础</div>
+                            <div class="text-sm text-gray-400">学习RDF三元组、序列化格式和语义网标准</div>
+                        </div>
+                        <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 23: 图数据建模原则</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 动画 1: ER图到图模型转换
+        // ============================================================
+        let erSvg, erWidth, erHeight, erMode = 'er'; // 'er' or 'graph'
+
+        const erData = {
+            tables: [
+                { name: "Users", x: 200, y: 150, fields: ["id", "name", "email"] },
+                { name: "Orders", x: 500, y: 150, fields: ["id", "user_id", "date"] },
+                { name: "Products", x: 500, y: 400, fields: ["id", "name", "price"] }
+            ],
+            relationships: [
+                { from: "Users", to: "Orders", label: "1:N" },
+                { from: "Orders", to: "Products", label: "N:M" }
+            ]
+        };
+
+        function initERAnimation() {
+            const container = document.getElementById("er-animation");
+            container.innerHTML = "";
+            erWidth = container.clientWidth;
+            erHeight = 500;
+
+            erSvg = d3.select("#er-animation")
+                .append("svg")
+                .attr("width", erWidth)
+                .attr("height", erHeight);
+
+            drawERDiagram();
+        }
+
+        function drawERDiagram() {
+            erSvg.selectAll("*").remove();
+
+            // 标题
+            erSvg.append("text")
+                .attr("x", erWidth / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("ER图 - 关系型数据库模型");
+
+            // 绘制表
+            erData.tables.forEach(table => {
+                const g = erSvg.append("g")
+                    .attr("transform", `translate(${table.x}, ${table.y})`);
+
+                // 表框
+                g.append("rect")
+                    .attr("x", -60)
+                    .attr("y", 0)
+                    .attr("width", 120)
+                    .attr("height", 30 + table.fields.length * 25)
+                    .attr("fill", "#1e3a8a")
+                    .attr("stroke", "#3b82f6")
+                    .attr("stroke-width", 2)
+                    .attr("rx", 5);
+
+                // 表名
+                g.append("text")
+                    .attr("x", 0)
+                    .attr("y", 20)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "white")
+                    .attr("font-weight", "bold")
+                    .attr("font-size", "14px")
+                    .text(table.name);
+
+                // 字段
+                table.fields.forEach((field, i) => {
+                    g.append("text")
+                        .attr("x", -50)
+                        .attr("y", 45 + i * 25)
+                        .attr("fill", "#93c5fd")
+                        .attr("font-size", "12px")
+                        .text(field);
+                });
+            });
+
+            // 绘制关系
+            erData.relationships.forEach(rel => {
+                const fromTable = erData.tables.find(t => t.name === rel.from);
+                const toTable = erData.tables.find(t => t.name === rel.to);
+
+                const line = erSvg.append("line")
+                    .attr("x1", fromTable.x + 60)
+                    .attr("y1", fromTable.y + 50)
+                    .attr("x2", toTable.x - 60)
+                    .attr("y2", toTable.y + 50)
+                    .attr("stroke", "#22c55e")
+                    .attr("stroke-width", 2)
+                    .attr("stroke-dasharray", "5,5");
+
+                // 关系标签
+                erSvg.append("text")
+                    .attr("x", (fromTable.x + toTable.x) / 2)
+                    .attr("y", (fromTable.y + toTable.y) / 2 + 40)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#22c55e")
+                    .attr("font-size", "14px")
+                    .attr("font-weight", "bold")
+                    .text(rel.label);
+            });
+        }
+
+        function drawGraphModel() {
+            erSvg.selectAll("*").remove();
+
+            // 标题
+            erSvg.append("text")
+                .attr("x", erWidth / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#22c55e")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("图模型 - Property Graph");
+
+            const nodes = [
+                { id: 1, label: "User:张三", type: "User", x: 200, y: 150, color: "#3b82f6" },
+                { id: 2, label: "User:李四", type: "User", x: 200, y: 350, color: "#3b82f6" },
+                { id: 3, label: "Order:#1001", type: "Order", x: 400, y: 150, color: "#8b5cf6" },
+                { id: 4, label: "Order:#1002", type: "Order", x: 400, y: 350, color: "#8b5cf6" },
+                { id: 5, label: "Product:手机", type: "Product", x: 600, y: 250, color: "#22c55e" }
+            ];
+
+            const links = [
+                { source: 1, target: 3, label: "PLACED" },
+                { source: 2, target: 4, label: "PLACED" },
+                { source: 3, target: 5, label: "CONTAINS" },
+                { source: 4, target: 5, label: "CONTAINS" }
+            ];
+
+            // 绘制边
+            links.forEach(link => {
+                const sourceNode = nodes.find(n => n.id === link.source);
+                const targetNode = nodes.find(n => n.id === link.target);
+
+                const line = erSvg.append("line")
+                    .attr("x1", sourceNode.x)
+                    .attr("y1", sourceNode.y)
+                    .attr("x2", targetNode.x)
+                    .attr("y2", targetNode.y)
+                    .attr("stroke", "#22c55e")
+                    .attr("stroke-width", 2)
+                    .attr("marker-end", "url(#arrowhead)");
+
+                // 关系标签
+                const midX = (sourceNode.x + targetNode.x) / 2;
+                const midY = (sourceNode.y + targetNode.y) / 2;
+
+                erSvg.append("text")
+                    .attr("x", midX)
+                    .attr("y", midY - 10)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#22c55e")
+                    .attr("font-size", "11px")
+                    .attr("font-weight", "bold")
+                    .text(link.label);
+            });
+
+            // 绘制节点
+            nodes.forEach(node => {
+                const g = erSvg.append("g")
+                    .attr("transform", `translate(${node.x}, ${node.y})`);
+
+                g.append("circle")
+                    .attr("r", 40)
+                    .attr("fill", node.color)
+                    .attr("opacity", 0.6)
+                    .attr("stroke", node.color)
+                    .attr("stroke-width", 2);
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", -5)
+                    .attr("fill", "white")
+                    .attr("font-size", "11px")
+                    .attr("font-weight", "bold")
+                    .text(node.label.substring(0, 10));
+
+                g.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", 15)
+                    .attr("fill", "white")
+                    .attr("font-size", "10px")
+                    .attr("opacity", 0.8)
+                    .text(node.type);
+            });
+
+            // 添加箭头定义
+            erSvg.append("defs")
+                .append("marker")
+                .attr("id", "arrowhead")
+                .attr("viewBox", "0 0 10 10")
+                .attr("refX", 8)
+                .attr("refY", 5)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                .attr("fill", "#22c55e");
+        }
+
+        function playERAnimation() {
+            resetERAnimation();
+
+            // 显示ER图
+            drawERDiagram();
+            updateERDescription("当前显示: ER图 - 表结构清晰,但需要JOIN连接");
+
+            // 1秒后开始转换
+            setTimeout(() => {
+                // 淡出ER图
+                erSvg.selectAll("*")
+                    .transition()
+                    .duration(500)
+                    .style("opacity", 0);
+
+                setTimeout(() => {
+                    updateERDescription("转换中... 表变为节点,外键变为边");
+                    drawGraphModel();
+                    erSvg.selectAll("*").style("opacity", 0);
+
+                    // 淡入图模型
+                    erSvg.selectAll("*")
+                        .transition()
+                        .duration(500)
+                        .style("opacity", 1);
+
+                    updateERDescription("✓ 转换完成! 图模型更直观,查询无需JOIN");
+                }, 600);
+            }, 1500);
+        }
+
+        function resetERAnimation() {
+            erMode = 'er';
+            drawERDiagram();
+            updateERDescription("点击播放转换查看ER图如何逐步转换为图数据模型");
+        }
+
+        function toggleView() {
+            if (erMode === 'er') {
+                drawGraphModel();
+                erMode = 'graph';
+                updateERDescription("当前显示: 图模型 - 节点和边直接连接");
+            } else {
+                drawERDiagram();
+                erMode = 'er';
+                updateERDescription("当前显示: ER图 - 表结构清晰,但需要JOIN连接");
+            }
+        }
+
+        function updateERDescription(text) {
+            document.getElementById("er-description").textContent = text;
+        }
+
+        // ============================================================
+        // 动画 2: 电商知识图谱构建
+        // ============================================================
+        let ecommerceSvg;
+        let ecommerceWidth;
+        let ecommerceHeight;
+        let ecommerceNodes = [];
+        let ecommerceLinks = [];
+
+        const entityTypes = [
+            { name: "User:张三", type: "user", color: "#3b82f6" },
+            { name: "Product:iPhone", type: "product", color: "#8b5cf6" },
+            { name: "Category:电子产品", type: "category", color: "#22c55e" },
+            { name: "Brand:Apple", type: "brand", color: "#f59e0b" },
+            { name: "Order:#1001", type: "order", color: "#ec4899" },
+            { name: "Review:好评", type: "review", color: "#06b6d4" }
+        ];
+
+        const relationshipTypes = [
+            { from: "User:张三", to: "Product:iPhone", relation: "BOUGHT" },
+            { from: "User:张三", to: "Order:#1001", relation: "PLACED" },
+            { from: "Product:iPhone", to: "Category:电子产品", relation: "BELONGS_TO" },
+            { from: "Product:iPhone", to: "Brand:Apple", relation: "PRODUCED_BY" },
+            { from: "User:张三", to: "Review:好评", relation: "WROTE" },
+            { from: "Review:好评", to: "Product:iPhone", relation: "REVIEWS" }
+        ];
+
+        function initEcommerceAnimation() {
+            const container = document.getElementById("ecommerce-animation");
+
+            // 只在第一次或SVG不存在时初始化
+            if (!ecommerceSvg || container.children.length === 0) {
+                container.innerHTML = "";
+                ecommerceWidth = container.clientWidth;
+                ecommerceHeight = 500;
+
+                ecommerceSvg = d3.select("#ecommerce-animation")
+                    .append("svg")
+                    .attr("width", ecommerceWidth)
+                    .attr("height", ecommerceHeight);
+
+                // 标题
+                ecommerceSvg.append("text")
+                    .attr("x", ecommerceWidth / 2)
+                    .attr("y", 30)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#60a5fa")
+                    .attr("font-size", "20px")
+                    .attr("font-weight", "bold")
+                    .text("电商知识图谱 - 实时构建中");
+            }
+        }
+
+        function playEcommerceAnimation() {
+            // 确保SVG已初始化
+            initEcommerceAnimation();
+
+            // 清空数据
+            ecommerceNodes = [];
+            ecommerceLinks = [];
+
+            // 清空SVG中除标题外的所有内容
+            ecommerceSvg.selectAll("*").filter(function() {
+                return this.tagName !== "text";
+            }).remove();
+
+            let step = 0;
+            const statsDiv = document.getElementById("ecommerce-stats");
+
+            // 创建图层
+            let simulation = null;
+            const linkGroup = ecommerceSvg.append("g");
+            const nodeGroup = ecommerceSvg.append("g");
+
+            function ticked() {
+                // 只更新已存在的元素
+                linkGroup.selectAll("line")
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                nodeGroup.selectAll("g")
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+
+                linkGroup.selectAll("text")
+                    .attr("x", d => (d.source.x + d.target.x) / 2)
+                    .attr("y", d => (d.source.y + d.target.y) / 2);
+            }
+
+            function addNextStep() {
+                if (step >= entityTypes.length) {
+                    statsDiv.innerHTML = `<span class="text-green-400">✓ 电商知识图谱构建完成!</span><br>` +
+                        `实体数: ${ecommerceNodes.length}<br>` +
+                        `关系数: ${ecommerceLinks.length}`;
+                    return;
+                }
+
+                const entity = entityTypes[step];
+                const newNode = {
+                    name: entity.name,
+                    type: entity.type,
+                    color: entity.color,
+                    x: Math.random() * parseInt(ecommerceSvg.attr("width")),
+                    y: Math.random() * 500
+                };
+
+                ecommerceNodes.push(newNode);
+
+                // 创建simulation（只在第一次添加节点时）
+                if (!simulation && ecommerceNodes.length > 0) {
+                    simulation = d3.forceSimulation(ecommerceNodes)
+                        .force("link", d3.forceLink(ecommerceLinks).id(d => d.name).distance(120))
+                        .force("charge", d3.forceManyBody().strength(-300))
+                        .force("center", d3.forceCenter(parseInt(ecommerceSvg.attr("width")) / 2, 280))
+                        .force("collision", d3.forceCollide().radius(50));
+                    simulation.on("tick", ticked);
+                }
+
+                // 绘制节点
+                const node = nodeGroup.append("g")
+                    .datum(newNode)
+                    .attr("class", "node")
+                    .style("opacity", 0);
+
+                node.append("circle")
+                    .attr("r", 35)
+                    .attr("fill", entity.color)
+                    .attr("opacity", 0.6)
+                    .attr("stroke", entity.color)
+                    .attr("stroke-width", 2);
+
+                node.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", -5)
+                    .attr("fill", "white")
+                    .attr("font-size", "10px")
+                    .attr("font-weight", "bold")
+                    .text(entity.name.substring(0, 10));
+
+                node.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", 15)
+                    .attr("fill", "white")
+                    .attr("font-size", "9px")
+                    .attr("opacity", 0.8)
+                    .text(entity.type);
+
+                node.transition()
+                    .duration(500)
+                    .style("opacity", 1);
+
+                // 添加相关的关系
+                const relatedRelationships = relationshipTypes.filter(
+                    r => r.from === entity.name || r.to === entity.name
+                );
+
+                relatedRelationships.forEach(rel => {
+                    const sourceNode = ecommerceNodes.find(n => n.name === rel.from);
+                    const targetNode = ecommerceNodes.find(n => n.name === rel.to);
+
+                    if (sourceNode && targetNode) {
+                        const existingLink = ecommerceLinks.find(
+                            l => l.source === sourceNode && l.target === targetNode
+                        );
+
+                        if (!existingLink) {
+                            const newLink = { source: sourceNode, target: targetNode, relation: rel.relation };
+                            ecommerceLinks.push(newLink);
+
+                            const line = linkGroup.insert("line", ":first-child")
+                                .datum(newLink)
+                                .attr("stroke", "#22c55e")
+                                .attr("stroke-width", 2)
+                                .attr("opacity", 0);
+
+                            line.transition()
+                                .duration(500)
+                                .attr("opacity", 1);
+
+                            // 关系标签
+                            const midX = (sourceNode.x + targetNode.x) / 2;
+                            const midY = (sourceNode.y + targetNode.y) / 2;
+
+                            linkGroup.append("text")
+                                .datum({ source: sourceNode, target: targetNode })
+                                .attr("fill", "#22c55e")
+                                .attr("font-size", "10px")
+                                .attr("font-weight", "bold")
+                                .attr("text-anchor", "middle")
+                                .style("opacity", 0)
+                                .text(rel.relation)
+                                .transition()
+                                .duration(500)
+                                .style("opacity", 1);
+                        }
+                    }
+                });
+
+                // 只在simulation存在时才重启
+                if (simulation) {
+                    simulation.nodes(ecommerceNodes);
+                    simulation.force("link").links(ecommerceLinks);
+                    simulation.alpha(1).restart();
+                }
+
+                statsDiv.innerHTML = `添加实体 ${step + 1}/${entityTypes.length}:<br>` +
+                    `<span class="text-blue-400">${entity.name}</span> (${entity.type})`;
+
+                step++;
+                setTimeout(addNextStep, 1500);
+            }
+
+            setTimeout(addNextStep, 500);
+        }
+
+        function resetEcommerceAnimation() {
+            // 只清空数据,不删除SVG元素
+            ecommerceNodes = [];
+            ecommerceLinks = [];
+
+            // 清空SVG中除标题外的所有内容
+            if (ecommerceSvg) {
+                ecommerceSvg.selectAll("*").filter(function() {
+                    return this.tagName !== "text";
+                }).remove();
+            }
+
+            document.getElementById("ecommerce-stats").innerHTML =
+                '点击"播放构建"开始演示电商知识图谱的建模过程';
+        }
+
+        function addEntity() {
+            const colors = ["#3b82f6", "#8b5cf6", "#22c55e", "#f59e0b", "#ec4899", "#06b6d4"];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            const types = ["user", "product", "category", "brand", "order", "review"];
+            const randomType = types[Math.floor(Math.random() * types.length)];
+            const randomId = Math.floor(Math.random() * 1000);
+
+            const newEntity = {
+                name: `${randomType}:${randomId}`,
+                type: randomType,
+                color: randomColor,
+                x: Math.random() * parseInt(ecommerceSvg.attr("width")),
+                y: Math.random() * 500
+            };
+
+            ecommerceNodes.push(newEntity);
+
+            const nodeGroup = ecommerceSvg.select("g:nth-child(2)");
+
+            const node = nodeGroup.append("g")
+                .datum(newEntity)
+                .attr("class", "node")
+                .style("opacity", 0);
+
+            node.append("circle")
+                .attr("r", 35)
+                .attr("fill", randomColor)
+                .attr("opacity", 0.6)
+                .attr("stroke", randomColor)
+                .attr("stroke-width", 2);
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", -5)
+                .attr("fill", "white")
+                .attr("font-size", "10px")
+                .attr("font-weight", "bold")
+                .text(newEntity.name.substring(0, 10));
+
+            node.append("text")
+                .attr("text-anchor", "middle")
+                .attr("dy", 15)
+                .attr("fill", "white")
+                .attr("font-size", "9px")
+                .attr("opacity", 0.8)
+                .text(randomType);
+
+            node.transition()
+                .duration(500)
+                .style("opacity", 1);
+
+            document.getElementById("ecommerce-stats").innerHTML =
+                `添加了新实体: <span class="text-blue-400">${newEntity.name}</span><br>` +
+                `当前实体数: ${ecommerceNodes.length}`;
+        }
+
+        // ============================================================
+        // 初始化
+        // ============================================================
+        document.addEventListener("DOMContentLoaded", function() {
+            initERAnimation();
+            initEcommerceAnimation();
+        });
+    </script>
+</body>
+</html>

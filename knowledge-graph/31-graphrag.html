@@ -1,0 +1,2517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块31: GraphRAG - 图增强检索生成 | 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subsection-title {
+            font-size: 1.8em;
+            margin: 30px 0 20px 0;
+            color: #60a5fa;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .warning-box {
+            background: rgba(239, 68, 68, 0.1);
+            border-left: 4px solid #ef4444;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .animation-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            line-height: 1.6;
+            color: #e2e8f0;
+        }
+
+        .code-block .keyword { color: #c792ea; }
+        .code-block .string { color: #c3e88d; }
+        .code-block .comment { color: #676e95; }
+        .code-block .function { color: #82aaff; }
+        .code-block .number { color: #f78c6c; }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .comparison-table th {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+            font-weight: 600;
+        }
+
+        .comparison-table tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2em;
+            }
+            .glass-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <a href="30-kg-visualization.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一模块
+                </a>
+                <a href="32-kg-applications.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 31 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 31: GraphRAG - 图增强检索生成
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">结合知识图谱与大语言模型，实现可解释的智能检索生成系统</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">进阶级别</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~90 分钟</span>
+                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">5 个交互动画</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: 传统RAG的局限性 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. 传统RAG的局限性</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是RAG?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>RAG (Retrieval-Augmented Generation)</strong> 是一种结合检索和生成的技术，通过从外部知识库中检索相关信息来增强大语言模型的生成能力。
+                </p>
+                <p class="text-gray-400">
+                    传统RAG主要依赖<strong>向量检索</strong>，将文档转换为向量嵌入，通过语义相似度找到相关内容。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    动画: 传统RAG vs GraphRAG对比
+                </div>
+                <div id="rag-comparison-animation" class="animation-canvas" style="min-height: 500px;"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playRAGComparison()">▶ 播放对比</button>
+                    <button class="btn btn-secondary" onclick="showTraditionalRAG()">查看传统RAG</button>
+                    <button class="btn btn-secondary" onclick="showGraphRAG()">查看GraphRAG</button>
+                </div>
+                <div id="rag-comparison-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">当前展示:</div>
+                    <div id="rag-description" class="text-gray-300">
+                        点击"播放对比"查看传统RAG和GraphRAG的区别
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">传统RAG的核心问题</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-red-500">
+                        <div class="font-bold text-red-400 mb-2">1. 语义理解不足</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 向量嵌入只能捕捉表面语义</li>
+                            <li>• 难以理解复杂关系</li>
+                            <li>• 无法处理多跳推理</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-orange-500">
+                        <div class="font-bold text-orange-400 mb-2">2. 关系缺失</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 文档被切碎成chunks</li>
+                            <li>• 实体间关系断裂</li>
+                            <li>• 结构化信息丢失</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-yellow-500">
+                        <div class="font-bold text-yellow-400 mb-2">3. 推理能力弱</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 只能做单次检索</li>
+                            <li>• 难以进行链式推理</li>
+                            <li>• 无法整合多源信息</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-pink-500">
+                        <div class="font-bold text-pink-400 mb-2">4. 可解释性差</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 无法展示推理路径</li>
+                            <li>• 难以追溯信息来源</li>
+                            <li>• 黑盒生成过程</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="warning-box mt-6">
+                <h3 class="text-xl font-bold text-red-300 mb-3">实际案例: 传统RAG的失败</h3>
+                <div class="bg-black/30 p-4 rounded-lg">
+                    <p class="text-gray-300 mb-3">
+                        <strong>问题:</strong> "埃隆·马斯克的公司之间的关系是什么?"
+                    </p>
+                    <p class="text-gray-400 text-sm mb-3">
+                        <strong>传统RAG检索结果:</strong>
+                    </p>
+                    <ul class="text-gray-400 text-sm space-y-1 ml-4">
+                        <li>• Chunk 1: "埃隆·马斯克是特斯拉的CEO"</li>
+                        <li>• Chunk 2: "SpaceX是一家航天公司"</li>
+                        <li>• Chunk 3: "马斯克还创立了The Boring Company"</li>
+                    </ul>
+                    <p class="text-red-400 text-sm mt-3">
+                        ❌ <strong>问题:</strong> 三个chunk是独立的，无法建立"特斯拉→马斯克→SpaceX"的关系链，无法回答公司间关系
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: GraphRAG架构 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. Microsoft GraphRAG 2024架构</h2>
+
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是Microsoft GraphRAG?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>Microsoft GraphRAG</strong> (2024) 是一种基于知识图谱的RAG方法,通过<strong>社区检测</strong>和<strong>层次化摘要</strong>
+                    实现全局上下文理解和高效的检索增强生成。
+                </p>
+                <p class="text-gray-400 mb-3">
+                    与传统RAG不同,GraphRAG在<strong>索引期</strong>构建层次化的社区摘要,在<strong>查询期</strong>支持全局和本地两种检索模式。
+                </p>
+            </div>
+
+            <!-- 核心概念深化 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">🔑 核心概念: 为什么需要GraphRAG?</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-blue-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">传统RAG的根本问题</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            <strong>索引期vs查询期</strong>: 传统RAG只在查询期检索,无法建立全局上下文
+                        </p>
+                        <p class="text-gray-400 text-sm">
+                            ❌ 文档切碎,关系断裂<br>
+                            ❌ 向量检索只看表面语义<br>
+                            ❌ 无法回答跨文档全局问题
+                        </p>
+                    </div>
+                    <div class="bg-green-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">GraphRAG的创新</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            <strong>索引期构建社区摘要</strong>: 预先计算层次结构和摘要
+                        </p>
+                        <p class="text-gray-400 text-sm">
+                            ✅ 社区检测发现实体群组<br>
+                            ✅ 层次化摘要提供全局视角<br>
+                            ✅ 支持全局和本地两种查询
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Leiden算法深入 -->
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-purple-300 mb-3">Leiden社区检测算法</h3>
+                <p class="text-gray-300 mb-3">
+                    <strong>Leiden算法</strong>是GraphRAG的核心,用于发现图中的社区结构。
+                </p>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <span class="text-blue-400 text-xl">1️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">什么是社区?</div>
+                            <p class="text-gray-400 text-sm">
+                                社区是图中<strong>内部连接紧密,外部连接稀疏</strong>的节点群组。
+                                例如: 在论文引用图中,"深度学习研究组"形成一个社区。
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 text-xl">2️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">Leiden算法特点</div>
+                            <p class="text-gray-400 text-sm">
+                                • 高质量社区划分<br>
+                                • 保证连通性<br>
+                                • 支持层次化结构<br>
+                                • 快速收敛
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-purple-400 text-xl">3️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">为什么需要层次结构?</div>
+                            <p class="text-gray-400 text-sm">
+                                例如: 研究员 → 研究组 → 实验室 → 机构 → 国家
+                                层次结构支持<strong>多粒度检索</strong>:可以查询单个研究员或整个领域
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 全局vs本地查询深入 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-cyan-300 mb-3">全局查询 vs 本地查询 vs 混合查询</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-white/20">
+                                <th class="p-3 text-left text-gray-400">维度</th>
+                                <th class="p-3 text-left text-blue-400">全局查询(Global Search)</th>
+                                <th class="p-3 text-left text-green-400">本地查询(Local Search)</th>
+                                <th class="p-3 text-left text-purple-400">混合查询(Hybrid)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold">检索范围</td>
+                                <td class="p-3">所有社区摘要</td>
+                                <td class="p-3">特定实体邻居</td>
+                                <td class="p-3">结合全局和本地</td>
+                            </tr>
+                            <tr class="border-b border-white/10 bg-white/5">
+                                <td class="p-3 font-bold">适用场景</td>
+                                <td class="p-3">整体主题、趋势分析</td>
+                                <td class="p-3">具体实体、细节查询</td>
+                                <td class="p-3">复杂问题,分步回答</td>
+                            </tr>
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold">优势</td>
+                                <td class="p-3">全局视角,跨文档</td>
+                                <td class="p-3">精确聚焦,高效</td>
+                                <td class="p-3">兼顾广度和深度</td>
+                            </tr>
+                            <tr class="bg-white/5">
+                                <td class="p-3 font-bold">例子</td>
+                                <td class="p-3">"这个领域的主要主题?"</td>
+                                <td class="p-3">"Alice具体做了什么?"</td>
+                                <td class="p-3">"Alice的工作如何影响整个团队?"</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="concept-card">
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    动画: GraphRAG架构流程
+                </div>
+                <div id="graphrag-architecture-animation" class="animation-canvas" style="min-height: 600px;"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playArchitectureAnimation()">▶ 播放架构流程</button>
+                    <button class="btn btn-secondary" onclick="resetArchitectureAnimation()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="showNextLayer()">→ 下一层</button>
+                </div>
+                <div id="architecture-info" class="info-panel">
+                    <div class="text-green-400 font-bold mb-2">当前步骤:</div>
+                    <div id="architecture-description" class="text-gray-300">
+                        点击"播放架构流程"查看GraphRAG的完整架构
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">GraphRAG的三层架构</h3>
+                <div class="space-y-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-2xl">📊</span>
+                            <div>
+                                <div class="text-lg font-bold text-blue-400">第1层: 知识图谱层</div>
+                                <div class="text-sm text-gray-400">Knowledge Graph Layer</div>
+                            </div>
+                        </div>
+                        <ul class="text-gray-300 text-sm space-y-1 ml-9">
+                            <li>• <strong>实体抽取</strong>: NER识别人名、地名、组织等</li>
+                            <li>• <strong>关系抽取</strong>: RE识别实体间关系</li>
+                            <li>• <strong>图存储</strong>: Neo4j、NebulaGraph等图数据库</li>
+                            <li>• <strong>示例</strong>: (埃隆·马斯克) -[CEO_of]-> (特斯拉)</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-2xl">🔍</span>
+                            <div>
+                                <div class="text-lg font-bold text-purple-400">第2层: 检索层</div>
+                                <div class="text-sm text-gray-400">Retrieval Layer</div>
+                            </div>
+                        </div>
+                        <ul class="text-gray-300 text-sm space-y-1 ml-9">
+                            <li>• <strong>向量检索</strong>: 语义相似度匹配</li>
+                            <li>• <strong>图遍历</strong>: 多跳关系查询</li>
+                            <li>• <strong>混合检索</strong>: 结合向量和图结构</li>
+                            <li>• <strong>示例</strong>: 找到与"马斯克"相关的所有公司节点</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="text-2xl">🤖</span>
+                            <div>
+                                <div class="text-lg font-bold text-green-400">第3层: LLM生成层</div>
+                                <div class="text-sm text-gray-400">LLM Generation Layer</div>
+                            </div>
+                        </div>
+                        <ul class="text-gray-300 text-sm space-y-1 ml-9">
+                            <li>• <strong>上下文构建</strong>: 整合检索结果和关系路径</li>
+                            <li>• <strong>Prompt工程</strong>: 设计结构化提示词</li>
+                            <li>• <strong>答案生成</strong>: LLM生成最终回答</li>
+                            <li>• <strong>可解释性</strong>: 展示推理路径和来源</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 3: 实现方案 -->
+        <div class="glass-card">
+            <h2 class="section-title">3. GraphRAG实现方案</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">技术栈选择</h3>
+                <div class="grid md:grid-cols-3 gap-4 text-center">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-3xl mb-2">🦜</div>
+                        <div class="font-bold text-blue-400">LangChain</div>
+                        <div class="text-sm text-gray-400">框架层</div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-3xl mb-2">🗄️</div>
+                        <div class="font-bold text-green-400">Neo4j</div>
+                        <div class="text-sm text-gray-400">图数据库</div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-3xl mb-2">🤗</div>
+                        <div class="font-bold text-purple-400">LLM API</div>
+                        <div class="text-sm text-gray-400">生成模型</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                    </svg>
+                    动画: 文档到图谱的构建流程
+                </div>
+                <div id="pipeline-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playPipelineAnimation()">▶ 播放流程</button>
+                    <button class="btn btn-secondary" onclick="resetPipelineAnimation()">↺ 重置</button>
+                </div>
+                <div id="pipeline-info" class="info-panel">
+                    <div class="text-purple-400 font-bold mb-2">流程说明:</div>
+                    <div id="pipeline-description" class="text-gray-300">
+                        点击"播放流程"查看如何从文档构建知识图谱
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-block">
+                <div class="text-blue-400 font-bold mb-3">示例 1: 使用LangChain + Neo4j构建GraphRAG</div>
+                <pre><span class="comment"># 安装依赖</span>
+<span class="comment"># pip install langchain langchain-openai neo4j</span>
+
+<span class="keyword">from</span> langchain.graphs <span class="keyword">import</span> Neo4jGraph
+<span class="keyword">from</span> langchain.chains <span class="keyword">import</span> GraphRAGChain
+<span class="keyword">from</span> langchain_openai <span class="keyword">import</span> ChatOpenAI, OpenAIEmbeddings
+<span class="keyword">from</span> langchain_community.graphs <span class="keyword">import</span> Neo4jGraph
+
+<span class="comment"># 1. 连接Neo4j图数据库</span>
+graph = Neo4jGraph(
+    url=<span class="string">"bolt://localhost:7687"</span>,
+    username=<span class="string">"neo4j"</span>,
+    password=<span class="string">"password"</span>
+)
+
+<span class="comment"># 2. 初始化LLM和嵌入模型</span>
+llm = ChatOpenAI(temperature=<span class="number">0</span>, model=<span class="string">"gpt-4"</span>)
+embeddings = OpenAIEmbeddings()
+
+<span class="comment"># 3. 创建GraphRAG链</span>
+<span class="keyword">from</span> langchain.chains <span class="keyword">import</span> GraphRAGChain
+
+rag_chain = GraphRAGChain(
+    llm=llm,
+    graph=graph,
+    embeddings=embeddings,
+    verbose=<span class="keyword">True</span>
+)
+
+<span class="comment"># 4. 添加文档到图谱</span>
+documents = [
+    <span class="string">"埃隆·马斯克是特斯拉的CEO，创立于2003年"</span>,
+    <span class="string">"马斯克还创立了SpaceX，一家航天公司"</span>,
+    <span class="string">"特斯拉和SpaceX在技术上有合作关系"</span>
+]
+
+<span class="comment"># 使用LLM抽取实体和关系</span>
+<span class="keyword">from</span> langchain_experimental.graph_transformers <span class="keyword">import</span> LLMGraphTransformer
+
+graph_transformer = LLMGraphTransformer(llm=llm)
+graph_documents = graph_transformer.convert_to_graph_documents(documents)
+
+<span class="comment"># 将图文档添加到Neo4j</span>
+graph.add_graph_documents(graph_documents)
+
+<span class="comment"># 5. 查询</span>
+question = <span class="string">"埃隆·马斯克的公司之间有什么关系?"</span>
+answer = rag_chain.run(question)
+
+<span class="function">print</span>(<span class="string">f"问题: {question}"</span>)
+<span class="function">print</span>(<span class="string">f"答案: {answer}"</span>)
+<span class="function">print</span>(<span class="string">f"推理路径: {rag_chain.get_reasoning_path()}"</span>)</pre>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">关键实现步骤</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">1️⃣</span>
+                        <div>
+                            <div class="font-bold text-blue-400">文档预处理</div>
+                            <div class="text-sm text-gray-400">分词、句子分割、实体识别(NER)</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">2️⃣</span>
+                        <div>
+                            <div class="font-bold text-green-400">实体关系抽取</div>
+                            <div class="text-sm text-gray-400">使用LLM抽取(主语, 谓语, 宾语)三元组</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">3️⃣</span>
+                        <div>
+                            <div class="font-bold text-purple-400">图谱构建</div>
+                            <div class="text-sm text-gray-400">将三元组存入Neo4j，创建节点和边</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">4️⃣</span>
+                        <div>
+                            <div class="font-bold text-yellow-400">向量化</div>
+                            <div class="text-sm text-gray-400">为实体和文档生成向量嵌入</div>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-2xl">5️⃣</span>
+                        <div>
+                            <div class="font-bold text-pink-400">检索与生成</div>
+                            <div class="text-sm text-gray-400">混合检索 + LLM生成答案</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-block">
+                <div class="text-blue-400 font-bold mb-3">示例 2: 手动构建图谱查询</div>
+                <pre><span class="comment"># 使用Cypher查询语言直接操作图谱</span>
+
+<span class="comment"># 查询埃隆·马斯克相关的所有公司</span>
+cypher_query = <span class="string">"""
+MATCH (p:Person {name: '埃隆·马斯克'})-[:CEO_of|FOUNDER_OF]->(c:Company)
+RETURN p.name AS person, c.name AS company, c.industry AS industry
+"""</span>
+
+result = graph.query(cypher_query)
+<span class="function">print</span>(<span class="string">f"找到 {len(result)} 家公司"</span>)
+
+<span class="comment"># 多跳查询: 找到公司之间的合作关系</span>
+cypher_query2 = <span class="string">"""
+MATCH (c1:Company)-[:COOPERATES_WITH]->(c2:Company)
+WHERE (c1)<-[:CEO_of|FOUNDER_OF]-(:Person {name: '埃隆·马斯克'})
+RETURN c1.name, c2.name, c2.industry
+"""</span>
+
+result2 = graph.query(cypher_query2)</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="text-blue-400 font-bold mb-3">示例 3: 自定义GraphRAG检索器</div>
+                <pre><span class="keyword">from</span> typing <span class="keyword">import</span> List, Dict, Any
+<span class="keyword">from</span> langchain.schema <span class="keyword">import</span> Document
+
+<span class="keyword">class</span> <span class="function">GraphRAGRetriever</span>:
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, graph: Neo4jGraph, llm: ChatOpenAI):
+        self.graph = graph
+        self.llm = llm
+
+    <span class="keyword">def</span> <span class="function">retrieve</span>(self, query: str, k: int = <span class="number">5</span>) -> List[Document]:
+        <span class="string">"""
+        混合检索: 向量检索 + 图遍历
+        """</span>
+
+        <span class="comment"># Step 1: 实体识别</span>
+        entities = self._extract_entities(query)
+
+        <span class="comment"># Step 2: 图谱检索 (找到相关节点)</span>
+        graph_contexts = []
+        <span class="keyword">for</span> entity <span class="keyword">in</span> entities:
+            cypher = <span class="string">f"""
+            MATCH (n {{name: '{entity}'}})-[r]-(m)
+            RETURN n.name, type(r), m.name, r.description
+            LIMIT {k}
+            """</span>
+            result = self.graph.query(cypher)
+            graph_contexts.extend(result)
+
+        <span class="comment"># Step 3: 向量检索 (语义相似度)</span>
+        <span class="comment"># 这里使用向量数据库查找相似文档</span>
+        vector_results = self._vector_search(query, k=k)
+
+        <span class="comment"># Step 4: 合并结果</span>
+        combined_contexts = {
+            <span class="string">"graph"</span>: graph_contexts,
+            <span class="string">"vector"</span>: vector_results
+        }
+
+        <span class="keyword">return</span> self._format_contexts(combined_contexts)
+
+    <span class="keyword">def</span> <span class="function">_extract_entities</span>(self, query: str) -> List[str]:
+        <span class="string">"""使用LLM从查询中抽取实体"""</span>
+        prompt = <span class="string">f"""从以下查询中提取实体(人名、公司名、地名等):
+        查询: {query}
+
+        只返回实体列表，用逗号分隔。
+        """</span>
+        response = self.llm.predict(prompt)
+        <span class="keyword">return</span> [e.strip() <span class="keyword">for</span> e <span class="keyword">in</span> response.split(<span class="string">","</span>)]
+
+    <span class="keyword">def</span> <span class="function">_vector_search</span>(self, query: str, k: int) -> List[Document]:
+        <span class="string">"""向量检索"""</span>
+        <span class="comment"># 使用向量数据库(如Pinecone、Weaviate)</span>
+        <span class="keyword">pass</span>
+
+    <span class="keyword">def</span> <span class="function">_format_contexts</span>(self, contexts: Dict) -> List[Document]:
+        <span class="string">"""格式化为LangChain Document对象"""</span>
+        docs = []
+        <span class="keyword">for</span> ctx <span class="keyword">in</span> contexts[<span class="string">"graph"</span>]:
+            doc = Document(
+                page_content=f"{ctx['n.name']} - {ctx['type(r)']} - {ctx['m.name']}",
+                metadata={<span class="string">"source"</span>: <span class="string">"knowledge_graph"</span>}
+            )
+            docs.append(doc)
+        <span class="keyword">return</span> docs
+
+<span class="comment"># 使用自定义检索器</span>
+retriever = GraphRAGRetriever(graph=graph, llm=llm)
+contexts = retriever.retrieve(<span class="string">"马斯克的公司之间有什么关系?"</span>)</pre>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 检索策略 -->
+        <div class="glass-card">
+            <h2 class="section-title">4. GraphRAG检索策略</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">三种核心检索策略</h3>
+                <p class="text-gray-300 leading-relaxed">
+                    GraphRAG支持多种检索策略，根据问题类型选择最合适的方法。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    动画: 检索策略对比
+                </div>
+                <div id="strategy-animation" class="animation-canvas" style="min-height: 500px;"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playStrategyAnimation()">▶ 播放策略对比</button>
+                    <button class="btn btn-secondary" onclick="showGlobalStrategy()">全局检索</button>
+                    <button class="btn btn-secondary" onclick="showLocalStrategy()">局部检索</button>
+                    <button class="btn btn-secondary" onclick="showHybridStrategy()">混合检索</button>
+                </div>
+                <div id="strategy-info" class="info-panel">
+                    <div class="text-purple-400 font-bold mb-2">当前策略:</div>
+                    <div id="strategy-description" class="text-gray-300">
+                        点击按钮查看不同检索策略的工作原理
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">策略对比表</h3>
+                <div class="overflow-x-auto">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>策略</th>
+                                <th>原理</th>
+                                <th>适用场景</th>
+                                <th>优点</th>
+                                <th>缺点</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr>
+                                <td class="font-bold text-blue-400">全局检索<br><span class="text-xs">Global Retrieval</span></td>
+                                <td>对整个图谱进行社区检测，提取全局关键实体和关系</td>
+                                <td>总结性问题、全局理解</td>
+                                <td>捕捉宏观结构、避免遗漏关键信息</td>
+                                <td>计算成本高、可能过度概括</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-green-400">局部检索<br><span class="text-xs">Local Retrieval</span></td>
+                                <td>从查询实体出发，进行多跳图遍历</td>
+                                <td>具体关系、路径查询</td>
+                                <td>快速、精确定位、可解释性强</td>
+                                <td>可能错过远处相关信息</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-purple-400">混合检索<br><span class="text-xs">Hybrid Retrieval</span></td>
+                                <td>结合向量检索 + 图遍历 + 全局摘要</td>
+                                <td>复杂问题、多层级查询</td>
+                                <td>平衡精度和召回率、适应性强</td>
+                                <td>实现复杂、需要调参</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="code-block">
+                <div class="text-blue-400 font-bold mb-3">示例 4: 实现局部检索 (多跳查询)</div>
+                <pre><span class="keyword">from</span> typing <span class="keyword">import</span> List, Tuple
+
+<span class="keyword">class</span> <span class="function">LocalRetriever</span>:
+    <span class="keyword">def</span> <span class="function">__init__</span>(self, graph: Neo4jGraph, max_hops: int = <span class="number">3</span>):
+        self.graph = graph
+        self.max_hops = max_hops
+
+    <span class="keyword">def</span> <span class="function">multi_hop_retrieve</span>(
+        self,
+        start_entity: str,
+        relation_types: List[str] = <span class="keyword">None</span>
+    ) -> List[Dict]:
+        <span class="string">"""
+        多跳检索: 从起始节点出发，遍历指定深度的邻居
+        """</span>
+
+        <span class="comment"># 构建Cypher查询</span>
+        hop_pattern = <span class="string">""</span>
+        <span class="keyword">for</span> i <span class="keyword">in</span> range(self.max_hops):
+            hop_pattern += <span class="string">"-[r"</span> + str(i+<span class="number">1</span>) + <span class="string">"]-(n"</span> + str(i+<span class="number">1</span>) + <span class="string">")"</span>
+
+        <span class="keyword">if</span> relation_types:
+            rel_filter = <span class="string">"|"</span>.join(relation_types)
+            query = <span class="string">f"""
+            MATCH p = (start {{name: '{start_entity}'}}){hop_pattern}
+            WHERE ALL(r IN relationships(p) WHERE type(r) IN ['{rel_filter}'])
+            RETURN p,
+                   [node IN nodes(p) | node.name] AS node_names,
+                   [rel IN relationships(p) | type(rel)] AS rel_types
+            """</span>
+        <span class="keyword">else</span>:
+            query = <span class="string">f"""
+            MATCH p = (start {{name: '{start_entity}'}}){hop_pattern}
+            RETURN p,
+                   [node IN nodes(p) | node.name] AS node_names,
+                   [rel IN relationships(p) | type(rel)] AS rel_types
+            """</span>
+
+        result = self.graph.query(query)
+        <span class="keyword">return</span> self._format_paths(result)
+
+    <span class="keyword">def</span> <span class="function">_format_paths</span>(self, paths: List) -> List[Dict]:
+        <span class="string">"""格式化路径为可读格式"""</span>
+        formatted = []
+        <span class="keyword">for</span> path <span class="keyword">in</span> paths:
+            formatted.append({
+                <span class="string">"path"</span>: <span class="string">" -> "</span>.join(path[<span class="string">'node_names'</span>]),
+                <span class="string">"relations"</span>: path[<span class="string">'rel_types'</span>],
+                <span class="string">"hops"</span>: len(path[<span class="string">'rel_types'</span>])
+            })
+        <span class="keyword">return</span> formatted
+
+<span class="comment"># 使用局部检索器</span>
+local_retriever = LocalRetriever(graph, max_hops=<span class="number">2</span>)
+
+<span class="comment"># 查询: 马斯克 -> CEO_of -> 公司 -> COOPERATES_WITH -> ?</span>
+paths = local_retriever.multi_hop_retrieve(
+    start_entity=<span class="string">"埃隆·马斯克"</span>,
+    relation_types=[<span class="string">"CEO_of"</span>, <span class="string">"FOUNDER_OF"</span>, <span class="string">"COOPERATES_WITH"</span>]
+)
+
+<span class="keyword">for</span> path <span class="keyword">in</span> paths:
+    <span class="function">print</span>(<span class="string">f"路径: {path['path']}"</span>)
+    <span class="function">print</span>(<span class="string">f"关系: {path['relations']}"</span>)
+    <span class="function">print</span>(<span class="string">f"跳数: {path['hops']}"</span>)
+    <span class="function">print</span>(<span class="string">"---"</span>)</pre>
+            </div>
+
+            <div class="code-block">
+                <div class="text-blue-400 font-bold mb-3">示例 5: 实现混合检索</div>
+                <pre><span class="keyword">from</span> sklearn.metrics.pairwise <span class="keyword">import</span> cosine_similarity
+<span class="keyword">import</span> numpy <span class="keyword">as</span> np
+
+<span class="keyword">class</span> <span class="function">HybridRetriever</span>:
+    <span class="keyword">def</span> <span class="function">__init__(
+        self,
+        graph: Neo4jGraph,
+        vector_store,
+        graph_weight: float = <span class="number">0.5</span>
+    </span>:
+        self.graph = graph
+        self.vector_store = vector_store
+        self.graph_weight = graph_weight  <span class="comment"># 图检索权重</span>
+        self.vector_weight = <span class="number">1.0</span> - graph_weight  <span class="comment"># 向量检索权重</span>
+
+    <span class="keyword">def</span> <span class="function">retrieve</span>(
+        self,
+        query: str,
+        query_vector: np.ndarray,
+        top_k: int = <span class="number">10</span>
+    ) -> List[Document]:
+        <span class="string">"""
+        混合检索: 结合向量相似度 + 图结构相关性
+        """</span>
+
+        <span class="comment"># Step 1: 向量检索</span>
+        vector_results = self.vector_store.similarity_search_by_vector(
+            query_vector,
+            k=top_k * <span class="number">2</span>  <span class="comment"># 获取更多候选</span>
+        )
+
+        <span class="comment"># Step 2: 图谱检索</span>
+        entities = self._extract_entities(query)
+        graph_results = []
+        <span class="keyword">for</span> entity <span class="keyword">in</span> entities:
+            cypher = <span class="string">f"""
+            MATCH (n {{name: '{entity}'}})-[r]-(m)
+            RETURN n.name, type(r), m.name, m.description
+            """</span>
+            result = self.graph.query(cypher)
+            graph_results.extend(result)
+
+        <span class="comment"># Step 3: 融合打分</span>
+        scored_results = self._rerank(
+            vector_results,
+            graph_results,
+            query_vector
+        )
+
+        <span class="comment"># Step 4: 返回top-k</span>
+        <span class="keyword">return</span> scored_results[:top_k]
+
+    <span class="keyword">def</span> <span class="function">_rerank</span>(
+        self,
+        vector_results: List,
+        graph_results: List,
+        query_vector: np.ndarray
+    ) -> List:
+        <span class="string">"""重新排序: 结合向量相似度和图相关性"""</span>
+
+        scores = []
+        <span class="keyword">for</span> doc <span class="keyword">in</span> vector_results:
+            <span class="comment"># 向量相似度分数</span>
+            vec_score = cosine_similarity(
+                query_vector.reshape(<span class="number">1</span>, -<span class="number">1</span>),
+                doc.embedding.reshape(<span class="number">1</span>, -<span class="number">1</span>)
+            )[<span class="number">0</span>][<span class="number">0</span>]
+
+            <span class="comment"># 图相关性分数</span>
+            graph_score = self._calculate_graph_relevance(
+                doc, graph_results
+            )
+
+            <span class="comment"># 加权融合</span>
+            final_score = (
+                self.vector_weight * vec_score +
+                self.graph_weight * graph_score
+            )
+
+            scores.append({
+                <span class="string">'doc'</span>: doc,
+                <span class="string">'score'</span>: final_score,
+                <span class="string">'vec_score'</span>: vec_score,
+                <span class="string">'graph_score'</span>: graph_score
+            })
+
+        <span class="comment"># 按最终分数排序</span>
+        scores.sort(key=<span class="keyword">lambda</span> x: x[<span class="string">'score'</span>], reverse=<span class="keyword">True</span>)
+        <span class="keyword">return</span> [s[<span class="string">'doc'</span>] <span class="keyword">for</span> s <span class="keyword">in</span> scores]
+
+    <span class="keyword">def</span> <span class="function">_calculate_graph_relevance</span>(
+        self,
+        doc,
+        graph_results: List
+    ) -> float:
+        <span class="string">"""计算文档与图谱结果的相关性"""</span>
+        <span class="comment"># 简化版: 如果文档包含图谱中的实体，加分</span>
+        score = <span class="number">0.0</span>
+        <span class="keyword">for</span> result <span class="keyword">in</span> graph_results:
+            <span class="keyword">if</span> result[<span class="string">'n.name'</span>] <span class="keyword">in</span> doc.page_content:
+                score += <span class="number">0.3</span>
+            <span class="keyword">if</span> result[<span class="string">'m.name'</span>] <span class="keyword">in</span> doc.page_content:
+                score += <span class="number">0.3</span>
+        <span class="keyword">return</span> min(score, <span class="number">1.0</span>)</pre>
+            </div>
+        </div>
+
+        <!-- Chapter 5: 实际应用案例 -->
+        <div class="glass-card">
+            <h2 class="section-title">5. 实际应用案例</h2>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">案例1: 企业知识库问答系统</h3>
+                <div class="bg-black/30 p-4 rounded-lg mb-4">
+                    <div class="font-bold text-blue-400 mb-2">场景描述</div>
+                    <p class="text-gray-300 text-sm">
+                        某大型企业有数千份文档(PDF、Word、Wiki)，员工需要快速找到相关信息并理解复杂关系。
+                    </p>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-red-400 mb-2">❌ 传统RAG的问题</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 无法理解项目间依赖关系</li>
+                            <li>• 难以回答"谁负责XX项目"的跨文档问题</li>
+                            <li>• 检索结果碎片化，需要人工整合</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">✅ GraphRAG的解决方案</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 构建项目-人员-技术知识图谱</li>
+                            <li>• 支持多跳查询: 项目 -> 负责人 -> 相关项目</li>
+                            <li>• 提供完整的推理路径和来源</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                    <div class="font-bold text-blue-400 mb-2">实际效果</div>
+                    <ul class="text-gray-300 text-sm space-y-1">
+                        <li>• 检索准确率提升 <span class="text-green-400 font-bold">35%</span></li>
+                        <li>• 复杂问题回答率提升 <span class="text-green-400 font-bold">50%</span></li>
+                        <li>• 员工满意度提升 <span class="text-green-400 font-bold">40%</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">案例2: 金融风控系统</h3>
+                <div class="bg-black/30 p-4 rounded-lg mb-4">
+                    <div class="font-bold text-blue-400 mb-2">场景描述</div>
+                    <p class="text-gray-300 text-sm">
+                        银行需要识别潜在的风险网络，如关联企业、担保圈、资金流向等。
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <div class="font-bold text-purple-400 mb-2">典型查询</div>
+                    <div class="bg-black/30 p-3 rounded-lg font-mono text-sm text-gray-300">
+                        "公司A和公司B之间有什么隐式关联?是否存在风险传导路径?"
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-red-400 mb-2">❌ 传统方法</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 只能查询单一企业的直接关系</li>
+                            <li>• 难以发现2-3层以上的隐性关联</li>
+                            <li>• 依赖专家经验，易漏报</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">✅ GraphRAG方案</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 图谱遍历发现多跳关联路径</li>
+                            <li>• 识别共同股东、担保链条</li>
+                            <li>• LLM生成风险分析报告</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="mt-4 p-4 bg-green-500/10 rounded-lg border border-green-500/30">
+                    <div class="font-bold text-green-400 mb-2">技术实现</div>
+                    <ul class="text-gray-300 text-sm space-y-1">
+                        <li>• <strong>图谱层</strong>: 企业-股东-担保-交易关系图谱</li>
+                        <li>• <strong>算法</strong>: PageRank识别关键节点，Louvain发现社区</li>
+                        <li>• <strong>LLM</strong>: 生成风险解释和建议</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">案例3: 医疗诊断辅助</h3>
+                <div class="bg-black/30 p-4 rounded-lg mb-4">
+                    <div class="font-bold text-blue-400 mb-2">场景描述</div>
+                    <p class="text-gray-300 text-sm">
+                        医生需要基于患者症状、病史、医学知识进行诊断推理。
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <div class="font-bold text-purple-400 mb-2">典型查询</div>
+                    <div class="bg-black/30 p-3 rounded-lg font-mono text-sm text-gray-300">
+                        "患者有症状A和B，服用药物C，可能的疾病是什么?需要注意什么?"
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-yellow-400 mb-2">🏥 知识图谱构建</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 疾病 - 症状关系</li>
+                            <li>• 药物 - 疾病治疗关系</li>
+                            <li>• 药物 - 药物相互作用</li>
+                            <li>• 疾病 - 并发症关系</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">✅ GraphRAG优势</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 多跳推理: 症状 -> 疾病 -> 药物 -> 副作用</li>
+                            <li>• 解释性强: 展示推理路径</li>
+                            <li>• 减少误诊: 整合多源知识</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">案例4: 法律案例分析</h3>
+                <div class="bg-black/30 p-4 rounded-lg mb-4">
+                    <div class="font-bold text-blue-400 mb-2">场景描述</div>
+                    <p class="text-gray-300 text-sm">
+                        律师需要查找类似案例、法条引用关系、判决趋势等。
+                    </p>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">📊 图谱结构</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 案例节点</li>
+                            <li>• 法条节点</li>
+                            <li>• 引用关系</li>
+                            <li>• 当事人关系</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">🎯 查询能力</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 找到引用某法条的所有案例</li>
+                            <li>• 发现案例间的引用链</li>
+                            <li>• 分析判决趋势变化</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">📈 效果</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 案例检索速度提升10倍</li>
+                            <li>• 相关案例召回率提升40%</li>
+                            <li>• 自动生成案情分析报告</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">案例5: 智能客服系统</h3>
+                <div class="bg-black/30 p-4 rounded-lg mb-4">
+                    <div class="font-bold text-blue-400 mb-2">场景描述</div>
+                    <p class="text-gray-300 text-sm">
+                        电商平台的智能客服需要理解产品关系、用户购买历史、售后政策等。
+                    </p>
+                </div>
+
+                <div class="mb-4">
+                    <div class="font-bold text-purple-400 mb-2">典型查询</div>
+                    <div class="bg-black/30 p-3 rounded-lg font-mono text-sm text-gray-300">
+                        "我买了手机X，现在想买耳机，有什么推荐?它们之间有什么优惠?"
+                    </div>
+                </div>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-pink-400 mb-2">🛒 知识图谱</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 产品 - 类别关系</li>
+                            <li>• 产品 - 配件关系</li>
+                            <li>• 产品 - 评价关系</li>
+                            <li>• 用户 - 购买历史</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">✅ GraphRAG能力</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 推荐相关配件</li>
+                            <li>• 解释产品兼容性</li>
+                            <li>• 整合优惠政策</li>
+                            <li>• 提供购买建议</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="glass-card">
+            <h2 class="section-title">模块总结</h2>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-400 mb-3">核心要点</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>🔴 <strong>传统RAG局限</strong>: 语义理解不足、关系缺失、推理能力弱</li>
+                        <li>🟢 <strong>GraphRAG优势</strong>: 结构化知识、多跳推理、可解释性强</li>
+                        <li>🏗️ <strong>三层架构</strong>: 知识图谱层 + 检索层 + LLM生成层</li>
+                        <li>🔍 <strong>检索策略</strong>: 全局、局部、混合三种策略</li>
+                        <li>⚙️ <strong>技术栈</strong>: LangChain + Neo4j + LLM API</li>
+                    </ul>
+                </div>
+
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-400 mb-3">实践建议</h3>
+                    <ul class="text-gray-300 space-y-2 text-sm">
+                        <li>✅ <strong>从小做起</strong>: 先在特定领域验证效果</li>
+                        <li>✅ <strong>数据质量</strong>: 图谱质量决定RAG效果</li>
+                        <li>✅ <strong>混合策略</strong>: 结合向量和图检索</li>
+                        <li>✅ <strong>可解释性</strong>: 展示推理路径增强信任</li>
+                        <li>✅ <strong>持续优化</strong>: 根据用户反馈调整策略</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-purple-400 mb-3">学习资源</h3>
+                <ul class="text-gray-300 space-y-2 text-sm">
+                    <li>📚 <strong>论文</strong>: "GraphRAG: Unlocking LLM Discovery" (Microsoft Research)</li>
+                    <li>📚 <strong>框架</strong>: LangChain GraphRAG, LlamaIndex Property Graph Index</li>
+                    <li>📚 <strong>工具</strong>: Neo4j, NebulaGraph, TigerGraph</li>
+                    <li>📚 <strong>社区</strong>: GraphRAG GitHub, Neo4j Discord</li>
+                </ul>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-yellow-400 mb-3">下一步学习</h3>
+                <p class="text-gray-300 mb-3">
+                    完成本模块后，建议继续学习:
+                </p>
+                <div class="space-y-2">
+                    <a href="32-advanced-topics.html" class="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-2">
+                        模块 32: 前沿话题与未来趋势 - 多模态知识图谱、神经符号AI
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 31: GraphRAG - 图增强检索生成</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 动画 1: 传统RAG vs GraphRAG对比
+        // ============================================================
+        let comparisonSvg;
+        let comparisonMode = 'both';
+
+        function initRAGComparisonAnimation() {
+            const container = document.getElementById("rag-comparison-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 500;
+
+            comparisonSvg = d3.select("#rag-comparison-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // 添加箭头定义
+            comparisonSvg.append("defs").append("marker")
+                .attr("id", "arrow")
+                .attr("viewBox", "0 0 10 10")
+                .attr("refX", 8)
+                .attr("refY", 5)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                .attr("fill", "#6b7280");
+
+            // 标题
+            comparisonSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("传统RAG vs GraphRAG");
+        }
+
+        function showTraditionalRAG() {
+            comparisonMode = 'traditional';
+            drawComparison();
+            document.getElementById("rag-description").innerHTML = `
+                <div class="text-red-400 font-bold mb-2">传统RAG:</div>
+                <ul class="text-sm space-y-1">
+                    <li>• 文档 → 切片 → 向量化</li>
+                    <li>• 向量相似度检索</li>
+                    <li>• LLM生成答案</li>
+                    <li>❌ 关系断裂，难以推理</li>
+                </ul>
+            `;
+        }
+
+        function showGraphRAG() {
+            comparisonMode = 'graph';
+            drawComparison();
+            document.getElementById("rag-description").innerHTML = `
+                <div class="text-green-400 font-bold mb-2">GraphRAG:</div>
+                <ul class="text-sm space-y-1">
+                    <li>• 文档 → 实体关系抽取 → 知识图谱</li>
+                    <li>• 图遍历 + 向量检索</li>
+                    <li>• LLM生成答案 + 推理路径</li>
+                    <li>✅ 结构化知识，可解释性强</li>
+                </ul>
+            `;
+        }
+
+        function playRAGComparison() {
+            comparisonMode = 'both';
+            drawComparison();
+            document.getElementById("rag-description").innerHTML = `
+                <div class="text-purple-400 font-bold mb-2">对比演示:</div>
+                <p class="text-sm">左侧为传统RAG，右侧为GraphRAG。注意观察数据流和推理能力的差异。</p>
+            `;
+        }
+
+        function drawComparison() {
+            if (!comparisonSvg) return;
+
+            comparisonSvg.selectAll("*").remove();
+            const width = comparisonSvg.attr("width");
+            const height = 500;
+
+            // 重新添加箭头定义
+            comparisonSvg.append("defs").append("marker")
+                .attr("id", "arrow")
+                .attr("viewBox", "0 0 10 10")
+                .attr("refX", 8)
+                .attr("refY", 5)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                .attr("fill", "#6b7280");
+
+            // 标题
+            comparisonSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("传统RAG vs GraphRAG");
+
+            if (comparisonMode === 'both' || comparisonMode === 'traditional') {
+                drawTraditionalRAG(comparisonSvg, width * 0.25, 80, comparisonMode === 'both');
+            }
+
+            if (comparisonMode === 'both' || comparisonMode === 'graph') {
+                drawGraphRAG(comparisonSvg, comparisonMode === 'both' ? width * 0.75 : width * 0.5, 80, comparisonMode === 'graph');
+            }
+        }
+
+        function drawTraditionalRAG(svg, centerX, startY, isComparison) {
+            const yOffset = isComparison ? 0 : 20;
+
+            // 标题
+            svg.append("text")
+                .attr("x", centerX)
+                .attr("y", startY + yOffset)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#ef4444")
+                .attr("font-size", "16px")
+                .attr("font-weight", "bold")
+                .text("传统RAG");
+
+            const boxes = [
+                { label: "文档", y: startY + 40 + yOffset, color: "#3b82f6" },
+                { label: "切片", y: startY + 120 + yOffset, color: "#8b5cf6" },
+                { label: "向量化", y: startY + 200 + yOffset, color: "#a855f7" },
+                { label: "向量检索", y: startY + 280 + yOffset, color: "#f59e0b" },
+                { label: "LLM生成", y: startY + 360 + yOffset, color: "#22c55e" }
+            ];
+
+            boxes.forEach((box, i) => {
+                // 箭头
+                if (i > 0) {
+                    svg.append("line")
+                        .attr("x1", centerX)
+                        .attr("y1", boxes[i - 1].y + 25)
+                        .attr("x2", centerX)
+                        .attr("y2", box.y - 25)
+                        .attr("stroke", "#6b7280")
+                        .attr("stroke-width", 2)
+                        .attr("marker-end", "url(#arrow)");
+                }
+
+                // 方框
+                svg.append("rect")
+                    .attr("x", centerX - 70)
+                    .attr("y", box.y - 25)
+                    .attr("width", 140)
+                    .attr("height", 50)
+                    .attr("rx", 8)
+                    .attr("fill", box.color)
+                    .attr("opacity", 0.3)
+                    .attr("stroke", box.color)
+                    .attr("stroke-width", 2);
+
+                // 文字
+                svg.append("text")
+                    .attr("x", centerX)
+                    .attr("y", box.y + 5)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "white")
+                    .attr("font-size", "14px")
+                    .attr("font-weight", "bold")
+                    .text(box.label);
+            });
+
+            // 问题标注
+            svg.append("text")
+                .attr("x", centerX)
+                .attr("y", startY + 440 + yOffset)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#ef4444")
+                .attr("font-size", "12px")
+                .text("❌ 关系断裂，难以推理");
+        }
+
+        function drawGraphRAG(svg, centerX, startY, isFullWidth) {
+            const yOffset = isFullWidth ? 0 : 20;
+
+            // 标题
+            svg.append("text")
+                .attr("x", centerX)
+                .attr("y", startY + yOffset)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#22c55e")
+                .attr("font-size", "16px")
+                .attr("font-weight", "bold")
+                .text("GraphRAG");
+
+            const boxes = [
+                { label: "文档", y: startY + 40 + yOffset, color: "#3b82f6" },
+                { label: "实体抽取", y: startY + 120 + yOffset, color: "#8b5cf6" },
+                { label: "关系抽取", y: startY + 200 + yOffset, color: "#a855f7" },
+                { label: "知识图谱", y: startY + 260 + yOffset, color: "#ec4899", width: 160 },
+                { label: "图检索+向量", y: startY + 340 + yOffset, color: "#f59e0b" },
+                { label: "LLM生成", y: startY + 400 + yOffset, color: "#22c55e" }
+            ];
+
+            boxes.forEach((box, i) => {
+                const boxWidth = box.width || 140;
+
+                // 箭头
+                if (i > 0) {
+                    svg.append("line")
+                        .attr("x1", centerX)
+                        .attr("y1", boxes[i - 1].y + 25)
+                        .attr("x2", centerX)
+                        .attr("y2", box.y - 25)
+                        .attr("stroke", "#6b7280")
+                        .attr("stroke-width", 2)
+                        .attr("marker-end", "url(#arrow)");
+                }
+
+                // 方框
+                svg.append("rect")
+                    .attr("x", centerX - boxWidth / 2)
+                    .attr("y", box.y - 25)
+                    .attr("width", boxWidth)
+                    .attr("height", 50)
+                    .attr("rx", 8)
+                    .attr("fill", box.color)
+                    .attr("opacity", 0.3)
+                    .attr("stroke", box.color)
+                    .attr("stroke-width", 2);
+
+                // 文字
+                svg.append("text")
+                    .attr("x", centerX)
+                    .attr("y", box.y + 5)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "white")
+                    .attr("font-size", "14px")
+                    .attr("font-weight", "bold")
+                    .text(box.label);
+            });
+
+            // 优势标注
+            svg.append("text")
+                .attr("x", centerX)
+                .attr("y", startY + 460 + yOffset)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#22c55e")
+                .attr("font-size", "12px")
+                .text("✅ 结构化知识 + 可解释推理路径");
+
+            // 绘制小的图谱示意图
+            const graphCenterX = centerX - 80;
+            const graphCenterY = startY + 260 + yOffset;
+
+            svg.append("circle")
+                .attr("cx", graphCenterX)
+                .attr("cy", graphCenterY)
+                .attr("r", 15)
+                .attr("fill", "#3b82f6")
+                .attr("opacity", 0.6);
+
+            svg.append("circle")
+                .attr("cx", graphCenterX + 30)
+                .attr("cy", graphCenterY - 15)
+                .attr("r", 12)
+                .attr("fill", "#22c55e")
+                .attr("opacity", 0.6);
+
+            svg.append("circle")
+                .attr("cx", graphCenterX + 30)
+                .attr("cy", graphCenterY + 15)
+                .attr("r", 12)
+                .attr("fill", "#f59e0b")
+                .attr("opacity", 0.6);
+
+            // 连接线
+            svg.append("line")
+                .attr("x1", graphCenterX)
+                .attr("y1", graphCenterY)
+                .attr("x2", graphCenterX + 30)
+                .attr("y2", graphCenterY - 15)
+                .attr("stroke", "#22c55e")
+                .attr("stroke-width", 2);
+
+            svg.append("line")
+                .attr("x1", graphCenterX)
+                .attr("y1", graphCenterY)
+                .attr("x2", graphCenterX + 30)
+                .attr("y2", graphCenterY + 15)
+                .attr("stroke", "#f59e0b")
+                .attr("stroke-width", 2);
+        }
+
+        // ============================================================
+        // 动画 2: GraphRAG架构流程
+        // ============================================================
+        let architectureSvg;
+        let currentLayer = 0;
+        const layers = [
+            {
+                name: "知识图谱层",
+                color: "#3b82f6",
+                description: "实体抽取 → 关系抽取 → 图存储",
+                items: ["文档", "NER", "RE", "Neo4j"]
+            },
+            {
+                name: "检索层",
+                color: "#a855f7",
+                description: "向量检索 + 图遍历 + 混合检索",
+                items: ["向量DB", "图遍历", "混合策略"]
+            },
+            {
+                name: "LLM生成层",
+                color: "#22c55e",
+                description: "上下文构建 → Prompt工程 → 答案生成",
+                items: ["上下文", "Prompt", "LLM", "答案"]
+            }
+        ];
+
+        function initArchitectureAnimation() {
+            const container = document.getElementById("graphrag-architecture-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 600;
+
+            architectureSvg = d3.select("#graphrag-architecture-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // 标题
+            architectureSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 40)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("GraphRAG三层架构");
+        }
+
+        function playArchitectureAnimation() {
+            currentLayer = 0;
+            layers.forEach((layer, index) => {
+                setTimeout(() => {
+                    showLayer(index);
+                }, index * 2000);
+            });
+        }
+
+        function showNextLayer() {
+            currentLayer = (currentLayer + 1) % (layers.length + 1);
+            if (currentLayer === layers.length) {
+                resetArchitectureAnimation();
+            } else {
+                showLayer(currentLayer);
+            }
+        }
+
+        function showLayer(index) {
+            currentLayer = index;
+            const layer = layers[index];
+            const width = architectureSvg.attr("width");
+            const height = 600;
+            const baseY = 100;
+            const layerHeight = 140;
+
+            // 清除当前层
+            architectureSvg.selectAll(`.layer-${index}`).remove();
+
+            const g = architectureSvg.append("g").attr("class", `layer-${index}`);
+
+            // 层背景
+            g.append("rect")
+                .attr("x", 50)
+                .attr("y", baseY + index * layerHeight)
+                .attr("width", width - 100)
+                .attr("height", layerHeight - 10)
+                .attr("rx", 10)
+                .attr("fill", layer.color)
+                .attr("opacity", 0.1)
+                .attr("stroke", layer.color)
+                .attr("stroke-width", 2)
+                .style("opacity", 0)
+                .transition()
+                .duration(500)
+                .style("opacity", 1);
+
+            // 层标题
+            g.append("text")
+                .attr("x", 70)
+                .attr("y", baseY + index * layerHeight + 30)
+                .attr("fill", layer.color)
+                .attr("font-size", "16px")
+                .attr("font-weight", "bold")
+                .text(layer.name)
+                .style("opacity", 0)
+                .transition()
+                .delay(200)
+                .duration(500)
+                .style("opacity", 1);
+
+            // 层描述
+            g.append("text")
+                .attr("x", 70)
+                .attr("y", baseY + index * layerHeight + 55)
+                .attr("fill", "#9ca3af")
+                .attr("font-size", "12px")
+                .text(layer.description)
+                .style("opacity", 0)
+                .transition()
+                .delay(400)
+                .duration(500)
+                .style("opacity", 1);
+
+            // 组件
+            const componentWidth = (width - 200) / layer.items.length;
+            layer.items.forEach((item, i) => {
+                const x = 70 + i * componentWidth + 20;
+                const y = baseY + index * layerHeight + 85;
+
+                g.append("rect")
+                    .attr("x", x)
+                    .attr("y", y)
+                    .attr("width", componentWidth - 40)
+                    .attr("height", 35)
+                    .attr("rx", 5)
+                    .attr("fill", layer.color)
+                    .attr("opacity", 0.3)
+                    .attr("stroke", layer.color)
+                    .attr("stroke-width", 1)
+                    .style("opacity", 0)
+                    .transition()
+                    .delay(600 + i * 150)
+                    .duration(500)
+                    .style("opacity", 1);
+
+                g.append("text")
+                    .attr("x", x + (componentWidth - 40) / 2)
+                    .attr("y", y + 22)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "white")
+                    .attr("font-size", "12px")
+                    .text(item)
+                    .style("opacity", 0)
+                    .transition()
+                    .delay(700 + i * 150)
+                    .duration(500)
+                    .style("opacity", 1);
+            });
+
+            // 更新说明
+            document.getElementById("architecture-description").innerHTML = `
+                <div class="font-bold text-${index === 0 ? 'blue' : index === 1 ? 'purple' : 'green'}-400 mb-2">${layer.name}</div>
+                <div class="text-sm">${layer.description}</div>
+                <div class="text-sm text-gray-400 mt-2">组件: ${layer.items.join(" → ")}</div>
+            `;
+        }
+
+        function resetArchitectureAnimation() {
+            if (architectureSvg) {
+                architectureSvg.selectAll("*").remove();
+                initArchitectureAnimation();
+            }
+            currentLayer = 0;
+            document.getElementById("architecture-description").innerHTML = '点击"播放架构流程"查看GraphRAG的完整架构';
+        }
+
+        // ============================================================
+        // 动画 3: 文档到图谱构建流程
+        // ============================================================
+        let pipelineSvg;
+        let pipelineStep = 0;
+
+        const pipelineSteps = [
+            {
+                name: "原始文档",
+                description: "输入: 多个文本文档",
+                color: "#3b82f6"
+            },
+            {
+                name: "文本处理",
+                description: "分词、句子分割、词性标注",
+                color: "#8b5cf6"
+            },
+            {
+                name: "实体识别 (NER)",
+                description: "识别人名、地名、组织等",
+                color: "#a855f7"
+            },
+            {
+                name: "关系抽取 (RE)",
+                description: "识别实体间关系",
+                color: "#ec4899"
+            },
+            {
+                name: "三元组生成",
+                description: "(实体, 关系, 实体)",
+                color: "#f59e0b"
+            },
+            {
+                name: "知识图谱",
+                description: "存入Neo4j图数据库",
+                color: "#22c55e"
+            }
+        ];
+
+        function initPipelineAnimation() {
+            const container = document.getElementById("pipeline-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            pipelineSvg = d3.select("#pipeline-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            pipelineSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#a855f7")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("文档 → 知识图谱构建流程");
+        }
+
+        function playPipelineAnimation() {
+            pipelineStep = 0;
+            pipelineSteps.forEach((step, index) => {
+                setTimeout(() => {
+                    showPipelineStep(index);
+                }, index * 1500);
+            });
+        }
+
+        function showPipelineStep(index) {
+            pipelineStep = index;
+            const step = pipelineSteps[index];
+            const width = pipelineSvg.attr("width");
+            const height = 400;
+            const stepWidth = (width - 100) / pipelineSteps.length;
+            const x = 50 + index * stepWidth;
+            const y = 150;
+
+            const g = pipelineSvg.append("g")
+                .attr("class", `pipeline-step-${index}`)
+                .style("opacity", 0);
+
+            // 箭头(除了第一步)
+            if (index > 0) {
+                g.append("line")
+                    .attr("x1", x - stepWidth / 2)
+                    .attr("y1", y + 25)
+                    .attr("x2", x - 10)
+                    .attr("y2", y + 25)
+                    .attr("stroke", "#6b7280")
+                    .attr("stroke-width", 2)
+                    .attr("marker-end", "url(#arrow)")
+                    .style("opacity", 0)
+                    .transition()
+                    .duration(500)
+                    .style("opacity", 1);
+            }
+
+            // 方框
+            g.append("rect")
+                .attr("x", x)
+                .attr("y", y)
+                .attr("width", stepWidth - 20)
+                .attr("height", 50)
+                .attr("rx", 8)
+                .attr("fill", step.color)
+                .attr("opacity", 0.3)
+                .attr("stroke", step.color)
+                .attr("stroke-width", 2);
+
+            // 文字
+            g.append("text")
+                .attr("x", x + (stepWidth - 20) / 2)
+                .attr("y", y + 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "white")
+                .attr("font-size", "13px")
+                .attr("font-weight", "bold")
+                .text(step.name);
+
+            // 显示动画
+            g.transition()
+                .duration(500)
+                .style("opacity", 1);
+
+            // 如果是最后一步，绘制知识图谱
+            if (index === pipelineSteps.length - 1) {
+                setTimeout(() => {
+                    drawMiniGraph(pipelineSvg, width / 2, 300);
+                }, 800);
+            }
+
+            // 更新说明
+            document.getElementById("pipeline-description").innerHTML = `
+                <div class="font-bold" style="color: ${step.color}">${index + 1}. ${step.name}</div>
+                <div class="text-sm text-gray-400 mt-1">${step.description}</div>
+            `;
+        }
+
+        function drawMiniGraph(svg, centerX, centerY) {
+            const nodes = [
+                { x: centerX - 40, y: centerY, color: "#3b82f6", label: "人" },
+                { x: centerX + 40, y: centerY, color: "#22c55e", label: "组织" },
+                { x: centerX, y: centerY + 40, color: "#f59e0b", label: "地点" }
+            ];
+
+            nodes.forEach(node => {
+                svg.append("circle")
+                    .attr("cx", node.x)
+                    .attr("cy", node.y)
+                    .attr("r", 15)
+                    .attr("fill", node.color)
+                    .attr("opacity", 0)
+                    .transition()
+                    .duration(500)
+                    .attr("opacity", 0.6);
+
+                svg.append("text")
+                    .attr("x", node.x)
+                    .attr("y", node.y + 4)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "white")
+                    .attr("font-size", "10px")
+                    .text(node.label)
+                    .style("opacity", 0)
+                    .transition()
+                    .delay(300)
+                    .duration(500)
+                    .style("opacity", 1);
+            });
+
+            // 连接线
+            svg.append("line")
+                .attr("x1", centerX - 40)
+                .attr("y1", centerY)
+                .attr("x2", centerX + 40)
+                .attr("y2", centerY)
+                .attr("stroke", "#22c55e")
+                .attr("stroke-width", 2)
+                .style("opacity", 0)
+                .transition()
+                .delay(500)
+                .duration(500)
+                .style("opacity", 1);
+        }
+
+        function resetPipelineAnimation() {
+            if (pipelineSvg) {
+                pipelineSvg.selectAll("*").remove();
+                initPipelineAnimation();
+            }
+            pipelineStep = 0;
+            document.getElementById("pipeline-description").innerHTML = '点击"播放流程"查看如何从文档构建知识图谱';
+        }
+
+        // ============================================================
+        // 动画 4: 检索策略对比
+        // ============================================================
+        let strategySvg;
+        let currentStrategy = 'none';
+
+        function initStrategyAnimation() {
+            const container = document.getElementById("strategy-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 500;
+
+            strategySvg = d3.select("#strategy-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            strategySvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("GraphRAG检索策略对比");
+        }
+
+        function playStrategyAnimation() {
+            showGlobalStrategy();
+            setTimeout(() => showLocalStrategy(), 3000);
+            setTimeout(() => showHybridStrategy(), 6000);
+        }
+
+        function showGlobalStrategy() {
+            currentStrategy = 'global';
+            drawStrategy('global');
+            document.getElementById("strategy-description").innerHTML = `
+                <div class="text-blue-400 font-bold mb-2">全局检索 (Global Retrieval)</div>
+                <ul class="text-sm space-y-1">
+                    <li>• 对整个图谱进行社区检测</li>
+                    <li>• 提取全局关键实体和关系</li>
+                    <li>• 适用于: 总结性问题、全局理解</li>
+                    <li>• 优点: 捕捉宏观结构</li>
+                    <li>• 缺点: 计算成本高</li>
+                </ul>
+            `;
+        }
+
+        function showLocalStrategy() {
+            currentStrategy = 'local';
+            drawStrategy('local');
+            document.getElementById("strategy-description").innerHTML = `
+                <div class="text-green-400 font-bold mb-2">局部检索 (Local Retrieval)</div>
+                <ul class="text-sm space-y-1">
+                    <li>• 从查询实体出发，多跳图遍历</li>
+                    <li>• 沿着关系边查找相关节点</li>
+                    <li>• 适用于: 具体关系、路径查询</li>
+                    <li>• 优点: 快速、精确、可解释</li>
+                    <li>• 缺点: 可能错过远处信息</li>
+                </ul>
+            `;
+        }
+
+        function showHybridStrategy() {
+            currentStrategy = 'hybrid';
+            drawStrategy('hybrid');
+            document.getElementById("strategy-description").innerHTML = `
+                <div class="text-purple-400 font-bold mb-2">混合检索 (Hybrid Retrieval)</div>
+                <ul class="text-sm space-y-1">
+                    <li>• 结合向量检索 + 图遍历 + 全局摘要</li>
+                    <li>• 平衡精度和召回率</li>
+                    <li>• 适用于: 复杂问题、多层级查询</li>
+                    <li>• 优点: 适应性强、效果最好</li>
+                    <li>• 缺点: 实现复杂、需要调参</li>
+                </ul>
+            `;
+        }
+
+        function drawStrategy(strategy) {
+            if (!strategySvg) return;
+
+            strategySvg.selectAll("*").remove();
+            const width = strategySvg.attr("width");
+            const height = 500;
+            const centerX = width / 2;
+            const centerY = 280;
+
+            // 标题
+            strategySvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("GraphRAG检索策略对比");
+
+            // 添加箭头定义
+            strategySvg.append("defs").append("marker")
+                .attr("id", "arrow")
+                .attr("viewBox", "0 0 10 10")
+                .attr("refX", 8)
+                .attr("refY", 5)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                .attr("fill", "#6b7280");
+
+            if (strategy === 'global') {
+                drawGlobalStrategy(strategySvg, centerX, centerY);
+            } else if (strategy === 'local') {
+                drawLocalStrategy(strategySvg, centerX, centerY);
+            } else if (strategy === 'hybrid') {
+                drawHybridStrategy(strategySvg, centerX, centerY);
+            }
+        }
+
+        function drawGlobalStrategy(svg, centerX, centerY) {
+            // 绘制多个社区
+            const communities = [
+                { x: centerX - 100, y: centerY, color: "#3b82f6", label: "社区1" },
+                { x: centerX + 100, y: centerY, color: "#22c55e", label: "社区2" },
+                { x: centerX, y: centerY + 100, color: "#f59e0b", label: "社区3" }
+            ];
+
+            communities.forEach((comm, i) => {
+                svg.append("circle")
+                    .attr("cx", comm.x)
+                    .attr("cy", comm.y)
+                    .attr("r", 60)
+                    .attr("fill", comm.color)
+                    .attr("opacity", 0)
+                    .transition()
+                    .delay(i * 200)
+                    .duration(500)
+                    .attr("opacity", 0.2);
+
+                svg.append("text")
+                    .attr("x", comm.x)
+                    .attr("y", comm.y)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", comm.color)
+                    .attr("font-size", "14px")
+                    .attr("font-weight", "bold")
+                    .text(comm.label)
+                    .style("opacity", 0)
+                    .transition()
+                    .delay(i * 200 + 300)
+                    .duration(500)
+                    .style("opacity", 1);
+            });
+
+            // 全局摘要
+            svg.append("rect")
+                .attr("x", centerX - 70)
+                .attr("y", centerY - 140)
+                .attr("width", 140)
+                .attr("height", 50)
+                .attr("rx", 8)
+                .attr("fill", "#3b82f6")
+                .attr("opacity", 0)
+                .transition()
+                .delay(800)
+                .duration(500)
+                .attr("opacity", 0.3);
+
+            svg.append("text")
+                .attr("x", centerX)
+                .attr("y", centerY - 110)
+                .attr("text-anchor", "middle")
+                .attr("fill", "white")
+                .attr("font-size", "12px")
+                .text("全局摘要")
+                .style("opacity", 0)
+                .transition()
+                .delay(1000)
+                .duration(500)
+                .style("opacity", 1);
+
+            // 箭头
+            svg.selectAll("line")
+                .data([[0, -100], [1, -100], [2, -100]])
+                .enter()
+                .append("line")
+                .attr("x1", (d, i) => communities[i].x)
+                .attr("y1", (d, i) => communities[i].y - 60)
+                .attr("x2", centerX)
+                .attr("y2", centerY - 90)
+                .attr("stroke", "#6b7280")
+                .attr("stroke-width", 2)
+                .attr("marker-end", "url(#arrow)")
+                .style("opacity", 0)
+                .transition()
+                .delay(1200)
+                .duration(500)
+                .style("opacity", 1);
+        }
+
+        function drawLocalStrategy(svg, centerX, centerY) {
+            // 起始节点
+            svg.append("circle")
+                .attr("cx", centerX)
+                .attr("cy", centerY)
+                .attr("r", 40)
+                .attr("fill", "#3b82f6")
+                .attr("opacity", 0)
+                .transition()
+                .duration(500)
+                .attr("opacity", 0.6);
+
+            svg.append("text")
+                .attr("x", centerX)
+                .attr("y", centerY + 5)
+                .attr("text-anchor", "middle")
+                .attr("fill", "white")
+                .attr("font-size", "12px")
+                .attr("font-weight", "bold")
+                .text("查询节点")
+                .style("opacity", 0)
+                .transition()
+                .delay(300)
+                .duration(500)
+                .style("opacity", 1);
+
+            // 1跳邻居
+            const hop1 = [
+                { x: centerX - 80, y: centerY - 50, color: "#22c55e" },
+                { x: centerX + 80, y: centerY - 50, color: "#22c55e" },
+                { x: centerX, y: centerY + 80, color: "#22c55e" }
+            ];
+
+            hop1.forEach((node, i) => {
+                svg.append("line")
+                    .attr("x1", centerX)
+                    .attr("y1", centerY)
+                    .attr("x2", node.x)
+                    .attr("y2", node.y)
+                    .attr("stroke", "#22c55e")
+                    .attr("stroke-width", 2)
+                    .style("opacity", 0)
+                    .transition()
+                    .delay(600 + i * 200)
+                    .duration(500)
+                    .style("opacity", 1);
+
+                svg.append("circle")
+                    .attr("cx", node.x)
+                    .attr("cy", node.y)
+                    .attr("r", 25)
+                    .attr("fill", node.color)
+                    .attr("opacity", 0)
+                    .transition()
+                    .delay(800 + i * 200)
+                    .duration(500)
+                    .attr("opacity", 0.6);
+
+                svg.append("text")
+                    .attr("x", node.x)
+                    .attr("y", node.y + 4)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "white")
+                    .attr("font-size", "10px")
+                    .text(`1跳-${i + 1}`)
+                    .style("opacity", 0)
+                    .transition()
+                    .delay(1000 + i * 200)
+                    .duration(500)
+                    .style("opacity", 1);
+            });
+
+            // 2跳邻居
+            setTimeout(() => {
+                const hop2 = [
+                    { x: centerX - 120, y: centerY - 100, color: "#f59e0b" },
+                    { x: centerX + 120, y: centerY - 100, color: "#f59e0b" }
+                ];
+
+                hop2.forEach((node, i) => {
+                    svg.append("line")
+                        .attr("x1", hop1[i].x)
+                        .attr("y1", hop1[i].y)
+                        .attr("x2", node.x)
+                        .attr("y2", node.y)
+                        .attr("stroke", "#f59e0b")
+                        .attr("stroke-width", 2)
+                        .attr("stroke-dasharray", "5,5")
+                        .style("opacity", 0)
+                        .transition()
+                        .duration(500)
+                        .style("opacity", 1);
+
+                    svg.append("circle")
+                        .attr("cx", node.x)
+                        .attr("cy", node.y)
+                        .attr("r", 20)
+                        .attr("fill", node.color)
+                        .attr("opacity", 0)
+                        .transition()
+                        .delay(200)
+                        .duration(500)
+                        .attr("opacity", 0.6);
+
+                    svg.append("text")
+                        .attr("x", node.x)
+                        .attr("y", node.y + 4)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "white")
+                        .attr("font-size", "10px")
+                        .text(`2跳`)
+                        .style("opacity", 0)
+                        .transition()
+                        .delay(400)
+                        .duration(500)
+                        .style("opacity", 1);
+                });
+            }, 2000);
+
+            // 说明
+            svg.append("text")
+                .attr("x", centerX)
+                .attr("y", centerY + 140)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#22c55e")
+                .attr("font-size", "14px")
+                .text("多跳遍历: 沿关系边查找")
+                .style("opacity", 0)
+                .transition()
+                .delay(2500)
+                .duration(500)
+                .style("opacity", 1);
+        }
+
+        function drawHybridStrategy(svg, centerX, centerY) {
+            // 向量检索部分
+            svg.append("rect")
+                .attr("x", centerX - 150)
+                .attr("y", centerY - 120)
+                .attr("width", 120)
+                .attr("height", 80)
+                .attr("rx", 8)
+                .attr("fill", "#3b82f6")
+                .attr("opacity", 0)
+                .transition()
+                .duration(500)
+                .attr("opacity", 0.3);
+
+            svg.append("text")
+                .attr("x", centerX - 90)
+                .attr("y", centerY - 75)
+                .attr("text-anchor", "middle")
+                .attr("fill", "white")
+                .attr("font-size", "12px")
+                .attr("font-weight", "bold")
+                .text("向量检索")
+                .style("opacity", 0)
+                .transition()
+                .delay(200)
+                .duration(500)
+                .style("opacity", 1);
+
+            // 图遍历部分
+            svg.append("rect")
+                .attr("x", centerX + 30)
+                .attr("y", centerY - 120)
+                .attr("width", 120)
+                .attr("height", 80)
+                .attr("rx", 8)
+                .attr("fill", "#22c55e")
+                .attr("opacity", 0)
+                .transition()
+                .delay(400)
+                .duration(500)
+                .attr("opacity", 0.3);
+
+            svg.append("text")
+                .attr("x", centerX + 90)
+                .attr("y", centerY - 75)
+                .attr("text-anchor", "middle")
+                .attr("fill", "white")
+                .attr("font-size", "12px")
+                .attr("font-weight", "bold")
+                .text("图遍历")
+                .style("opacity", 0)
+                .transition()
+                .delay(600)
+                .duration(500)
+                .style("opacity", 1);
+
+            // 融合
+            svg.append("rect")
+                .attr("x", centerX - 70)
+                .attr("y", centerY + 20)
+                .attr("width", 140)
+                .attr("height", 60)
+                .attr("rx", 8)
+                .attr("fill", "#a855f7")
+                .attr("opacity", 0)
+                .transition()
+                .delay(800)
+                .duration(500)
+                .attr("opacity", 0.3);
+
+            svg.append("text")
+                .attr("x", centerX)
+                .attr("y", centerY + 55)
+                .attr("text-anchor", "middle")
+                .attr("fill", "white")
+                .attr("font-size", "12px")
+                .attr("font-weight", "bold")
+                .text("混合融合")
+                .style("opacity", 0)
+                .transition()
+                .delay(1000)
+                .duration(500)
+                .style("opacity", 1);
+
+            // 箭头
+            svg.append("line")
+                .attr("x1", centerX - 90)
+                .attr("y1", centerY - 40)
+                .attr("x2", centerX - 50)
+                .attr("y2", centerY + 20)
+                .attr("stroke", "#6b7280")
+                .attr("stroke-width", 2)
+                .attr("marker-end", "url(#arrow)")
+                .style("opacity", 0)
+                .transition()
+                .delay(1200)
+                .duration(500)
+                .style("opacity", 1);
+
+            svg.append("line")
+                .attr("x1", centerX + 90)
+                .attr("y1", centerY - 40)
+                .attr("x2", centerX + 50)
+                .attr("y2", centerY + 20)
+                .attr("stroke", "#6b7280")
+                .attr("stroke-width", 2)
+                .attr("marker-end", "url(#arrow)")
+                .style("opacity", 0)
+                .transition()
+                .delay(1400)
+                .duration(500)
+                .style("opacity", 1);
+
+            // 权重说明
+            svg.append("text")
+                .attr("x", centerX - 90)
+                .attr("y", centerY - 55)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#9ca3af")
+                .attr("font-size", "10px")
+                .text("权重: 0.4")
+                .style("opacity", 0)
+                .transition()
+                .delay(1600)
+                .duration(500)
+                .style("opacity", 1);
+
+            svg.append("text")
+                .attr("x", centerX + 90)
+                .attr("y", centerY - 55)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#9ca3af")
+                .attr("font-size", "10px")
+                .text("权重: 0.6")
+                .style("opacity", 0)
+                .transition()
+                .delay(1800)
+                .duration(500)
+                .style("opacity", 1);
+        }
+
+        // ============================================================
+        // 初始化
+        // ============================================================
+        document.addEventListener("DOMContentLoaded", function() {
+            initRAGComparisonAnimation();
+            initArchitectureAnimation();
+            initPipelineAnimation();
+            initStrategyAnimation();
+
+            // 默认显示对比
+            setTimeout(() => {
+                playRAGComparison();
+            }, 500);
+        });
+    </script>
+</body>
+</html>

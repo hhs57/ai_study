@@ -1,0 +1,2108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块32: 知识图谱应用与最佳实践 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subsection-title {
+            font-size: 1.8em;
+            margin: 30px 0 20px 0;
+            color: #60a5fa;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .animation-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .case-card {
+            background: rgba(0, 0, 0, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            transition: all 0.3s ease;
+        }
+
+        .case-card:hover {
+            border-color: rgba(59, 130, 246, 0.5);
+            transform: translateY(-2px);
+        }
+
+        .metric-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            overflow: hidden;
+        }
+
+        .metric-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2em;
+            }
+            .glass-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <a href="31-graphrag.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一模块
+                </a>
+                <a href="33-reasoning.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 32 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 32: 知识图谱应用与最佳实践
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">从理论到实践：全面掌握知识图谱的应用场景、架构模式和最佳实践</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">总结模块</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~120 分钟</span>
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">8 个应用案例</span>
+                <span class="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30">3 种架构模式</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: 推荐系统应用 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. 推荐系统中的知识图谱应用</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">为什么知识图谱能提升推荐效果?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    传统推荐系统(协同过滤、矩阵分解)面临<strong>冷启动</strong>、<strong>稀疏性</strong>和<strong>可解释性差</strong>等问题。
+                    知识图谱通过<strong>引入外部知识</strong>和<strong>关系推理</strong>，显著改善推荐质量。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">知识图谱增强推荐的核心思路</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="font-bold text-blue-400 mb-2">1. 知识感知</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 建立物品-属性关系</li>
+                            <li>• 连接用户-兴趣图谱</li>
+                            <li>• 融入领域知识</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2">2. 图嵌入表示</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• TransE / TransR</li>
+                            <li>• GraphSAGE</li>
+                            <li>• 图神经网络编码</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2">3. 推理预测</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 路径相似度计算</li>
+                            <li>• 多跳推理</li>
+                            <li>• 可解释推荐</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    动画: 知识图谱推荐流程
+                </div>
+                <div id="recommendation-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playRecommendationAnimation()">▶ 播放演示</button>
+                    <button class="btn btn-secondary" onclick="resetRecommendationAnimation()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="switchRecommendationCase()">🔄 切换案例</button>
+                </div>
+                <div id="recommendation-info" class="info-panel">
+                    <div class="text-blue-400 font-bold mb-2">推荐案例:</div>
+                    <div id="recommendation-description" class="text-gray-300">
+                        点击"播放演示"查看知识图谱如何增强推荐系统
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">应用案例 1: 阿里巴巴电商推荐</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="text-green-400 font-bold mb-2">技术方案</h4>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 构建了10亿+实体的商品知识图谱</li>
+                            <li>• 使用KGAT (Knowledge Graph Attention Network)</li>
+                            <li>• 融入用户行为序列和物品属性</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-purple-400 font-bold mb-2">效果提升</h4>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• CTR提升 <span class="text-green-400 font-bold">15.2%</span></li>
+                            <li>• GMV提升 <span class="text-green-400 font-bold">12.8%</span></li>
+                            <li>• 冷启动物品曝光增加 <span class="text-green-400 font-bold">20%</span></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: 语义搜索 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. 知识图谱增强的语义搜索</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">语义搜索 vs 关键词搜索</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    关键词搜索只匹配字面，而语义搜索<strong>理解意图</strong>和<strong>实体关系</strong>。
+                    知识图谱为语义搜索提供<strong>结构化知识</strong>和<strong>推理能力</strong>。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">知识图谱在搜索中的4大作用</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🔍</div>
+                        <div class="font-bold text-blue-400 mb-2">实体识别与链接</div>
+                        <p class="text-gray-300 text-sm">识别查询中的实体，链接到知识图谱，获取更多上下文信息</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🔗</div>
+                        <div class="font-bold text-purple-400 mb-2">关系扩展</div>
+                        <p class="text-gray-300 text-sm">通过图谱关系扩展查询，发现相关实体和文档</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🎯</div>
+                        <div class="font-bold text-green-400 mb-2">意图理解</div>
+                        <p class="text-gray-300 text-sm">分析实体关系推断用户真实意图，提供精准答案</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">💡</div>
+                        <div class="font-bold text-yellow-400 mb-2">知识卡片</div>
+                        <p class="text-gray-300 text-sm">直接展示结构化知识，如人物简介、产品参数</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    动画: 多跳查询与结果排序
+                </div>
+                <div id="search-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playSearchAnimation()">▶ 执行查询</button>
+                    <button class="btn btn-secondary" onclick="resetSearchAnimation()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="changeSearchQuery()">📝 切换查询</button>
+                </div>
+                <div id="search-info" class="info-panel">
+                    <div class="text-green-400 font-bold mb-2">查询示例:</div>
+                    <div id="search-description" class="text-gray-300">
+                        点击"执行查询"查看知识图谱如何支持语义搜索
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">应用案例 2: 百度知识图谱搜索</h3>
+                <div class="space-y-3">
+                    <div class="bg-black/30 p-3 rounded-lg">
+                        <div class="text-green-400 font-bold mb-1">直接答案</div>
+                        <p class="text-gray-300 text-sm">如搜索"埃隆·马斯克年龄"，右侧直接显示"52岁"(2023)</p>
+                    </div>
+                    <div class="bg-black/30 p-3 rounded-lg">
+                        <div class="text-purple-400 font-bold mb-1">实体卡片</div>
+                        <p class="text-gray-300 text-sm">展示实体的基本信息、相关人物、重要事件等</p>
+                    </div>
+                    <div class="bg-black/30 p-3 rounded-lg">
+                        <div class="text-blue-400 font-bold mb-1">关系探索</div>
+                        <p class="text-gray-300 text-sm">用户可点击实体关系，继续探索相关知识网络</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 3: 企业架构模式 -->
+        <div class="glass-card">
+            <h2 class="section-title">3. 知识图谱企业架构模式对比</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">三种主流架构模式</h3>
+                <p class="text-gray-300 leading-relaxed">
+                    企业在选择知识图谱架构时，需要根据<strong>数据规模</strong>、<strong>查询复杂度</strong>、
+                    <strong>实时性要求</strong>和<strong>团队能力</strong>选择合适的模式。
+                </p>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                    </svg>
+                    交互式架构对比
+                </div>
+                <div id="architecture-animation" class="animation-canvas" style="min-height: 600px;"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="showArchitecture(1)">模式 1: 单体架构</button>
+                    <button class="btn btn-primary" onclick="showArchitecture(2)">模式 2: 分层架构</button>
+                    <button class="btn btn-primary" onclick="showArchitecture(3)">模式 3: 微服务架构</button>
+                    <button class="btn btn-secondary" onclick="compareAll()">📊 对比全部</button>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">架构选择决策树</h3>
+                <div class="bg-black/30 p-4 rounded-lg text-sm">
+                    <div class="text-blue-400 font-bold mb-2">Q1: 数据规模有多大?</div>
+                    <div class="ml-4 mb-2">
+                        <span class="text-gray-300">• &lt;100万实体</span> → <span class="text-green-400">单体架构够用</span>
+                    </div>
+                    <div class="ml-4 mb-2">
+                        <span class="text-gray-300">• 100万-1亿实体</span> → <span class="text-yellow-400">考虑分层架构</span>
+                    </div>
+                    <div class="ml-4 mb-3">
+                        <span class="text-gray-300">• &gt;1亿实体</span> → <span class="text-purple-400">微服务架构</span>
+                    </div>
+
+                    <div class="text-purple-400 font-bold mb-2">Q2: 查询复杂度?</div>
+                    <div class="ml-4 mb-2">
+                        <span class="text-gray-300">• 简单1-2跳查询</span> → <span class="text-green-400">单体架构</span>
+                    </div>
+                    <div class="ml-4 mb-2">
+                        <span class="text-gray-300">• 复杂多跳+推理</span> → <span class="text-yellow-400">分层架构</span>
+                    </div>
+                    <div class="ml-4 mb-3">
+                        <span class="text-gray-300">• 实时+批处理混合</span> → <span class="text-purple-400">微服务架构</span>
+                    </div>
+
+                    <div class="text-green-400 font-bold mb-2">Q3: 团队技术能力?</div>
+                    <div class="ml-4">
+                        <span class="text-gray-300">• 小团队(&lt;5人)</span> → <span class="text-green-400">单体架构</span>
+                        <span class="text-gray-300 ml-4">• 中型团队(5-20人)</span> → <span class="text-yellow-400">分层架构</span>
+                        <span class="text-gray-300 ml-4">• 大团队(&gt;20人)</span> → <span class="text-purple-400">微服务架构</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">应用案例 3: 金融风控知识图谱架构</h3>
+                <div class="grid md:grid-cols-3 gap-4 text-center">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-3xl mb-2">🏦</div>
+                        <div class="font-bold text-blue-400 mb-2">数据层</div>
+                        <p class="text-gray-400 text-sm">Neo4j存储<br/>5000万实体<br/>10亿关系</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-3xl mb-2">⚙️</div>
+                        <div class="font-bold text-purple-400 mb-2">计算层</div>
+                        <p class="text-gray-400 text-sm">图计算引擎<br/>图神经网络<br/>规则推理</p>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-3xl mb-2">📊</div>
+                        <div class="font-bold text-green-400 mb-2">应用层</div>
+                        <p class="text-gray-400 text-sm">贷前审核<br/>贷中监控<br/>贷后催收</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 性能优化 -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 知识图谱性能优化实战</h2>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">性能优化三大支柱</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="font-bold text-blue-400 mb-2 text-center">索引优化</div>
+                        <ul class="text-gray-300 text-sm space-y-2">
+                            <li>• <strong>节点索引</strong>: 为高频查询属性建索引</li>
+                            <li>• <strong>关系索引</strong>: 加速关系遍历</li>
+                            <li>• <strong>全文索引</strong>: 支持文本搜索</li>
+                            <li>• <strong>空间索引</strong>: 地理位置查询</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2 text-center">缓存策略</div>
+                        <ul class="text-gray-300 text-sm space-y-2">
+                            <li>• <strong>查询缓存</strong>: Redis缓存Cypher/SPARQL结果</li>
+                            <li>• <strong>实体缓存</strong>: 热点实体预加载</li>
+                            <li>• <strong>图缓存</strong>: 子图缓存加速多跳</li>
+                            <li>• <strong>CDN缓存</strong>: 静态知识卡片</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2 text-center">查询优化</div>
+                        <ul class="text-gray-300 text-sm space-y-2">
+                            <li>• <strong>避免笛卡尔积</strong>: 精确匹配优先</li>
+                            <li>• <strong>限制查询深度</strong>: 最多3-5跳</li>
+                            <li>• <strong>使用过滤器</strong>: 早停策略</li>
+                            <li>• <strong>批量查询</strong>: 减少网络往返</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    性能对比演示
+                </div>
+                <div id="performance-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="runPerformanceTest()">▶ 运行性能测试</button>
+                    <button class="btn btn-secondary" onclick="resetPerformanceAnimation()">↺ 重置</button>
+                </div>
+                <div id="performance-info" class="info-panel">
+                    <div class="text-yellow-400 font-bold mb-2">测试结果:</div>
+                    <div id="performance-results" class="text-gray-300">
+                        点击"运行性能测试"查看优化前后的性能差异
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">应用案例 4: 社交网络图谱优化</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <h4 class="text-blue-400 font-bold mb-2">优化前</h4>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 2跳好友查询: <span class="text-red-400">15秒</span></li>
+                            <li>• 数据库负载: <span class="text-red-400">90% CPU</span></li>
+                            <li>• 并发支持: <span class="text-red-400">100 QPS</span></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-green-400 font-bold mb-2">优化后</h4>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 2跳好友查询: <span class="text-green-400">0.3秒</span> (快50倍)</li>
+                            <li>• 数据库负载: <span class="text-green-400">30% CPU</span></li>
+                            <li>• 并发支持: <span class="text-green-400">5000 QPS</span></li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mt-3 p-3 bg-black/20 rounded-lg">
+                    <div class="text-purple-400 font-bold mb-1">优化措施:</div>
+                    <p class="text-gray-300 text-sm">1) 为user_id和relationship_type建立组合索引<br/>
+                    2) Redis缓存2度关系列表<br/>
+                    3) 使用Cypher PROFILE分析查询计划<br/>
+                    4) 将深度限制在3跳以内</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 5: 知识图谱治理 -->
+        <div class="glass-card">
+            <h2 class="section-title">5. 知识图谱治理最佳实践</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是知识图谱治理?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    知识图谱治理是指<strong>管理知识图谱全生命周期</strong>的一套流程和规范，
+                    包括<strong>数据质量</strong>、<strong>版本管理</strong>、<strong>访问控制</strong>、
+                    <strong>变更管理</strong>等方面。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">治理框架4大支柱</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="case-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="text-3xl">✅</div>
+                            <div>
+                                <div class="font-bold text-blue-400">数据质量管理</div>
+                                <div class="text-sm text-gray-400">Data Quality Management</div>
+                            </div>
+                        </div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• <strong>完整性检查</strong>: 必填属性缺失检测</li>
+                            <li>• <strong>一致性校验</strong>: 关系约束验证</li>
+                            <li>• <strong>准确性验证</strong>: 与外部数据源对比</li>
+                            <li>• <strong>重复检测</strong>: 实体去重和合并</li>
+                            <li>• <strong>质量评分</strong>: 实体可信度打分</li>
+                        </ul>
+                    </div>
+
+                    <div class="case-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="text-3xl">📚</div>
+                            <div>
+                                <div class="font-bold text-purple-400">本体版本管理</div>
+                                <div class="text-sm text-gray-400">Ontology Versioning</div>
+                            </div>
+                        </div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• <strong>版本控制</strong>: Git管理本体定义</li>
+                            <li>• <strong>迁移策略</strong>: 本体演进数据迁移</li>
+                            <li>• <strong>兼容性检查</strong>: 向后兼容性验证</li>
+                            <li>• <strong>变更审核</strong>: 本体变更审批流程</li>
+                            <li>• <strong>影响分析</strong>: 评估变更影响范围</li>
+                        </ul>
+                    </div>
+
+                    <div class="case-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="text-3xl">🔐</div>
+                            <div>
+                                <div class="font-bold text-green-400">访问权限控制</div>
+                                <div class="text-sm text-gray-400">Access Control</div>
+                            </div>
+                        </div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• <strong>角色管理</strong>: RBAC角色权限模型</li>
+                            <li>• <strong>数据分级</strong>: 公开/内部/机密数据</li>
+                            <li>• <strong>查询权限</strong>: 限制查询复杂度</li>
+                            <li>• <strong>审计日志</strong>: 记录所有操作</li>
+                            <li>• <strong>数据脱敏</strong>: 敏感信息处理</li>
+                        </ul>
+                    </div>
+
+                    <div class="case-card">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="text-3xl">🔄</div>
+                            <div>
+                                <div class="font-bold text-yellow-400">变更与发布流程</div>
+                                <div class="text-sm text-gray-400">Change Management</div>
+                            </div>
+                        </div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• <strong>开发环境</strong>: 本地开发测试</li>
+                            <li>• <strong>测试环境</strong>: 集成测试验证</li>
+                            <li>• <strong>预发布</strong>: 灰度发布验证</li>
+                            <li>• <strong>生产发布</strong>: 蓝绿部署</li>
+                            <li>• <strong>回滚机制</strong>: 快速回退能力</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    数据质量检查演示
+                </div>
+                <div id="governance-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="runQualityCheck()">▶ 运行质量检查</button>
+                    <button class="btn btn-secondary" onclick="resetGovernanceAnimation()">↺ 重置</button>
+                </div>
+                <div id="governance-info" class="info-panel">
+                    <div class="text-green-400 font-bold mb-2">检查结果:</div>
+                    <div id="governance-results" class="text-gray-300">
+                        点击"运行质量检查"查看数据质量分析
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 6: 未来趋势 -->
+        <div class="glass-card">
+            <h2 class="section-title">6. 知识图谱未来发展趋势</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">2024-2030年技术演进路线</h3>
+                <p class="text-gray-300 leading-relaxed">
+                    知识图谱正在与<strong>大语言模型</strong>、<strong>多模态AI</strong>、<strong>自动化技术</strong>深度融合，
+                    开启新的应用范式。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">三大前沿方向</h3>
+
+                <div class="case-card">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="text-4xl">🤖</div>
+                        <div>
+                            <div class="text-2xl font-bold text-blue-400">LLM + KG 融合</div>
+                            <div class="text-sm text-gray-400">神经符号AI的新范式</div>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="text-green-400 font-bold mb-2">GraphRAG演进</h4>
+                            <ul class="text-gray-300 text-sm space-y-1">
+                                <li>• <strong>社区检测</strong>: 自动发现图谱子结构</li>
+                                <li>• <strong>层次化摘要</strong>: 多层级社区描述</li>
+                                <li>• <strong>混合检索</strong>: 向量+图谱融合</li>
+                                <li>• <strong>动态更新</strong>: 增量式社区维护</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <h4 class="text-purple-400 font-bold mb-2">KG增强LLM</h4>
+                            <ul class="text-gray-300 text-sm space-y-1">
+                                <li>• <strong>事实校验</strong>: 减少LLM幻觉</li>
+                                <li>• <strong>可解释推理</strong>: 显示推理路径</li>
+                                <li>• <strong>知识注入</strong>: Fine-tuning with KG</li>
+                                <li>• <strong>动态知识</strong>: 实时更新LLM知识</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 p-3 bg-black/30 rounded-lg">
+                        <div class="text-yellow-400 font-bold mb-1">应用案例 5: Microsoft GraphRAG</div>
+                        <p class="text-gray-300 text-sm">
+                            Microsoft开源的GraphRAG框架，使用Leiden算法检测知识图谱中的社区，
+                            生成层次化的社区摘要，显著提升长文档问答和全局推理能力。
+                            相比纯向量RAG，在全局问题上<strong>准确率提升40%+</strong>。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="case-card">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="text-4xl">🎨</div>
+                        <div>
+                            <div class="text-2xl font-bold text-purple-400">多模态知识图谱</div>
+                            <div class="text-sm text-gray-400">跨越文本、图像、视频的知识表示</div>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div class="bg-black/30 p-3 rounded-lg text-center">
+                            <div class="text-3xl mb-2">📝</div>
+                            <div class="font-bold text-blue-400 mb-1">文本KG</div>
+                            <p class="text-gray-400 text-xs">传统三元组<br/>实体关系抽取</p>
+                        </div>
+                        <div class="bg-black/30 p-3 rounded-lg text-center">
+                            <div class="text-3xl mb-2">🖼️</div>
+                            <div class="font-bold text-green-400 mb-1">视觉KG</div>
+                            <p class="text-gray-400 text-xs">图像中的实体<br/>视觉关系抽取</p>
+                        </div>
+                        <div class="bg-black/30 p-3 rounded-lg text-center">
+                            <div class="text-3xl mb-2">🎬</div>
+                            <div class="font-bold text-purple-400 mb-1">视频KG</div>
+                            <p class="text-gray-400 text-xs">时序事件抽取<br/>动作关系建模</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 p-3 bg-black/30 rounded-lg">
+                        <div class="text-yellow-400 font-bold mb-1">应用案例 6: 跨模态问答</div>
+                        <p class="text-gray-300 text-sm">
+                            用户问"埃隆·马斯克和SpaceX的关系"，系统不仅返回文本答案，
+                            还展示相关<strong>图片</strong>(马斯克照片、SpaceX火箭)、
+                            <strong>视频</strong>(发射场景)、<strong>数据可视化</strong>(时间轴)。
+                            多模态KG将文本、图像、视频实体通过跨模态对齐连接到统一图谱。
+                        </p>
+                    </div>
+                </div>
+
+                <div class="case-card">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="text-4xl">⚡</div>
+                        <div>
+                            <div class="text-2xl font-bold text-green-400">自动化知识图谱构建</div>
+                            <div class="text-sm text-gray-400">从人工标注到AI自动构建</div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-4 p-3 bg-black/30 rounded-lg">
+                            <div class="text-2xl">📊</div>
+                            <div class="flex-1">
+                                <div class="font-bold text-blue-400">AutoML + KG</div>
+                                <div class="text-gray-300 text-sm">自动选择最优的NER、RE模型，自动调参</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 p-3 bg-black/30 rounded-lg">
+                            <div class="text-2xl">🧠</div>
+                            <div class="flex-1">
+                                <div class="font-bold text-purple-400">LLM驱动的抽取</div>
+                                <div class="text-gray-300 text-sm">使用GPT-4等大模型直接从文本生成三元组</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-4 p-3 bg-black/30 rounded-lg">
+                            <div class="text-2xl">🔄</div>
+                            <div class="flex-1">
+                                <div class="font-bold text-green-400">增量学习</div>
+                                <div class="text-gray-300 text-sm">新数据到来时自动更新图谱，无需全量重建</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                    </svg>
+                    未来趋势时间线
+                </div>
+                <div id="trend-animation" class="animation-canvas" style="min-height: 500px;"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playTrendAnimation()">▶ 播放趋势</button>
+                    <button class="btn btn-secondary" onclick="resetTrendAnimation()">↺ 重置</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 7: 应用案例全景 -->
+        <div class="glass-card">
+            <h2 class="section-title">7. 知识图谱应用案例全景</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">6大典型应用场景</h3>
+                <p class="text-gray-300 leading-relaxed">
+                    知识图谱已渗透到各行各业，从搜索引擎到金融风控，从医疗诊断到智能制造，
+                    图谱技术正在<strong>重塑数据处理和智能决策</strong>的方式。
+                </p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <!-- 案例1: 搜索引擎 -->
+                <div class="case-card">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-3xl">🔍</div>
+                        <div>
+                            <div class="font-bold text-blue-400 text-lg">搜索引擎增强</div>
+                            <div class="text-xs text-gray-400">Search Engine Enhancement</div>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">应用企业:</span>
+                            <span class="text-gray-300">Google, 百度, Bing</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">图谱规模:</span>
+                            <span class="text-gray-300">5亿-10亿实体</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">核心价值:</span>
+                            <span class="text-green-400">直接答案+知识卡片</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">技术栈:</span>
+                            <span class="text-gray-300">内部图DB + 知识卡片</span>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-gray-400 mb-1">效果提升:</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill bg-gradient-to-r from-blue-500 to-blue-400" style="width: 85%;"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">用户满意度提升 85%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 案例2: 推荐系统 -->
+                <div class="case-card">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-3xl">🎯</div>
+                        <div>
+                            <div class="font-bold text-purple-400 text-lg">智能推荐系统</div>
+                            <div class="text-xs text-gray-400">Recommendation System</div>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">应用企业:</span>
+                            <span class="text-gray-300">阿里, 拼多多, Netflix</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">图谱规模:</span>
+                            <span class="text-gray-300">10亿+ 商品实体</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">核心价值:</span>
+                            <span class="text-green-400">冷启动+可解释性</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">技术栈:</span>
+                            <span class="text-gray-300">Neo4j + 图神经网络</span>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-gray-400 mb-1">效果提升:</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill bg-gradient-to-r from-purple-500 to-purple-400" style="width: 65%;"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">CTR提升 15-20%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 案例3: 金融风控 -->
+                <div class="case-card">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-3xl">🏦</div>
+                        <div>
+                            <div class="font-bold text-green-400 text-lg">金融风控与反欺诈</div>
+                            <div class="text-xs text-gray-400">Financial Risk Control</div>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">应用企业:</span>
+                            <span class="text-gray-300">蚂蚁金服, 招行, 平安</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">图谱规模:</span>
+                            <span class="text-gray-300">千万级用户+亿级关系</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">核心价值:</span>
+                            <span class="text-green-400">团伙欺诈检测</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">技术栈:</span>
+                            <span class="text-gray-300">Neo4j + 图算法</span>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-gray-400 mb-1">效果提升:</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill bg-gradient-to-r from-green-500 to-green-400" style="width: 75%;"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">欺诈识别率提升 75%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 案例4: 医疗健康 -->
+                <div class="case-card">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-3xl">🏥</div>
+                        <div>
+                            <div class="font-bold text-red-400 text-lg">医疗知识图谱</div>
+                            <div class="text-xs text-gray-400">Medical Knowledge Graph</div>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">应用机构:</span>
+                            <span class="text-gray-300">IBM Watson, Mayo Clinic</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">图谱规模:</span>
+                            <span class="text-gray-300">疾病+药物+症状+基因</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">核心价值:</span>
+                            <span class="text-green-400">辅助诊断+药物研发</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">技术栈:</span>
+                            <span class="text-gray-300">本体驱动+推理引擎</span>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-gray-400 mb-1">效果提升:</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill bg-gradient-to-r from-red-500 to-red-400" style="width: 70%;"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">诊断准确率提升 20-30%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 案例5: 智能制造 -->
+                <div class="case-card">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-3xl">🏭</div>
+                        <div>
+                            <div class="font-bold text-yellow-400 text-lg">工业知识图谱</div>
+                            <div class="text-xs text-gray-400">Industrial Knowledge Graph</div>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">应用企业:</span>
+                            <span class="text-gray-300">西门子, GE, 宝钢</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">图谱规模:</span>
+                            <span class="text-gray-300">设备+故障+维修方案</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">核心价值:</span>
+                            <span class="text-green-400">预测性维护</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">技术栈:</span>
+                            <span class="text-gray-300">时序图+IoT集成</span>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-gray-400 mb-1">效果提升:</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill bg-gradient-to-r from-yellow-500 to-yellow-400" style="width: 60%;"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">停机时间减少 60%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 案例6: GraphRAG -->
+                <div class="case-card">
+                    <div class="flex items-center gap-3 mb-3">
+                        <div class="text-3xl">🤖</div>
+                        <div>
+                            <div class="font-bold text-pink-400 text-lg">GraphRAG应用</div>
+                            <div class="text-xs text-gray-400">KG + LLM Fusion</div>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">应用场景:</span>
+                            <span class="text-gray-300">企业问答, 文档分析</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">图谱规模:</span>
+                            <span class="text-gray-300">文档实体+概念关系</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">核心价值:</span>
+                            <span class="text-green-400">可解释推理+减少幻觉</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">技术栈:</span>
+                            <span class="text-gray-300">Neo4j + LangChain + GPT</span>
+                        </div>
+                        <div class="mt-2">
+                            <div class="text-gray-400 mb-1">效果提升:</div>
+                            <div class="metric-bar">
+                                <div class="metric-fill bg-gradient-to-r from-pink-500 to-pink-400" style="width: 80%;"></div>
+                            </div>
+                            <div class="text-xs text-gray-500 mt-1">答案准确率提升 40-50%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="glass-card">
+            <h2 class="section-title">课程总结: 知识图谱学习路线</h2>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">完整知识体系回顾</h3>
+                <div class="space-y-3">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="font-bold text-blue-400 mb-2">阶段1: 基础理论 (模块21-22)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 模块21: 知识图谱基础概念 (实体、关系、属性、本体、三元组)</li>
+                            <li>✅ 模块22: 知识表示理论 (RDF、RDFS、OWL)</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2">阶段2: 存储与查询 (模块23-25)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 模块23: 图数据库基础 (Neo4j、Cypher)</li>
+                            <li>✅ 模块24: 图数据建模 (Schema设计、最佳实践)</li>
+                            <li>✅ 模块25: SPARQL查询语言 (RDF标准查询)</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2">阶段3: 知识抽取 (模块26-28)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 模块26: 信息抽取基础 (NER、关系抽取基础)</li>
+                            <li>✅ 模块27: 深度学习与抽取 (BERT、GNN用于抽取)</li>
+                            <li>✅ 模块28: 知识图谱构建 (ETL、融合、质量控制)</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-yellow-500">
+                        <div class="font-bold text-yellow-400 mb-2">阶段4: 高级应用 (模块29-31)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 模块29: 图算法与推理 (PageRank、最短路径、推理规则)</li>
+                            <li>✅ 模块30: 图嵌入与GNN (GraphSAGE、图神经网络)</li>
+                            <li>✅ 模块31: GraphRAG (LLM + KG融合)</li>
+                        </ul>
+                    </div>
+
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-pink-500">
+                        <div class="font-bold text-pink-400 mb-2">阶段5: 实战总结 (模块32)</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 模块32: 知识图谱应用与最佳实践 (本模块)</li>
+                            <li>• 推荐系统、语义搜索、架构模式</li>
+                            <li>• 性能优化、数据治理、未来趋势</li>
+                            <li>• 6大应用案例全景</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">核心能力清单</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div>
+                        <h4 class="text-green-400 font-bold mb-2">理论基础</h4>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 理解知识图谱核心概念</li>
+                            <li>✅ 掌握RDF/RDFS/OWL标准</li>
+                            <li>✅ 熟悉本体建模方法</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-purple-400 font-bold mb-2">技术能力</h4>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 使用Neo4j和Cypher</li>
+                            <li>✅ 编写SPARQL查询</li>
+                            <li>✅ 实现基础信息抽取</li>
+                            <li>✅ 应用图算法和推理</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-yellow-400 font-bold mb-2">应用能力</h4>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>✅ 设计知识图谱架构</li>
+                            <li>✅ 优化查询性能</li>
+                            <li>✅ 构建完整知识图谱项目</li>
+                            <li>✅ 结合LLM应用GraphRAG</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">下一步学习建议</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="text-2xl">📚</div>
+                        <div>
+                            <div class="font-bold text-blue-400">深入学习方向</div>
+                            <p class="text-gray-300 text-sm">根据你的兴趣选择: 图算法研究、GNN深度应用、知识图谱与LLM融合、多模态KG等</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="text-2xl">💻</div>
+                        <div>
+                            <div class="font-bold text-purple-400">动手实践项目</div>
+                            <p class="text-gray-300 text-sm">构建自己的知识图谱项目: 从数据抽取到应用部署，完整走一遍流程</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="text-2xl">🌐</div>
+                        <div>
+                            <div class="font-bold text-green-400">关注前沿技术</div>
+                            <p class="text-gray-300 text-sm">GraphRAG、多模态知识图谱、自动化构建、神经符号AI等最新进展</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card mt-6 text-center">
+                <h3 class="text-2xl font-bold text-green-400 mb-3">恭喜完成知识图谱完整课程! 🎉</h3>
+                <p class="text-gray-300 mb-4">
+                    你已经掌握了从理论到实践的完整知识体系，可以开始构建自己的知识图谱应用了。
+                </p>
+                <div class="flex flex-wrap gap-4 justify-center text-sm">
+                    <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full">32个模块</span>
+                    <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full">50+ 交互动画</span>
+                    <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full">8个应用案例</span>
+                    <span class="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-full">完整知识体系</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 32: 知识图谱应用与最佳实践</p>
+            <p class="mt-2">课程完成 🎓 | 2024</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 动画 1: 推荐系统流程
+        // ============================================================
+        let recSvg;
+        let recCurrentCase = 0;
+
+        const recCases = [
+            {
+                name: "电商推荐",
+                description: "用户购买过'苹果手机' → 通过知识图谱发现'手机配件'类别 → 推荐'无线充电器'、'手机壳'等配件",
+                entities: ["用户", "苹果手机", "手机配件", "无线充电器", "手机壳"],
+                relations: ["购买", "属于", "包含", "包含"]
+            },
+            {
+                name: "电影推荐",
+                description: "用户喜欢'盗梦空间' → 通过知识图谱发现诺勒导演作品 → 推荐'星际穿越'、'信条'",
+                entities: ["用户", "盗梦空间", "诺勒", "星际穿越", "信条"],
+                relations: ["喜欢", "导演", "导演", "导演"]
+            },
+            {
+                name: "新闻推荐",
+                description: "用户阅读'AI芯片'新闻 → 通过知识图谱发现相关技术 → 推荐'GPU计算'、'深度学习框架'文章",
+                entities: ["用户", "AI芯片", "GPU计算", "深度学习框架", "相关技术"],
+                relations: ["阅读", "相关", "相关", "属于"]
+            }
+        ];
+
+        function initRecommendationAnimation() {
+            const container = document.getElementById("recommendation-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            recSvg = d3.select("#recommendation-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            recSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("知识图谱增强推荐流程");
+        }
+
+        function playRecommendationAnimation() {
+            resetRecommendationAnimation();
+            const currentCase = recCases[recCurrentCase];
+            const width = recSvg.node().clientWidth;
+
+            document.getElementById("recommendation-description").innerHTML = `
+                <div class="text-blue-400 font-bold mb-1">${currentCase.name}推荐</div>
+                <div class="text-sm">${currentCase.description}</div>
+            `;
+
+            const positions = [
+                { x: width * 0.15, y: 200 },
+                { x: width * 0.35, y: 200 },
+                { x: width * 0.55, y: 200 },
+                { x: width * 0.75, y: 120 },
+                { x: width * 0.75, y: 280 }
+            ];
+
+            const colors = ["#3b82f6", "#8b5cf6", "#22c55e", "#f59e0b", "#ec4899"];
+
+            // 绘制节点
+            currentCase.entities.forEach((entity, i) => {
+                setTimeout(() => {
+                    const g = recSvg.append("g")
+                        .attr("transform", `translate(${positions[i].x}, ${positions[i].y})`)
+                        .style("opacity", 0);
+
+                    g.append("circle")
+                        .attr("r", 40)
+                        .attr("fill", colors[i])
+                        .attr("opacity", 0.6);
+
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", 5)
+                        .attr("fill", "white")
+                        .attr("font-size", "11px")
+                        .attr("font-weight", "bold")
+                        .text(entity);
+
+                    g.transition()
+                        .duration(500)
+                        .style("opacity", 1);
+                }, i * 600);
+            });
+
+            // 绘制关系
+            setTimeout(() => {
+                const connections = [
+                    [0, 1],
+                    [1, 2],
+                    [2, 3],
+                    [2, 4]
+                ];
+
+                connections.forEach((conn, i) => {
+                    setTimeout(() => {
+                        const line = recSvg.insert("line", ":first-child")
+                            .attr("x1", positions[conn[0]].x)
+                            .attr("y1", positions[conn[0]].y)
+                            .attr("x2", positions[conn[0]].x)
+                            .attr("y2", positions[conn[0]].y)
+                            .attr("stroke", "#22c55e")
+                            .attr("stroke-width", 2)
+                            .attr("stroke-dasharray", "5,5");
+
+                        line.transition()
+                            .duration(800)
+                            .attr("x2", positions[conn[1]].x)
+                            .attr("y2", positions[conn[1]].y);
+
+                        const midX = (positions[conn[0]].x + positions[conn[1]].x) / 2;
+                        const midY = (positions[conn[0]].y + positions[conn[1]].y) / 2;
+
+                        recSvg.append("text")
+                            .attr("x", midX)
+                            .attr("y", midY - 10)
+                            .attr("text-anchor", "middle")
+                            .attr("fill", "#22c55e")
+                            .attr("font-size", "11px")
+                            .style("opacity", 0)
+                            .text(currentCase.relations[i])
+                            .transition()
+                            .delay(400)
+                            .duration(500)
+                            .style("opacity", 1);
+                    }, i * 500);
+                });
+            }, 3000);
+        }
+
+        function resetRecommendationAnimation() {
+            if (recSvg) {
+                recSvg.selectAll("*").remove();
+                initRecommendationAnimation();
+            }
+        }
+
+        function switchRecommendationCase() {
+            recCurrentCase = (recCurrentCase + 1) % recCases.length;
+            playRecommendationAnimation();
+        }
+
+        // ============================================================
+        // 动画 2: 语义搜索
+        // ============================================================
+        let searchSvg;
+        let searchCurrentQuery = 0;
+
+        const searchQueries = [
+            {
+                query: "马斯克创办的公司",
+                steps: [
+                    { desc: "识别实体: 马斯克", entities: ["马斯克"] },
+                    { desc: "扩展关系: founder_of", entities: ["马斯克", "SpaceX", "Tesla"] },
+                    { desc: "过滤结果: 公司类型", entities: ["马斯克", "SpaceX", "Tesla", "Boring"] },
+                    { desc: "排序结果: 按知名度", entities: ["马斯k", "SpaceX ⭐", "Tesla ⭐", "Boring"] }
+                ]
+            },
+            {
+                query: "iPhone的竞争对手",
+                steps: [
+                    { desc: "识别实体: iPhone", entities: ["iPhone"] },
+                    { desc: "扩展类别: 智能手机", entities: ["iPhone", "智能手机"] },
+                    { desc: "查找同类产品", entities: ["iPhone", "三星 Galaxy", "华为 Mate", "Pixel"] },
+                    { desc: "排序结果: 按销量", entities: ["iPhone", "Galaxy 🔥", "Mate 🔥", "Pixel"] }
+                ]
+            }
+        ];
+
+        function initSearchAnimation() {
+            const container = document.getElementById("search-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            searchSvg = d3.select("#search-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            searchSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#22c55e")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("知识图谱语义搜索流程");
+        }
+
+        function playSearchAnimation() {
+            resetSearchAnimation();
+            const currentQuery = searchQueries[searchCurrentQuery];
+            const width = searchSvg.node().clientWidth;
+
+            document.getElementById("search-description").innerHTML = `
+                <div class="text-green-400 font-bold mb-1">查询: "${currentQuery.query}"</div>
+                <div class="text-sm">点击下方按钮逐步查看查询过程</div>
+            `;
+
+            let step = 0;
+            const stepInterval = setInterval(() => {
+                if (step >= currentQuery.steps.length) {
+                    clearInterval(stepInterval);
+                    return;
+                }
+
+                const currentStep = currentQuery.steps[step];
+                document.getElementById("search-description").innerHTML = `
+                    <div class="text-green-400 font-bold mb-1">查询: "${currentQuery.query}"</div>
+                    <div class="text-sm">步骤 ${step + 1}: ${currentStep.desc}</div>
+                `;
+
+                const centerX = width / 2;
+                const centerY = 200;
+                const radius = 100;
+                const count = currentStep.entities.length;
+
+                currentStep.entities.forEach((entity, i) => {
+                    const angle = (i * 2 * Math.PI) / count - Math.PI / 2;
+                    const x = centerX + Math.cos(angle) * radius;
+                    const y = centerY + Math.sin(angle) * radius;
+
+                    const g = searchSvg.append("g")
+                        .attr("transform", `translate(${x}, ${y})`)
+                        .style("opacity", 0);
+
+                    g.append("circle")
+                        .attr("r", 35)
+                        .attr("fill", i === 0 ? "#3b82f6" : "#8b5cf6")
+                        .attr("opacity", 0.6);
+
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", 5)
+                        .attr("fill", "white")
+                        .attr("font-size", "11px")
+                        .attr("font-weight", "bold")
+                        .text(entity);
+
+                    g.transition()
+                        .duration(500)
+                        .style("opacity", 1);
+                });
+
+                step++;
+            }, 2000);
+        }
+
+        function resetSearchAnimation() {
+            if (searchSvg) {
+                searchSvg.selectAll("*").remove();
+                initSearchAnimation();
+            }
+        }
+
+        function changeSearchQuery() {
+            searchCurrentQuery = (searchCurrentQuery + 1) % searchQueries.length;
+            playSearchAnimation();
+        }
+
+        // ============================================================
+        // 动画 3: 架构对比
+        // ============================================================
+        let archSvg;
+
+        function initArchitectureAnimation() {
+            const container = document.getElementById("architecture-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 600;
+
+            archSvg = d3.select("#architecture-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            archSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("点击按钮查看不同架构模式");
+        }
+
+        function showArchitecture(mode) {
+            resetArchitectureAnimation();
+            const width = archSvg.node().clientWidth;
+            const height = 600;
+
+            let title, description, components;
+
+            if (mode === 1) {
+                title = "模式1: 单体架构 (Monolithic)";
+                description = "适合小规模项目(&lt;100万实体)，开发简单，部署方便";
+                components = [
+                    { name: "应用层", y: 100, color: "#3b82f6" },
+                    { name: "业务逻辑层", y: 200, color: "#8b5cf6" },
+                    { name: "图数据库层", y: 300, color: "#22c55e" },
+                    { name: "存储层", y: 400, color: "#f59e0b" }
+                ];
+            } else if (mode === 2) {
+                title = "模式2: 分层架构 (Layered)";
+                description = "适合中大型项目(100万-1亿实体)，职责分离，易于维护";
+                components = [
+                    { name: "Web/API层", y: 100, color: "#3b82f6" },
+                    { name: "服务层", y: 180, color: "#8b5cf6" },
+                    { name: "业务逻辑层", y: 260, color: "#a855f7" },
+                    { name: "数据访问层", y: 340, color: "#22c55e" },
+                    { name: "图数据库+缓存", y: 420, color: "#14b8a6" },
+                    { name: "存储层", y: 500, color: "#f59e0b" }
+                ];
+            } else {
+                title = "模式3: 微服务架构 (Microservices)";
+                description = "适合大规模项目(&gt;1亿实体)，可扩展，高可用";
+                components = [
+                    { name: "API网关", y: 100, color: "#3b82f6" },
+                    { name: "查询服务", y: 200, x: width * 0.25, color: "#8b5cf6" },
+                    { name: "推理服务", y: 200, x: width * 0.5, color: "#a855f7" },
+                    { name: "写入服务", y: 200, x: width * 0.75, color: "#22c55e" },
+                    { name: "图数据库集群", y: 350, color: "#14b8a6" },
+                    { name: "缓存集群", y: 450, color: "#f59e0b" }
+                ];
+            }
+
+            // 标题
+            archSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 60)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#4ade80")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text(title);
+
+            // 描述
+            archSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 85)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#9ca3af")
+                .attr("font-size", "13px")
+                .text(description);
+
+            // 绘制组件
+            components.forEach((comp, i) => {
+                setTimeout(() => {
+                    const x = comp.x || width / 2;
+                    const g = archSvg.append("g")
+                        .attr("transform", `translate(${x}, ${comp.y})`)
+                        .style("opacity", 0);
+
+                    g.append("rect")
+                        .attr("x", mode === 3 && i >= 1 && i <= 3 ? -60 : -100)
+                        .attr("y", -20)
+                        .attr("width", mode === 3 && i >= 1 && i <= 3 ? 120 : 200)
+                        .attr("height", 40)
+                        .attr("rx", 10)
+                        .attr("fill", comp.color)
+                        .attr("opacity", 0.3);
+
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", 5)
+                        .attr("fill", "white")
+                        .attr("font-size", "14px")
+                        .attr("font-weight", "bold")
+                        .text(comp.name);
+
+                    g.transition()
+                        .duration(500)
+                        .style("opacity", 1);
+
+                    // 连接线
+                    if (i > 0) {
+                        const prevComp = components[i - 1];
+                        const prevX = prevComp.x || width / 2;
+                        const line = archSvg.insert("line", ":first-child")
+                            .attr("x1", prevX)
+                            .attr("y1", prevComp.y + 20)
+                            .attr("x2", prevX)
+                            .attr("y2", prevComp.y + 20)
+                            .attr("stroke", "#4b5563")
+                            .attr("stroke-width", 2)
+                            .attr("stroke-dasharray", "5,5")
+                            .attr("opacity", 0);
+
+                        line.transition()
+                            .duration(500)
+                            .attr("x2", x)
+                            .attr("y2", comp.y - 20)
+                            .attr("opacity", 1);
+                    }
+                }, i * 400);
+            });
+        }
+
+        function resetArchitectureAnimation() {
+            if (archSvg) {
+                archSvg.selectAll("*").remove();
+                initArchitectureAnimation();
+            }
+        }
+
+        function compareAll() {
+            alert("在完整版本中，这里会显示一个对比表格，详细对比三种架构的优缺点、适用场景、技术栈等！");
+        }
+
+        // ============================================================
+        // 动画 4: 性能测试
+        // ============================================================
+        let perfSvg;
+
+        function initPerformanceAnimation() {
+            const container = document.getElementById("performance-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            perfSvg = d3.select("#performance-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            perfSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#fbbf24")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("性能优化前后对比");
+        }
+
+        function runPerformanceTest() {
+            resetPerformanceAnimation();
+            const width = perfSvg.node().clientWidth;
+
+            const metrics = [
+                { name: "查询耗时", before: 15, beforeUnit: "秒", after: 0.3, afterUnit: "秒", color: "#ef4444" },
+                { name: "CPU使用率", before: 90, beforeUnit: "%", after: 30, afterUnit: "%", color: "#f59e0b" },
+                { name: "并发能力", before: 100, beforeUnit: " QPS", after: 5000, afterUnit: " QPS", color: "#22c55e" }
+            ];
+
+            const startX = 200;
+            const barHeight = 30;
+            const gap = 50;
+
+            metrics.forEach((metric, i) => {
+                const y = 100 + i * (barHeight + gap);
+
+                // 标签
+                perfSvg.append("text")
+                    .attr("x", 180)
+                    .attr("y", y + barHeight / 2 + 5)
+                    .attr("text-anchor", "end")
+                    .attr("fill", "#e2e8f0")
+                    .attr("font-size", "13px")
+                    .attr("font-weight", "bold")
+                    .text(metric.name);
+
+                // 优化前标签
+                perfSvg.append("text")
+                    .attr("x", startX)
+                    .attr("y", y - 5)
+                    .attr("fill", "#ef4444")
+                    .attr("font-size", "11px")
+                    .text("优化前");
+
+                // 优化前柱状图
+                const beforeWidth = Math.min(metric.before * 10, 300);
+                perfSvg.append("rect")
+                    .attr("x", startX)
+                    .attr("y", y)
+                    .attr("width", 0)
+                    .attr("height", barHeight)
+                    .attr("fill", "#ef4444")
+                    .attr("opacity", 0.6)
+                    .attr("rx", 5)
+                    .transition()
+                    .delay(i * 300)
+                    .duration(1000)
+                    .attr("width", beforeWidth);
+
+                perfSvg.append("text")
+                    .attr("x", startX + beforeWidth + 10)
+                    .attr("y", y + barHeight / 2 + 5)
+                    .attr("fill", "#ef4444")
+                    .attr("font-size", "12px")
+                    .attr("opacity", 0)
+                    .text(`${metric.before}${metric.beforeUnit}`)
+                    .transition()
+                    .delay(i * 300 + 1000)
+                    .duration(500)
+                    .attr("opacity", 1);
+
+                // 优化后标签
+                perfSvg.append("text")
+                    .attr("x", startX + 350)
+                    .attr("y", y - 5)
+                    .attr("fill", "#22c55e")
+                    .attr("font-size", "11px")
+                    .text("优化后");
+
+                // 优化后柱状图
+                const afterWidth = Math.min(metric.after * 10, 300);
+                perfSvg.append("rect")
+                    .attr("x", startX + 350)
+                    .attr("y", y)
+                    .attr("width", 0)
+                    .attr("height", barHeight)
+                    .attr("fill", "#22c55e")
+                    .attr("opacity", 0.6)
+                    .attr("rx", 5)
+                    .transition()
+                    .delay(i * 300 + 500)
+                    .duration(1000)
+                    .attr("width", afterWidth);
+
+                perfSvg.append("text")
+                    .attr("x", startX + 350 + afterWidth + 10)
+                    .attr("y", y + barHeight / 2 + 5)
+                    .attr("fill", "#22c55e")
+                    .attr("font-size", "12px")
+                    .attr("opacity", 0)
+                    .text(`${metric.after}${metric.afterUnit}`)
+                    .transition()
+                    .delay(i * 300 + 1500)
+                    .duration(500)
+                    .attr("opacity", 1);
+
+                // 改善比例
+                const improvement = Math.round((metric.before - metric.after) / metric.before * 100);
+                perfSvg.append("text")
+                    .attr("x", startX + 700)
+                    .attr("y", y + barHeight / 2 + 5)
+                    .attr("fill", "#4ade80")
+                    .attr("font-size", "14px")
+                    .attr("font-weight", "bold")
+                    .attr("opacity", 0)
+                    .text(`↓ ${improvement}%`)
+                    .transition()
+                    .delay(i * 300 + 2000)
+                    .duration(500)
+                    .attr("opacity", 1);
+            });
+
+            setTimeout(() => {
+                document.getElementById("performance-results").innerHTML = `
+                    <div class="text-green-400 font-bold mb-2">测试完成！</div>
+                    <div class="text-sm">• 查询速度提升: <span class="text-green-400 font-bold">50倍</span></div>
+                    <div class="text-sm">• CPU使用率降低: <span class="text-green-400 font-bold">67%</span></div>
+                    <div class="text-sm">• 并发能力提升: <span class="text-green-400 font-bold">50倍</span></div>
+                `;
+            }, 3000);
+        }
+
+        function resetPerformanceAnimation() {
+            if (perfSvg) {
+                perfSvg.selectAll("*").remove();
+                initPerformanceAnimation();
+            }
+            document.getElementById("performance-results").innerHTML = "点击\"运行性能测试\"查看优化前后的性能差异";
+        }
+
+        // ============================================================
+        // 动画 5: 数据质量检查
+        // ============================================================
+        let govSvg;
+
+        function initGovernanceAnimation() {
+            const container = document.getElementById("governance-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            govSvg = d3.select("#governance-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            govSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#22c55e")
+                .attr("font-size", "18px")
+                .attr("font-weight", "bold")
+                .text("数据质量自动检查");
+        }
+
+        function runQualityCheck() {
+            resetGovernanceAnimation();
+            const width = govSvg.node().clientWidth;
+
+            const checks = [
+                { name: "完整性检查", total: 1000, failed: 50, color: "#ef4444" },
+                { name: "一致性校验", total: 1000, failed: 30, color: "#f59e0b" },
+                { name: "重复检测", total: 1000, failed: 20, color: "#8b5cf6" },
+                { name: "格式验证", total: 1000, failed: 10, color: "#3b82f6" },
+                { name: "关系约束", total: 1000, failed: 15, color: "#22c55e" }
+            ];
+
+            let totalFailed = 0;
+            const startX = 150;
+            const barWidth = 300;
+            const barHeight = 35;
+            const gap = 45;
+
+            checks.forEach((check, i) => {
+                const y = 80 + i * (barHeight + gap);
+                totalFailed += check.failed;
+
+                // 检查名称
+                govSvg.append("text")
+                    .attr("x", 130)
+                    .attr("y", y + barHeight / 2 + 5)
+                    .attr("text-anchor", "end")
+                    .attr("fill", "#e2e8f0")
+                    .attr("font-size", "12px")
+                    .text(check.name);
+
+                // 背景条
+                govSvg.append("rect")
+                    .attr("x", startX)
+                    .attr("y", y)
+                    .attr("width", barWidth)
+                    .attr("height", barHeight)
+                    .attr("fill", "rgba(255,255,255,0.1)")
+                    .attr("rx", 5);
+
+                // 进度条
+                const successRate = ((check.total - check.failed) / check.total) * 100;
+                govSvg.append("rect")
+                    .attr("x", startX)
+                    .attr("y", y)
+                    .attr("width", 0)
+                    .attr("height", barHeight)
+                    .attr("fill", check.color)
+                    .attr("opacity", 0.7)
+                    .attr("rx", 5)
+                    .transition()
+                    .delay(i * 300)
+                    .duration(1000)
+                    .attr("width", barWidth * successRate / 100);
+
+                // 百分比
+                govSvg.append("text")
+                    .attr("x", startX + barWidth + 15)
+                    .attr("y", y + barHeight / 2 + 5)
+                    .attr("fill", check.color)
+                    .attr("font-size", "13px")
+                    .attr("font-weight", "bold")
+                    .attr("opacity", 0)
+                    .text(`${successRate.toFixed(1)}%`)
+                    .transition()
+                    .delay(i * 300 + 1000)
+                    .duration(500)
+                    .attr("opacity", 1);
+
+                // 失败数
+                govSvg.append("text")
+                    .attr("x", startX + barWidth + 80)
+                    .attr("y", y + barHeight / 2 + 5)
+                    .attr("fill", "#9ca3af")
+                    .attr("font-size", "11px")
+                    .attr("opacity", 0)
+                    .text(`(${check.failed}个问题)`)
+                    .transition()
+                    .delay(i * 300 + 1000)
+                    .duration(500)
+                    .attr("opacity", 1);
+            });
+
+            setTimeout(() => {
+                const overallQuality = ((checks.reduce((sum, c) => sum + c.total - c.failed, 0)) /
+                                        (checks.reduce((sum, c) => sum + c.total, 0))) * 100;
+
+                document.getElementById("governance-results").innerHTML = `
+                    <div class="text-yellow-400 font-bold mb-2">检查完成!</div>
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>• 总体质量: <span class="text-green-400 font-bold">${overallQuality.toFixed(1)}%</span></div>
+                        <div>• 发现问题: <span class="text-red-400 font-bold">${totalFailed}个</span></div>
+                        <div>• 完整性: <span class="text-blue-400">95.0%</span></div>
+                        <div>• 一致性: <span class="text-purple-400">97.0%</span></div>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-400">建议: 优先修复完整性问题(50个)</div>
+                `;
+            }, 3000);
+        }
+
+        function resetGovernanceAnimation() {
+            if (govSvg) {
+                govSvg.selectAll("*").remove();
+                initGovernanceAnimation();
+            }
+            document.getElementById("governance-results").innerHTML = "点击\"运行质量检查\"查看数据质量分析";
+        }
+
+        // ============================================================
+        // 动画 6: 未来趋势时间线
+        // ============================================================
+        let trendSvg;
+
+        const trends = [
+            { year: "2024", title: "GraphRAG爆发", desc: "LLM+KG融合成为热点，Microsoft、阿里等推出GraphRAG解决方案", icon: "🤖" },
+            { year: "2025", title: "多模态KG", desc: "文本、图像、视频知识图谱融合，跨模态推理成为现实", icon: "🎨" },
+            { year: "2026", title: "自动化构建", desc: "LLM驱动全自动知识抽取，人工标注需求大幅降低", icon: "⚡" },
+            { year: "2027", title: "神经符号AI", desc: "神经网络与符号推理深度融合，可解释AI成为主流", icon: "🧠" },
+            { year: "2028", title: "知识互联", desc: "个人、企业、行业知识图谱互联互通，形成全球知识网络", icon: "🌐" }
+        ];
+
+        function initTrendAnimation() {
+            const container = document.getElementById("trend-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 500;
+
+            trendSvg = d3.select("#trend-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // 时间线
+            const lineY = height / 2;
+            const startX = 80;
+            const endX = width - 80;
+
+            trendSvg.append("line")
+                .attr("x1", startX)
+                .attr("y1", lineY)
+                .attr("x2", endX)
+                .attr("y2", lineY)
+                .attr("stroke", "rgba(255,255,255,0.1)")
+                .attr("stroke-width", 4)
+                .attr("stroke-linecap", "round");
+
+            trendSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 50)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#ec4899")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("知识图谱未来发展趋势 (2024-2028)");
+
+            // 初始化里程碑点
+            trends.forEach((t, i) => {
+                const x = startX + (endX - startX) * (i / (trends.length - 1));
+
+                trendSvg.append("circle")
+                    .attr("cx", x)
+                    .attr("cy", lineY)
+                    .attr("r", 8)
+                    .attr("fill", "#ec4899")
+                    .attr("opacity", 0.3)
+                    .attr("class", `trend-point-${i}`);
+
+                trendSvg.append("text")
+                    .attr("x", x)
+                    .attr("y", lineY + 40)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#9ca3af")
+                    .attr("font-size", "14px")
+                    .attr("opacity", 0)
+                    .attr("class", `trend-year-${i}`)
+                    .text(t.year);
+            });
+        }
+
+        function playTrendAnimation() {
+            resetTrendAnimation();
+
+            trends.forEach((trend, i) => {
+                setTimeout(() => {
+                    const width = trendSvg.attr("width");
+                    const height = 500;
+                    const lineY = height / 2;
+                    const startX = 80;
+                    const endX = width - 80;
+                    const x = startX + (endX - startX) * (i / (trends.length - 1));
+
+                    // 高亮当前点
+                    trendSvg.select(`.trend-point-${i}`)
+                        .transition()
+                        .duration(500)
+                        .attr("r", 15)
+                        .attr("opacity", 1);
+
+                    trendSvg.select(`.trend-year-${i}`)
+                        .transition()
+                        .duration(500)
+                        .attr("opacity", 1);
+
+                    // 绘制卡片
+                    const cardY = i % 2 === 0 ? lineY - 120 : lineY + 80;
+                    const cardGroup = trendSvg.append("g")
+                        .attr("class", `trend-card-${i}`)
+                        .attr("transform", `translate(${x}, ${cardY})`)
+                        .style("opacity", 0);
+
+                    cardGroup.append("rect")
+                        .attr("x", -100)
+                        .attr("y", 0)
+                        .attr("width", 200)
+                        .attr("height", 70)
+                        .attr("rx", 10)
+                        .attr("fill", "rgba(236, 72, 153, 0.2)")
+                        .attr("stroke", "#ec4899")
+                        .attr("stroke-width", 2);
+
+                    cardGroup.append("text")
+                        .attr("x", 0)
+                        .attr("y", 25)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "white")
+                        .attr("font-size", "13px")
+                        .attr("font-weight", "bold")
+                        .text(`${trend.icon} ${trend.title}`);
+
+                    cardGroup.append("text")
+                        .attr("x", 0)
+                        .attr("y", 55)
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#ec4899")
+                        .attr("font-size", "14px")
+                        .text(trend.year);
+
+                    cardGroup.transition()
+                        .duration(500)
+                        .style("opacity", 1);
+
+                }, i * 1500);
+            });
+        }
+
+        function resetTrendAnimation() {
+            if (trendSvg) {
+                trends.forEach((_, i) => {
+                    trendSvg.selectAll(`.trend-card-${i}`).remove();
+                    trendSvg.select(`.trend-point-${i}`)
+                        .attr("r", 8)
+                        .attr("opacity", 0.3);
+                    trendSvg.select(`.trend-year-${i}`)
+                        .attr("opacity", 0);
+                });
+            }
+        }
+
+        // ============================================================
+        // 初始化
+        // ============================================================
+        document.addEventListener("DOMContentLoaded", function() {
+            initRecommendationAnimation();
+            initSearchAnimation();
+            initArchitectureAnimation();
+            initPerformanceAnimation();
+            initGovernanceAnimation();
+            initTrendAnimation();
+        });
+    </script>
+</body>
+</html>

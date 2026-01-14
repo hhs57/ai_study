@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>知识图谱学习平台 - 从理论到实践</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#f0fdf4',
+                            100: '#dcfce7',
+                            200: '#bbf7d0',
+                            300: '#86efac',
+                            400: '#4ade80',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            800: '#166534',
+                            900: '#14532d',
+                        },
+                        accent: {
+                            50: '#fdf4ff',
+                            100: '#fae8ff',
+                            200: '#f5d0fe',
+                            300: '#f0abfc',
+                            400: '#e879f9',
+                            500: '#d946ef',
+                            600: '#c026d3',
+                            700: '#a21caf',
+                            800: '#86198f',
+                            900: '#701a75',
+                        },
+                    },
+                    animation: {
+                        'float': 'float 6s ease-in-out infinite',
+                        'pulse-slow': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'shimmer': 'shimmer 2s linear infinite',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0px)' },
+                            '50%': { transform: 'translateY(-20px)' },
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-1000px 0' },
+                            '100%': { backgroundPosition: '1000px 0' },
+                        },
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* Animated background orbs */
+        .bg-orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: 0.3;
+            animation: float 8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: linear-gradient(135deg, #22c55e, #8b5cf6);
+            top: -200px;
+            left: -200px;
+            animation-delay: 0s;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: linear-gradient(135deg, #d946ef, #ec4899);
+            bottom: -150px;
+            right: -150px;
+            animation-delay: 2s;
+        }
+
+        .orb-3 {
+            width: 400px;
+            height: 400px;
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-delay: 4s;
+        }
+
+        /* Glassmorphism card */
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Module card gradient borders */
+        .module-card {
+            position: relative;
+            background: linear-gradient(135deg, rgba(34, 197, 94, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .module-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            padding: 1px;
+            background: linear-gradient(135deg, #22c55e, #8b5cf6, #d946ef);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .module-card:hover::before {
+            opacity: 1;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Text glow effect */
+        .text-glow {
+            text-shadow: 0 0 40px rgba(34, 197, 94, 0.5);
+        }
+
+        /* Badge styles */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .badge-beginner {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .badge-intermediate {
+            background: rgba(251, 191, 36, 0.2);
+            color: #fbbf24;
+            border: 1px solid rgba(251, 191, 36, 0.3);
+        }
+
+        .badge-advanced {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+    </style>
+</head>
+<body class="text-white">
+    <!-- Animated background -->
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+    <div class="bg-orb orb-3"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed top-4 left-4 right-4 z-50">
+        <div class="glass-card rounded-2xl px-6 py-4 max-w-7xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="../index.html" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xl font-bold">知识图谱学习平台</span>
+                </a>
+            </div>
+            <div class="flex items-center gap-6">
+                <a href="#modules" class="text-gray-300 hover:text-white transition-colors font-medium">课程模块</a>
+                <a href="#roadmap" class="text-gray-300 hover:text-white transition-colors font-medium">学习路径</a>
+                <a href="../index.html" class="text-gray-300 hover:text-white transition-colors">返回首页</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="min-h-screen flex items-center justify-center px-4 pt-24 pb-16">
+        <div class="max-w-6xl mx-auto text-center">
+            <div class="inline-flex items-center gap-2 glass-card px-4 py-2 rounded-full mb-8">
+                <span class="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span>
+                <span class="text-sm font-medium text-gray-300">12 个系统化学习模块</span>
+            </div>
+
+            <h1 class="text-5xl md:text-7xl font-extrabold mb-6 text-glow">
+                全面掌握
+                <span class="bg-gradient-to-r from-primary-400 via-accent-400 to-primary-400 bg-clip-text text-transparent">
+                    知识图谱
+                </span>
+                <br>技术与应用
+            </h1>
+
+            <p class="text-xl text-gray-400 mb-8 max-w-2xl mx-auto leading-relaxed">
+                从图论基础到 GraphRAG，通过 12 个渐进式课程模块，
+                系统学习知识图谱的理论基础、核心技术和前沿应用。
+            </p>
+
+            <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16">
+                <a href="#modules" class="group px-8 py-4 bg-gradient-to-r from-primary-600 to-accent-600 rounded-xl font-semibold text-lg transition-all hover:shadow-lg hover:shadow-primary-500/25 hover:scale-105">
+                    开始学习
+                    <svg class="inline-block w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </a>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-4xl mx-auto">
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="text-4xl font-bold text-primary-400 mb-2">12</div>
+                    <div class="text-sm text-gray-400">课程模块</div>
+                </div>
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="text-4xl font-bold text-accent-400 mb-2">50+</div>
+                    <div class="text-sm text-gray-400">实践示例</div>
+                </div>
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="text-4xl font-bold text-green-400 mb-2">100%</div>
+                    <div class="text-sm text-gray-400">免费开源</div>
+                </div>
+                <div class="glass-card rounded-2xl p-6">
+                    <div class="text-4xl font-bold text-yellow-400 mb-2">∞</div>
+                    <div class="text-sm text-gray-400">学习可能性</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Course Modules -->
+    <section id="modules" class="py-20 px-4">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-5xl font-bold mb-4">课程模块</h2>
+                <p class="text-xl text-gray-400">理论基础 → 核心技术 → 高级应用</p>
+            </div>
+
+            <!-- Theory Fundamentals -->
+            <div class="mb-12">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="h-px flex-1 bg-gradient-to-r from-transparent to-primary-500"></div>
+                    <h3 class="text-2xl font-bold text-primary-400">理论基础 (21-22)</h3>
+                    <div class="h-px flex-1 bg-gradient-to-l from-transparent to-primary-500"></div>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Module 21 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='21-graph-theory.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-xl font-bold">
+                                21
+                            </div>
+                            <span class="badge badge-beginner">入门</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-primary-400 transition-colors">图谱理论基础</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            现代知识图谱发展史、图论基础、网络理论、图的遍历算法、为什么图适合表示知识。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                4 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~60 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 22 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='22-knowledge-representation.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-xl font-bold">
+                                22
+                            </div>
+                            <span class="badge badge-beginner">入门</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-primary-400 transition-colors">知识表示理论</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            DIKW 模型、知识表示方法、逻辑推理基础、知识图谱演进、知识图谱类型对比。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                4 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~55 分钟
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Concepts -->
+            <div class="mb-12">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="h-px flex-1 bg-gradient-to-r from-transparent to-blue-500"></div>
+                    <h3 class="text-2xl font-bold text-blue-400">基础工具与概念 (23-26)</h3>
+                    <div class="h-px flex-1 bg-gradient-to-l from-transparent to-blue-500"></div>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Module 23 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='23-graph-modeling.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xl font-bold">
+                                23
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-blue-400 transition-colors">图数据建模原则</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            数据建模基础、图建模原则、Schema 设计、常见建模模式、建模最佳实践。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                5 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~60 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 24 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='24-rdf-basics.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center text-xl font-bold">
+                                24
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-blue-400 transition-colors">RDF 和语义网基础</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            RDF 三元组模型、序列化格式、语义网和 Linked Data、使用 rdflib 处理 RDF。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                4 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~50 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 25 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='25-ontology-modeling.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-accent-600 flex items-center justify-center text-xl font-bold">
+                                25
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-blue-400 transition-colors">本体和语义建模</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            RDFS、OWL 2、SHACL、其他语义标准（SKOS、Schema.org）、本体工程和 Protégé。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                5 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~60 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 26 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='26-graph-databases.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-accent-600 flex items-center justify-center text-xl font-bold">
+                                26
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-blue-400 transition-colors">图数据库基础</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            图数据库概述、Property Graph vs RDF Graph、Neo4j 入门、Cypher 查询语言基础。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                5 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~60 分钟
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Technologies -->
+            <div class="mb-12">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="h-px flex-1 bg-gradient-to-r from-transparent to-accent-500"></div>
+                    <h3 class="text-2xl font-bold text-accent-400">核心技术 (27-29)</h3>
+                    <div class="h-px flex-1 bg-gradient-to-l from-transparent to-accent-500"></div>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Module 27 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='27-sparql.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-500 to-accent-700 flex items-center justify-center text-xl font-bold">
+                                27
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-accent-400 transition-colors">SPARQL 和知识图谱查询</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            SPARQL 基础、进阶查询、路径查询、SPARQL UPDATE、联邦查询、使用 SPARQLWrapper。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                6 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~55 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 28 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='28-knowledge-extraction.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-500 to-purple-700 flex items-center justify-center text-xl font-bold">
+                                28
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-accent-400 transition-colors">知识抽取与构建</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            信息抽取基础、NLP 工具、NER 和关系抽取、实体链接和消歧、知识图谱构建流程。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                6 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~65 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 29 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='29-graph-algorithms.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-500 to-purple-700 flex items-center justify-center text-xl font-bold">
+                                29
+                            </div>
+                            <span class="badge badge-intermediate">进阶</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-accent-400 transition-colors">图算法与分析</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            路径查找算法、中心性算法、社区发现、Neo4j GDS 库、NetworkX 实践。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                6 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~70 分钟
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Applications -->
+            <div class="mb-12">
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="h-px flex-1 bg-gradient-to-r from-transparent to-pink-500"></div>
+                    <h3 class="text-2xl font-bold text-pink-400">高级应用 (30-32)</h3>
+                    <div class="h-px flex-1 bg-gradient-to-l from-transparent to-pink-500"></div>
+                </div>
+
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Module 30 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='30-kg-visualization.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-700 flex items-center justify-center text-xl font-bold">
+                                30
+                            </div>
+                            <span class="badge badge-advanced">高级</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-pink-400 transition-colors">知识图谱可视化</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            可视化基础、Neo4j 可视化工具、Python 可视化库、大规模图可视化、最佳实践。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                5 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~50 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 31 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='31-graphrag.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-red-700 flex items-center justify-center text-xl font-bold">
+                                31
+                            </div>
+                            <span class="badge badge-advanced">高级</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-pink-400 transition-colors">GraphRAG</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            传统 RAG 的局限性、GraphRAG 架构、实现方案（LangChain + Neo4j）、知识图谱检索策略。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                5 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~70 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 32 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='32-kg-applications.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-red-500 to-orange-700 flex items-center justify-center text-xl font-bold">
+                                32
+                            </div>
+                            <span class="badge badge-advanced">高级</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-red-400 transition-colors">知识图谱应用与最佳实践</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            推荐系统、语义搜索、架构模式、性能优化、知识图谱治理、未来趋势。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                </svg>
+                                6 个示例
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~75 分钟
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Module 33 -->
+                    <div class="module-card glass-card rounded-2xl p-6 cursor-pointer group" onclick="location.href='33-reasoning.html'">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-700 flex items-center justify-center text-xl font-bold">
+                                33
+                            </div>
+                            <span class="badge badge-advanced">高级</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3 group-hover:text-indigo-400 transition-colors">推理机制详解</h3>
+                        <p class="text-gray-400 text-sm mb-4 leading-relaxed">
+                            RDFS推理规则、OWL推理机制、Tableau算法、推理工具、推理策略与权衡。
+                        </p>
+                        <div class="flex items-center text-sm text-gray-500 gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                </svg>
+                                5 个章节
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                ~90 分钟
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section id="roadmap" class="py-20 px-4">
+        <div class="max-w-4xl mx-auto text-center">
+            <div class="glass-card rounded-3xl p-12">
+                <h2 class="text-4xl md:text-5xl font-bold mb-6">准备好开始了吗?</h2>
+                <p class="text-xl text-gray-400 mb-8 leading-relaxed">
+                    加入我们的知识图谱学习之旅,从零开始构建强大的知识图谱应用。
+                    所有课程完全免费,代码开源,随时学习。
+                </p>
+                <a href="#modules" class="inline-block px-10 py-5 bg-gradient-to-r from-primary-600 to-accent-600 rounded-xl font-bold text-xl transition-all hover:shadow-lg hover:shadow-primary-500/25 hover:scale-105">
+                    立即开始学习
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-4 border-t border-white/10">
+        <div class="max-w-6xl mx-auto">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                        </svg>
+                    </div>
+                    <span class="text-lg font-bold">知识图谱学习平台</span>
+                </div>
+                <p class="text-gray-500 text-sm">
+                    开源项目 · MIT License · 2024
+                </p>
+                <a href="../index.html" class="text-gray-400 hover:text-white transition-colors">返回首页</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Intersection Observer for scroll animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.opacity = '1';
+                    entry.target.style.transform = 'translateY(0)';
+                }
+            });
+        }, observerOptions);
+
+        // Observe all cards
+        document.querySelectorAll('.module-card, .glass-card').forEach(card => {
+            card.style.opacity = '0';
+            card.style.transform = 'translateY(20px)';
+            card.style.transition = 'opacity 0.6s ease-out, transform 0.6s ease-out';
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html>

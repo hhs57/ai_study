@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块33: 推理机制详解 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #22c55e, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .concept-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            overflow-x: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .code-block code {
+            color: #e2e8f0;
+        }
+
+        .keyword {
+            color: #f472b6;
+        }
+
+        .uri {
+            color: #60a5fa;
+        }
+
+        .string {
+            color: #4ade80;
+        }
+
+        .comment {
+            color: #94a3b8;
+        }
+
+        .animation-container {
+            margin: 30px 0;
+        }
+
+        .animation-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(34, 197, 94, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.05);
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body class="text-white">
+    <!-- Animated background -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <!-- Navigation -->
+    <div class="container">
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                    <a href="32-kg-applications.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                        上一模块
+                    </a>
+                    <span class="text-gray-600">最后模块</span>
+                </div>
+                <div class="text-gray-400 text-sm">模块 33 / 33</div>
+            </div>
+        </div>
+
+        <!-- Module Header -->
+        <div class="glass-card">
+            <h1 class="text-4xl font-bold mb-4 bg-gradient-to-r from-green-400 to-purple-400 bg-clip-text text-transparent">
+                推理机制详解
+            </h1>
+            <p class="text-xl text-gray-400 mb-6">
+                深入理解RDFS和OWL的推理机制,掌握从已知知识推导新知识的能力
+            </p>
+            <div class="flex flex-wrap gap-3">
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">高级模块</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~75 分钟</span>
+                <span class="px-4 py-2 bg-green-500/20 text-green-400 rounded-full border border-green-500/30">3 个交互动画</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: 什么是推理 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. 什么是推理?</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">推理的定义</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>推理(Reasoning)</strong>是从<strong>已知知识</strong>出发,通过逻辑规则推导出<strong>新知识</strong>的过程。
+                    在知识图谱中,推理允许我们自动发现隐含的关系、分类实例、验证一致性。
+                </p>
+                <p class="text-gray-400">
+                    推理是知识图谱区别于传统数据库的核心能力之一。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">为什么需要推理?</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-blue-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">1. 发现隐含知识</div>
+                        <p class="text-gray-300 text-sm">
+                            例如: 知道"Alice是Employee"和"Employee是Person的子类",可以自动推断"Alice是Person"
+                        </p>
+                    </div>
+                    <div class="bg-green-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">2. 数据一致性检查</div>
+                        <p class="text-gray-300 text-sm">
+                            例如: 声明"某人既是Male又是Female",可以检测出冲突(假设这两个类不相交)
+                        </p>
+                    </div>
+                    <div class="bg-purple-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">3. 减少数据冗余</div>
+                        <p class="text-gray-300 text-sm">
+                            不需要显式存储所有可推导的知识,推理时动态计算
+                        </p>
+                    </div>
+                    <div class="bg-pink-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-pink-400 mb-2">4. 支持复杂查询</div>
+                        <p class="text-gray-300 text-sm">
+                            例如: 查找"所有 indirectly-knows 的人",通过推理链自动发现
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-purple-300 mb-3">推理 vs 查询</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr>
+                                <th class="text-left text-gray-400">维度</th>
+                                <th class="text-left text-blue-400">查询(Query)</th>
+                                <th class="text-left text-green-400">推理(Reasoning)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr>
+                                <td class="font-bold">目的</td>
+                                <td>检索已有的数据</td>
+                                <td>生成新的知识</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold">输出</td>
+                                <td>匹配的数据</td>
+                                <td>推导的事实</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold">能力</td>
+                                <td>模式匹配</td>
+                                <td>逻辑推导</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold">例子</td>
+                                <td>"查找所有Person"</td>
+                                <td>"从Employee推断Person"</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: RDFS推理 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. RDFS推理</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">RDFS推理规则</h3>
+                <p class="text-gray-300 mb-4">
+                    RDFS定义了一套简单的推理规则,支持基本的类层次和属性推理。
+                </p>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr>
+                                <th class="text-left text-gray-400">规则</th>
+                                <th class="text-left text-gray-400">如果(前提)</th>
+                                <th class="text-left text-gray-400">那么(结论)</th>
+                                <th class="text-left text-gray-400">示例</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr>
+                                <td class="font-bold text-blue-400">rdfs1</td>
+                                <td>?x rdf:type ?c<br>?c rdfs:subClassOf ?d</td>
+                                <td>?x rdf:type ?d</td>
+                                <td>Alice rdf:type Employee<br>Employee rdfs:subClassOf Person<br>→ Alice rdf:type Person</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-green-400">rdfs2</td>
+                                <td>?a ?p ?b<br>?p rdfs:subPropertyOf ?q</td>
+                                <td>?a ?q ?b</td>
+                                <td>Alice ex:fatherOf Bob<br>ex:fatherOf rdfs:subPropertyOf ex:parentOf<br>→ Alice ex:parentOf Bob</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-purple-400">rdfs3</td>
+                                <td>?p rdfs:domain ?c<br>?x ?p ?y</td>
+                                <td>?x rdf:type ?c</td>
+                                <td>ex:parentOf rdfs:domain ex:Person<br>Alice ex:parentOf Bob<br>→ Alice rdf:type Person</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-pink-400">rdfs4</td>
+                                <td>?p rdfs:range ?c<br>?x ?p ?y</td>
+                                <td>?y rdf:type ?c</td>
+                                <td>ex:parentOf rdfs:range ex:Person<br>Alice ex:parentOf Bob<br>→ Bob rdf:type Person</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-yellow-400">rdfs5</td>
+                                <td>?x ?p ?y<br>?p rdf:type rdf:Property</td>
+                                <td>?y rdf:type rdfs:Resource</td>
+                                <td>Alice ex:knows Bob<br>→ Bob rdf:type rdfs:Resource</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-orange-400">rdfs6</td>
+                                <td>?x rdf:type ?c<br>?c rdfs:subClassOf ?d<br>?d rdfs:subClassOf ?e</td>
+                                <td>?x rdf:type ?e</td>
+                                <td>Employee rdfs:subClassOf Person<br>Person rdfs:subClassOf Agent<br>→ Employee的实例也是Agent</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-cyan-400">rdfs7</td>
+                                <td>?x rdf:type rdfs:Class</td>
+                                <td>?x rdfs:subClassOf rdfs:Resource</td>
+                                <td>ex:Person rdf:type rdfs:Class<br>→ ex:Person rdfs:subClassOf rdfs:Resource</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-red-400">rdfs8</td>
+                                <td>?x rdf:type rdfs:Class</td>
+                                <td>?x rdfs:subClassOf ?x</td>
+                                <td>所有类都是自己的子类(自反)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 动画: RDFS推理链 -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                    动画: RDFS推理链示例
+                </div>
+                <div id="rdfs-reasoning-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playRDFSReasoning()">▶ 播放推理</button>
+                    <button class="btn btn-secondary" onclick="resetRDFSReasoning()">↺ 重置</button>
+                </div>
+                <div class="info-panel">
+                    <div class="text-green-400 font-bold mb-2">推理示例:</div>
+                    <div id="rdfs-reasoning-info" class="text-gray-300 text-sm">
+                        已知: Alice rdf:type Employee<br>
+                        已知: Employee rdfs:subClassOf Person<br>
+                        推理: Alice rdf:type Person (通过rdfs1规则)
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">RDFS推理的特点</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-green-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">✅ 优势</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 推理速度快(PTime)</li>
+                            <li>• 规则简单直观</li>
+                            <li>• 适合大规模数据</li>
+                            <li>• 所有推理机都支持</li>
+                        </ul>
+                    </div>
+                    <div class="bg-red-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-red-400 mb-2">❌ 限制</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 表达能力有限</li>
+                            <li>• 无基数约束</li>
+                            <li>• 无类表达式</li>
+                            <li>• 只能做简单推理</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 3: OWL推理 -->
+        <div class="glass-card">
+            <h2 class="section-title">3. OWL推理</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">OWL推理的复杂性</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    OWL 2基于<strong>描述逻辑(Description Logic)</strong>,提供强大的表达能力,但推理复杂度也显著增加。
+                    OWL 2 DL的推理复杂度是<strong>N2ExpTime-complete</strong>,这意味着在最坏情况下,推理时间随本体大小指数增长。
+                </p>
+                <p class="text-gray-400">
+                    因此,OWL 2提供了多个子语言(OWL 2 EL、QL、RL),在表达能力和推理复杂度之间提供不同的权衡点。
+                </p>
+            </div>
+
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">OWL推理类型</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div>
+                        <div class="font-bold text-blue-400 mb-2">1. 类表达式推理</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            从类的定义推导实例分类
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment">定义</span>
+<span class="uri">ex:Parent</span> <span class="uri">owl:equivalentClass</span> [
+    <span class="uri">owl:intersectionOf</span> (
+        <span class="uri">ex:Man</span>
+        <span class="uri">ex:Woman</span>
+    )
+] .
+
+<span class="comment">推理</span>
+<span class="comment">任何人如果既是Man又是Woman,则自动分类为Parent</span></code>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-green-400 mb-2">2. 属性特征推理</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            从属性的特征(对称、传递等)推导新关系
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment">定义</span>
+<span class="uri">ex:knows</span> <span class="uri">rdf:type</span> <span class="uri">owl:SymmetricProperty</span> .
+
+<span class="comment">推理</span>
+<span class="uri">ex:alice</span> <span class="uri">ex:knows</span> <span class="uri">ex:bob</span> .
+<span class="comment">→ ex:bob ex:knows ex:alice</span></code>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-purple-400 mb-2">3. 基数约束推理</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            从属性的基数约束推导隐含关系
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment">定义</span>
+<span class="uri">ex:hasMother</span> <span class="uri">rdf:type</span> <span class="uri">owl:FunctionalProperty</span> .
+
+<span class="comment">推理</span>
+<span class="uri">ex:alice</span> <span class="uri">ex:hasMother</span> <span class="uri">ex:bob</span> .
+<span class="uri">ex:alice</span> <span class="uri">ex:hasMother</span> <span class="uri">ex:carol</span> .
+<span class="comment">→ ex:bob = ex:carol (唯一值)</span></code>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-pink-400 mb-2">4. 一致性检查</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            检测本体和数据中的逻辑冲突
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment">定义</span>
+<span class="uri">ex:Male</span> <span class="uri">owl:disjointWith</span> <span class="uri">ex:Female</span> .
+
+<span class="comment">检测冲突</span>
+<span class="uri">ex:alice</span> <span class="uri">rdf:type</span> <span class="uri">ex:Male</span> .
+<span class="uri">ex:alice</span> <span class="uri">rdf:type</span> <span class="uri">ex:Female</span> .
+<span class="comment">→ 不一致!冲突检测</span></code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 动画: OWL一致性检查 -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    动画: OWL一致性检查
+                </div>
+                <div id="owl-consistency-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playOWLConsistency()">▶ 检查一致性</button>
+                    <button class="btn btn-secondary" onclick="resetOWLConsistency()">↺ 重置</button>
+                </div>
+                <div class="info-panel">
+                    <div class="text-purple-400 font-bold mb-2">一致性检查流程:</div>
+                    <div id="owl-consistency-info" class="text-gray-300 text-sm">
+                        检查本体和数据是否存在逻辑冲突
+                    </div>
+                </div>
+            </div>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-orange-300 mb-3">Tableau算法简介</h3>
+                <p class="text-gray-300 mb-3">
+                    <strong>Tableau算法</strong>是OWL DL推理的核心算法,用于判断一致性、计算分类。
+                </p>
+                <div class="space-y-3 text-sm">
+                    <div class="flex items-start gap-3">
+                        <span class="text-blue-400">1️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">构建模型</div>
+                            <p class="text-gray-400">为类表达式创建候选模型( tableau)</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400">2️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">应用规则</div>
+                            <p class="text-gray-400">通过 tableau 规则扩展模型</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-purple-400">3️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">检测冲突</div>
+                            <p class="text-gray-400">如果发现矛盾(如A and not A),则不可满足</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-pink-400">4️⃣</span>
+                        <div>
+                            <div class="font-bold text-gray-300">回溯</div>
+                            <p class="text-gray-400">如果所有规则都应用完且无冲突,则一致</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-red-300 mb-3">⚠️ 推理复杂度警告</h3>
+                <div class="bg-red-500/20 p-4 rounded-lg border-l-4 border-red-500">
+                    <p class="text-gray-300 text-sm mb-2">
+                        <strong>OWL 2 DL的推理复杂度是N2ExpTime-complete</strong>
+                    </p>
+                    <p class="text-gray-400 text-sm">
+                        这意味着在最坏情况下,推理时间随本体大小呈<strong>双重指数</strong>增长。
+                        对于大型本体(如SNOMED CT医学本体,包含30万概念),OWL DL推理可能需要数小时甚至数天。
+                    </p>
+                </div>
+                <div class="mt-4 p-3 bg-green-500/20 rounded-lg">
+                    <p class="text-green-400 text-sm font-bold mb-1">💡 实践建议</p>
+                    <p class="text-gray-300 text-sm">
+                        对于大规模数据,优先使用OWL 2 EL或RL子语言,它们在PTime内可完成推理。
+                        如果必须使用OWL DL,考虑<strong>预计算推理</strong>(离线推理,存储结果)而非实时推理。
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 推理工具 -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 推理工具</h2>
+
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-300 mb-3">Apache Jena</h3>
+                    <p class="text-gray-400 text-sm mb-3">
+                        Java框架,支持RDFS、OWL推理
+                    </p>
+                    <div class="code-block text-sm">
+<code><span class="comment">// Java代码</span>
+<span class="keyword">Reasoner</span> reasoner = <span class="keyword">new</span> <span class="uri">OWLReasoner</span>();
+Model model = ModelFactory.
+    createDefaultModel();
+reasoner = reasoner.bind(model);</code>
+                    </div>
+                    <div class="mt-3 text-sm">
+                        <div class="text-green-400">✅ 支持完整OWL</div>
+                        <div class="text-yellow-400">⚠️ 较慢</div>
+                    </div>
+                </div>
+
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-300 mb-3">RDF4J</h3>
+                    <p class="text-gray-400 text-sm mb-3">
+                        Java框架,高性能推理
+                    </p>
+                    <div class="code-block text-sm">
+<code><span class="comment">// Java代码</span>
+<span class="keyword">Sail</span> sail = <span class="keyword">new</span> <span class="uri">ReasoningSail</span>(
+    <span class="keyword">new</span> <span class="uri">MemoryStore</span>()
+);
+Repository repo = <span class="keyword">new</span> <span class="uri">SailRepository</span>(sail);</code>
+                    </div>
+                    <div class="mt-3 text-sm">
+                        <div class="text-green-400">✅ 高性能</div>
+                        <div class="text-blue-400">✅ 可扩展</div>
+                    </div>
+                </div>
+
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-purple-300 mb-3">Protégé</h3>
+                    <p class="text-gray-400 text-sm mb-3">
+                        图形化本体编辑器,内置推理机
+                    </p>
+                    <div class="code-block text-sm">
+<code><span class="comment"># 内置推理机</span>
+• Pellet
+• FaCT++
+• HermiT
+• Elk</code>
+                    </div>
+                    <div class="mt-3 text-sm">
+                        <div class="text-green-400">✅ 图形界面</div>
+                        <div class="text-pink-400">✅ 实时推理</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 5: 推理的权衡 -->
+        <div class="glass-card">
+            <h2 class="section-title">5. 推理的权衡: 能力 vs 性能</h2>
+
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">何时使用推理?</h3>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-green-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">✅ 适合场景</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 需要自动发现隐含知识</li>
+                            <li>• 数据规模中小型(<10万三元组)</li>
+                            <li>• 需要一致性检查</li>
+                            <li>• 复杂的本体建模</li>
+                            <li>• 离线知识推理</li>
+                        </ul>
+                    </div>
+                    <div class="bg-red-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-red-400 mb-2">❌ 不适合场景</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 超大规模数据(百万级三元组)</li>
+                            <li>• 需要实时查询响应</li>
+                            <li>• 简单的类型系统(RDFS够用)</li>
+                            <li>• 频繁数据更新</li>
+                            <li>• 推理结果变化不频繁</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">推理策略对比</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr>
+                                <th class="text-left text-gray-400">策略</th>
+                                <th class="text-left text-gray-400">说明</th>
+                                <th class="text-left text-gray-400">优点</th>
+                                <th class="text-left text-gray-400">缺点</th>
+                                <th class="text-left text-gray-400">适用场景</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr>
+                                <td class="font-bold text-blue-400">实时推理</td>
+                                <td>每次查询时动态推理</td>
+                                <td>总是最新结果</td>
+                                <td>查询慢</td>
+                                <td>小规模数据,频繁更新</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-green-400">预计算推理</td>
+                                <td>离线推理,存储结果</td>
+                                <td>查询极快</td>
+                                <td>结果可能过时</td>
+                                <td>大规模数据,静态本体</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-purple-400">增量推理</td>
+                                <td>只推理新增数据</td>
+                                <td>平衡性能和新鲜度</td>
+                                <td>实现复杂</td>
+                                <td>中等规模,周期性更新</td>
+                            </tr>
+                            <tr>
+                                <td class="font-bold text-pink-400">混合推理</td>
+                                <td>预计算 + 实时补充</td>
+                                <td>兼顾性能和完整性</td>
+                                <td>系统复杂</td>
+                                <td>复杂系统,多级缓存</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">推理的局限性</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <span class="text-red-400 text-xl">⚠️</span>
+                        <div>
+                            <div class="font-bold text-gray-300">计算复杂度高</div>
+                            <p class="text-gray-400 text-sm">
+                                OWL DL推理在最坏情况下是N2ExpTime,大规模数据可能非常慢
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-orange-400 text-xl">⚠️</span>
+                        <div>
+                            <div class="font-bold text-gray-300">解释性有限</div>
+                            <p class="text-gray-400 text-sm">
+                                难以向用户解释"为什么推导出这个结论"(黑盒)
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-yellow-400 text-xl">⚠️</span>
+                        <div>
+                            <div class="font-bold text-gray-300">过度推理</div>
+                            <p class="text-gray-400 text-sm">
+                                可能推导出大量不相关或无用的知识,增加系统负担
+                            </p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-pink-400 text-xl">⚠️</span>
+                        <div>
+                            <div class="font-bold text-gray-300">维护成本高</div>
+                            <p class="text-gray-400 text-sm">
+                                复杂的本体和推理规则难以维护和调试
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="glass-card">
+            <h2 class="section-title">模块总结</h2>
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-green-400 mb-3">核心要点</h3>
+                <ul class="text-gray-300 space-y-2">
+                    <li>✅ <strong>推理</strong>: 从已知知识推导新知识的能力</li>
+                    <li>✅ <strong>RDFS推理</strong>: 简单高效,适合大规模数据</li>
+                    <li>✅ <strong>OWL推理</strong>: 强大但复杂,适合中小规模</li>
+                    <li>✅ <strong>推理策略</strong>: 实时vs预计算vs增量vs混合</li>
+                    <li>✅ <strong>权衡</strong>: 能力vs性能,需根据场景选择</li>
+                </ul>
+            </div>
+
+            <div class="concept-card mt-4">
+                <h3 class="text-xl font-bold text-blue-400 mb-3">下一步学习</h3>
+                <a href="30-kg-visualization.html" class="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-2">
+                    模块 30: 知识图谱可视化 - 学习如何可视化推理结果
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                    </svg>
+                </a>
+            </div>
+        </div>
+
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 33: 推理机制详解</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 动画: RDFS推理链
+        // ============================================================
+        let rdfsReasoningSvg, rdfsReasoningStep = 0;
+
+        function initRDFSReasoning() {
+            const container = document.getElementById("rdfs-reasoning-animation");
+            if (container.children.length > 0) return;
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            rdfsReasoningSvg = d3.select("#rdfs-reasoning-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            // 绘制推理链
+            drawRDFSReasoningStep(0);
+        }
+
+        function drawRDFSReasoningStep(step) {
+            const width = rdfsReasoningSvg.attr("width");
+            const height = rdfsReasoningSvg.attr("height");
+            rdfsReasoningSvg.selectAll("*").remove();
+
+            const nodes = [
+                { id: 1, x: width * 0.2, y: height * 0.3, label: "Alice", type: "instance", color: "#3b82f6" },
+                { id: 2, x: width * 0.5, y: height * 0.3, label: "Employee", type: "class", color: "#22c55e" },
+                { id: 3, x: width * 0.8, y: height * 0.3, label: "Person", type: "class", color: "#a855f7" },
+            ];
+
+            const links = [
+                { source: 1, target: 2, label: "rdf:type", color: "#60a5fa" },
+                { source: 2, target: 3, label: "subClassOf", color: "#4ade80" },
+            ];
+
+            // 绘制箭头
+            rdfsReasoningSvg.append("defs")
+                .append("marker")
+                .attr("id", "arrowhead")
+                .attr("viewBox", "0 0 10 10")
+                .attr("refX", 8)
+                .attr("refY", 5)
+                .append("path")
+                .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                .attr("fill", "#60a5fa");
+
+            // 绘制边
+            rdfsReasoningSvg.selectAll(".link")
+                .data(links)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("x1", d => d.source.x)
+                .attr("y1", d => d.source.y)
+                .attr("x2", d => d.target.x)
+                .attr("y2", d => d.target.y)
+                .attr("stroke", d => d.color)
+                .attr("stroke-width", 2)
+                .attr("marker-end", "url(#arrowhead)");
+
+            // 绘制边标签
+            rdfsReasoningSvg.selectAll(".link-label")
+                .data(links)
+                .enter()
+                .append("text")
+                .attr("x", d => (d.source.x + d.target.x) / 2)
+                .attr("y", d => d.source.y - 10)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#9ca3af")
+                .attr("font-size", "12px")
+                .text(d => d.label);
+
+            // 绘制节点
+            rdfsReasoningSvg.selectAll(".node")
+                .data(nodes)
+                .enter()
+                .append("circle")
+                .attr("class", "node")
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y)
+                .attr("r", 40)
+                .attr("fill", d => d.color)
+                .attr("opacity", d => d.id === 1 ? 1 : (d.id === 2 ? 1 : (step >= 1 ? 0.3 : 1)));
+
+            // 绘制节点标签
+            rdfsReasoningSvg.selectAll(".node-label")
+                .data(nodes)
+                .enter()
+                .append("text")
+                .attr("x", d => d.x)
+                .attr("y", d => d.y)
+                .attr("text-anchor", "middle")
+                .attr("dy", "0.35em")
+                .attr("fill", "white")
+                .attr("font-weight", "bold")
+                .text(d => d.label);
+
+            // 绘制推理结果
+            if (step >= 1) {
+                rdfsReasoningSvg.append("line")
+                    .attr("x1", nodes[0].x)
+                    .attr("y1", nodes[0].y + 50)
+                    .attr("x2", nodes[2].x)
+                    .attr("y2", nodes[0].y + 50)
+                    .attr("stroke", "#fbbf24")
+                    .attr("stroke-width", 2)
+                    .attr("stroke-dasharray", "5,5");
+
+                rdfsReasoningSvg.append("text")
+                    .attr("x", width / 2)
+                    .attr("y", nodes[0].y + 80)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "#fbbf24")
+                    .attr("font-size", "14px")
+                    .text("推理: Alice rdf:type Person");
+            }
+        }
+
+        function playRDFSReasoning() {
+            initRDFSReasoning();
+            rdfsReasoningStep = 0;
+            drawRDFSReasoningStep(0);
+
+            setTimeout(() => {
+                rdfsReasoningStep = 1;
+                drawRDFSReasoningStep(1);
+            }, 1000);
+        }
+
+        function resetRDFSReasoning() {
+            initRDFSReasoning();
+            rdfsReasoningStep = 0;
+            drawRDFSReasoningStep(0);
+        }
+
+        // ============================================================
+        // 动画: OWL一致性检查
+        // ============================================================
+        let owlConsistencySvg;
+
+        function initOWLConsistency() {
+            const container = document.getElementById("owl-consistency-animation");
+            if (container.children.length > 0) return;
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            owlConsistencySvg = d3.select("#owl-consistency-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+        }
+
+        function playOWLConsistency() {
+            initOWLConsistency();
+            const width = owlConsistencySvg.attr("width");
+            const height = owlConsistencySvg.attr("height");
+            owlConsistencySvg.selectAll("*").remove();
+
+            const nodes = [
+                { id: "alice", x: width * 0.5, y: height * 0.3, label: "Alice", color: "#3b82f6" },
+                { id: "male", x: width * 0.3, y: height * 0.6, label: "Male", color: "#22c55e" },
+                { id: "female", x: width * 0.7, y: height * 0.6, label: "Female", color: "#a855f7" },
+            ];
+
+            // 绘制节点
+            owlConsistencySvg.selectAll(".node")
+                .data(nodes)
+                .enter()
+                .append("circle")
+                .attr("class", "node")
+                .attr("cx", d => d.x)
+                .attr("cy", d => d.y)
+                .attr("r", 40)
+                .attr("fill", d => d.color);
+
+            owlConsistencySvg.selectAll(".node-label")
+                .data(nodes)
+                .enter()
+                .append("text")
+                .attr("x", d => d.x)
+                .attr("y", d => d.y)
+                .attr("text-anchor", "middle")
+                .attr("dy", "0.35em")
+                .attr("fill", "white")
+                .attr("font-weight", "bold")
+                .text(d => d.label);
+
+            // 绘制rdf:type关系
+            owlConsistencySvg.append("line")
+                .attr("x1", nodes[0].x)
+                .attr("y1", nodes[0].y + 40)
+                .attr("x2", nodes[1].x)
+                .attr("y2", nodes[1].y - 40)
+                .attr("stroke", "#60a5fa")
+                .attr("stroke-width", 2)
+                .transition()
+                .duration(500)
+                .attr("x2", nodes[2].x)
+                .attr("y2", nodes[2].y - 40);
+
+            owlConsistencySvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height * 0.85)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#ef4444")
+                .attr("font-size", "16px")
+                .text("冲突! Alice不能既是Male又是Female");
+        }
+
+        function resetOWLConsistency() {
+            initOWLConsistency();
+            owlConsistencySvg.selectAll("*").remove();
+        }
+
+        // 初始化
+        document.addEventListener("DOMContentLoaded", () => {
+            // 初始化所有动画容器
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Skill(ui-ux-pro-max:*)",
+      "Bash(cd:*)",
+      "Bash(cat:*)",
+      "Bash(python:*)",
+      "Bash(node:*)",
+      "Bash(pip install:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(rm:*)",
+      "Bash(start:*)",
+      "Bash(powershell:*)",
+      "Bash(tree:*)",
+      "Bash(grep:*)",
+      "Skill(ralph-loop:help)",
+      "Skill(ralph-loop:help:*)",
+      "Skill(ralph-x3)",
+      "Skill(ralph-x3:*)"
+    ]
+  }
+}

@@ -1,0 +1,1573 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangGraph Agent - LangChain 学习 15</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 浮动光球 */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(236, 72, 153, 0.2) 0%, rgba(168, 85, 247, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -30px) scale(1.1); }
+            50% { transform: translate(-20px, 20px) scale(0.9); }
+            75% { transform: translate(-30px, -20px) scale(1.05); }
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 头部 */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(167, 139, 250, 0.3);
+        }
+
+        .header p {
+            font-size: 1.3em;
+            color: rgba(226, 232, 240, 0.8);
+        }
+
+        /* 进度条 */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6 0%, #a855f7 50%, #d946ef 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* 场景容器 */
+        .scene {
+            display: none;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .scene.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 场景标题 */
+        .scene-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 动画画布 */
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Agent 可视化 */
+        .agent-visualization {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            padding: 30px 20px;
+            flex-wrap: wrap;
+            position: relative;
+        }
+
+        .agent-node {
+            background: rgba(139, 92, 246, 0.2);
+            border: 3px solid rgba(139, 92, 246, 0.5);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            min-width: 130px;
+            transition: all 0.5s;
+            transform: scale(0.8);
+            opacity: 0;
+            position: relative;
+        }
+
+        .agent-node.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .agent-node.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: rgba(34, 197, 94, 0.7);
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+            transform: scale(1.2);
+            animation: nodeActive 0.6s ease-in-out;
+        }
+
+        @keyframes nodeActive {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1.2); }
+        }
+
+        .agent-node.deciding {
+            animation: deciding 0.5s ease-in-out infinite;
+        }
+
+        @keyframes deciding {
+            0%, 100% { transform: scale(1.2) rotate(0deg); }
+            25% { transform: scale(1.25) rotate(-2deg); }
+            75% { transform: scale(1.25) rotate(2deg); }
+        }
+
+        .agent-node .icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .agent-node h4 {
+            color: #a78bfa;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+
+        .agent-node p {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.85em;
+        }
+
+        .agent-arrow {
+            font-size: 2.5em;
+            color: #8b5cf6;
+            opacity: 0;
+            transition: all 0.5s;
+            display: inline-block;
+        }
+
+        .agent-arrow.visible {
+            opacity: 1;
+        }
+
+        .agent-arrow.flow {
+            animation: arrowFlow 1s ease-in-out infinite;
+        }
+
+        @keyframes arrowFlow {
+            0%, 100% { transform: translateX(0); opacity: 0.6; }
+            50% { transform: translateX(5px); opacity: 1; }
+        }
+
+        .loop-back-arrow {
+            position: absolute;
+            font-size: 3em;
+            color: #d946ef;
+            opacity: 0;
+            transition: all 0.5s;
+        }
+
+        .loop-back-arrow.visible {
+            opacity: 1;
+            animation: loopPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes loopPulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.3); opacity: 1; }
+        }
+
+        /* 循环路径可视化 */
+        .loop-path {
+            position: absolute;
+            border: 3px dashed #d946ef;
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loop-path.visible {
+            opacity: 0.6;
+            animation: loopPathPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes loopPathPulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+
+        /* 数据流动画 */
+        .data-flow {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: radial-gradient(circle, #22c55e 0%, #16a34a 100%);
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+        }
+
+        .data-flow.animate {
+            animation: dataFlowMove 1s ease-in-out forwards;
+        }
+
+        /* 工具列表 */
+        .tool-list {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+
+        .tool-item {
+            background: rgba(14, 165, 233, 0.2);
+            border: 2px solid rgba(14, 165, 233, 0.4);
+            border-radius: 12px;
+            padding: 15px 20px;
+            text-align: center;
+            transition: all 0.3s;
+            transform: scale(0.9);
+            opacity: 0;
+        }
+
+        .tool-item.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .tool-item:hover {
+            background: rgba(14, 165, 233, 0.3);
+            transform: scale(1.05);
+        }
+
+        .tool-item.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: rgba(34, 197, 94, 0.6);
+            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+            animation: toolActivate 0.6s ease-in-out;
+        }
+
+        @keyframes toolActivate {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.15) rotate(3deg); }
+            100% { transform: scale(1.05) rotate(0deg); }
+        }
+
+        .tool-icon {
+            font-size: 2em;
+            margin-bottom: 5px;
+            transition: transform 0.3s;
+        }
+
+        .tool-item.active .tool-icon {
+            animation: iconBounce 0.5s ease-in-out;
+        }
+
+        @keyframes iconBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .tool-name {
+            font-weight: 600;
+            color: #0ea5e9;
+            font-size: 0.9em;
+        }
+
+        /* 对话框 */
+        .conversation-box {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(139, 92, 246, 0.3);
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 150px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+
+        .conversation-line {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            opacity: 0;
+            animation: slideInLeft 0.5s forwards;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .user-msg {
+            color: #60a5fa;
+        }
+
+        .agent-msg {
+            color: #a78bfa;
+        }
+
+        .tool-msg {
+            color: #22c55e;
+        }
+
+        /* 特性卡片 */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-card:hover {
+            background: rgba(139, 92, 246, 0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h4 {
+            color: #a78bfa;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+
+        .feature-card p {
+            color: rgba(226, 232, 240, 0.7);
+            line-height: 1.6;
+        }
+
+        /* 代码片段 */
+        .code-snippet {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .keyword { color: #c792ea; font-weight: bold; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .function { color: #82aaff; }
+
+        /* 高亮框 */
+        .highlight-box {
+            background: rgba(139, 92, 246, 0.15);
+            border-left: 5px solid #8b5cf6;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+            animation: slideInRight 0.8s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .highlight-box h3 {
+            color: #a78bfa;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .highlight-box p {
+            line-height: 1.8;
+            color: rgba(226, 232, 240, 0.9);
+        }
+
+        /* 演示按钮 */
+        .demo-btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            margin: 20px auto;
+            display: block;
+        }
+
+        .demo-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6);
+        }
+
+        .demo-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            border-radius: 12px;
+            color: #a78bfa;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(139, 92, 246, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(139, 92, 246, 0.4);
+        }
+
+        /* 针对 a 标签的导航按钮样式 */
+        .nav-btn.back-to-list {
+            text-decoration: none;
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+        }
+
+        .nav-btn.back-to-list:hover {
+            background: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 5px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-btn.next {
+            margin-left: auto;
+        }
+
+        /* 场景指示器 */
+        .scene-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 40px 0;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            background: #8b5cf6;
+            transform: scale(1.3);
+        }
+
+        .indicator:hover {
+            transform: scale(1.2);
+        }
+
+        /* 步骤指示器 */
+        .step-indicator {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(217, 70, 239, 0.15);
+            border: 2px solid rgba(217, 70, 239, 0.3);
+            border-radius: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
+        }
+
+        .current-step {
+            font-size: 1.5em;
+            color: #d946ef;
+            font-weight: bold;
+        }
+
+        /* 对比表格 */
+        .comparison-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 30px 0;
+            overflow: hidden;
+            border-radius: 15px;
+        }
+
+        .comparison-table thead {
+            background: rgba(139, 92, 246, 0.3);
+        }
+
+        .comparison-table th {
+            padding: 20px;
+            text-align: left;
+            font-weight: bold;
+            color: #a78bfa;
+            font-size: 1.1em;
+        }
+
+        .comparison-table td {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .comparison-table tr:hover td {
+            background: rgba(139, 92, 246, 0.1);
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .agent-visualization {
+                flex-direction: column;
+            }
+
+            .agent-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    
+        /* 标准导航样式 */
+        .nav-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-card a {
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-card a:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 顶部导航卡片 */
+        .top-nav-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .top-nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .top-nav-left,
+        .top-nav-center,
+        .top-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .top-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #9ca3af;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .top-nav-link:hover {
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .top-nav-link.home {
+            color: #4ade80;
+        }
+
+        .top-nav-link.home:hover {
+            color: #86efac;
+        }
+
+        .top-nav-link svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .top-nav-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .top-nav-text {
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+
+        .top-nav-progress {
+            color: #9ca3af;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+</style>
+</head>
+<body>
+    <!-- 浮动光球 -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>    <!-- 顶部导航 - 跨模块 -->
+    <div class="top-nav-card">
+        <div class="top-nav-container">
+            <div class="top-nav-left">
+                <a href="index.html" class="top-nav-link home">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回LangGraph目录
+                </a>
+            </div>
+            <div class="top-nav-center">
+                <a href="14-langgraph-loops-demo.html" class="top-nav-link">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一课
+                </a>
+                <div class="top-nav-divider"></div>
+                <a href="16-human-in-loop-demo.html" class="top-nav-link">
+                    下一课
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="top-nav-right">
+                <span class="top-nav-progress">课程 15 / 20</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>LangGraph Agent</h1>
+            <p>构建智能体 - 使用 LLM 决策的自主系统</p>
+        </div>
+
+        <!-- 场景 1: 什么是 Agent -->
+        <div class="scene active" id="scene1">
+            <h2 class="scene-title">什么是 LangGraph Agent？</h2>
+
+            <div class="highlight-box">
+                <h3>🤖 核心概念</h3>
+                <p>
+                    LangGraph Agent 是一个使用 <strong>LLM 作为"大脑"</strong>的自主系统。<br><br>
+                    它可以<strong>自主决定使用哪些工具</strong>来完成任务，而不是按照预定义的流程。<br><br>
+                    <strong>核心公式：</strong><br>
+                    Agent = LLM + Tools + Loop<br><br>
+                    <strong>ReAct 循环：</strong><br>
+                    思考 (Thought) → 行动 (Action) → 观察 (Observation) → 重复 (Repeat)
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card" data-delay="0">
+                    <div class="feature-icon">🧠</div>
+                    <h4>LLM 大脑</h4>
+                    <p>自主决策和推理</p>
+                </div>
+
+                <div class="feature-card" data-delay="100">
+                    <div class="feature-icon">🔧</div>
+                    <h4>工具箱</h4>
+                    <p>可调用外部工具</p>
+                </div>
+
+                <div class="feature-card" data-delay="200">
+                    <div class="feature-icon">🔄</div>
+                    <h4>循环执行</h4>
+                    <p>多步推理能力</p>
+                </div>
+
+                <div class="feature-card" data-delay="300">
+                    <div class="feature-icon">📊</div>
+                    <h4>状态管理</h4>
+                    <p>追踪思考过程</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景 2: Agent vs Chain -->
+        <div class="scene" id="scene2">
+            <h2 class="scene-title">Agent vs Chain</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a78bfa; margin-bottom: 30px; font-size: 1.5em;">对比演示</h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
+                    <div style="text-align: center; position: relative;">
+                        <h4 style="color: #ef4444; margin-bottom: 15px; font-size: 1.2em;">❌ Chain（固定流程）</h4>
+                        <p style="color: rgba(239, 68, 68, 0.8); margin-bottom: 20px; font-size: 0.95em;">机械执行每个步骤,无法灵活调整</p>
+                        <div class="chain-container" style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                            <div class="agent-node" id="chain1" data-delay="0">
+                                <div class="icon">📝</div>
+                                <h4>步骤1</h4>
+                                <p>固定</p>
+                            </div>
+                            <div class="agent-arrow" id="arrow1" data-delay="200">→</div>
+                            <div class="agent-node" id="chain2" data-delay="400">
+                                <div class="icon">📝</div>
+                                <h4>步骤2</h4>
+                                <p>固定</p>
+                            </div>
+                            <div class="agent-arrow" id="arrow2" data-delay="600">→</div>
+                            <div class="agent-node" id="chain3" data-delay="800">
+                                <div class="icon">📝</div>
+                                <h4>步骤3</h4>
+                                <p>固定</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="text-align: center; position: relative;">
+                        <h4 style="color: #22c55e; margin-bottom: 15px; font-size: 1.2em;">✅ Agent（动态决策）</h4>
+                        <p style="color: rgba(34, 197, 94, 0.8); margin-bottom: 20px; font-size: 0.95em;">自主思考并决定下一步行动</p>
+                        <div class="agent-container" style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; position: relative;">
+                            <div class="agent-node" id="agentThink" data-delay="0">
+                                <div class="icon">🧠</div>
+                                <h4>思考</h4>
+                                <p>决策</p>
+                            </div>
+                            <div class="agent-arrow" id="arrow3" data-delay="200">→</div>
+                            <div class="agent-node" id="agentAct" data-delay="400">
+                                <div class="icon">🔧</div>
+                                <h4>行动</h4>
+                                <p>执行</p>
+                            </div>
+                            <div class="agent-arrow" id="arrow4" data-delay="600" style="color: #d946ef;">↻</div>
+                            <div class="loop-path" id="agentLoopPath" style="width: 250px; height: 100px; top: -20px; left: 50%; transform: translateX(-50%);"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="compareBtn" onclick="animateComparison()">▶️ 播放对比演示</button>
+            </div>
+
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>特性</th>
+                        <th>Chain</th>
+                        <th>Agent</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>决策方式</strong></td>
+                        <td>预定义流程</td>
+                        <td>动态决策</td>
+                    </tr>
+                    <tr>
+                        <td><strong>执行路径</strong></td>
+                        <td>固定顺序</td>
+                        <td>根据情况调整</td>
+                    </tr>
+                    <tr>
+                        <td><strong>工具使用</strong></td>
+                        <td>手动调用</td>
+                        <td>自主选择</td>
+                    </tr>
+                    <tr>
+                        <td><strong>适用场景</strong></td>
+                        <td>简单任务</td>
+                        <td>复杂任务</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 场景 3: ReAct 循环 -->
+        <div class="scene" id="scene3">
+            <h2 class="scene-title">ReAct 循环可视化</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a78bfa; margin-bottom: 30px; font-size: 1.5em;">ReAct Agent 工作流程</h3>
+
+                <div class="agent-visualization" id="reactViz">
+                    <div class="loop-path" id="reactLoopPath" style="width: 600px; height: 180px; top: -30px; left: 50%; transform: translateX(-50%);"></div>
+
+                    <div class="agent-node" id="reactThink" data-step="1">
+                        <div class="icon">🤔</div>
+                        <h4>思考</h4>
+                        <p>Thought</p>
+                    </div>
+
+                    <div class="agent-arrow" id="reactArrow1" data-step="2">→</div>
+
+                    <div class="agent-node" id="reactAct" data-step="3">
+                        <div class="icon">🔧</div>
+                        <h4>行动</h4>
+                        <p>Action</p>
+                    </div>
+
+                    <div class="agent-arrow" id="reactArrow2" data-step="4">→</div>
+
+                    <div class="agent-node" id="reactObserve" data-step="5">
+                        <div class="icon">👁️</div>
+                        <h4>观察</h4>
+                        <p>Observation</p>
+                    </div>
+
+                    <div class="agent-arrow" id="reactArrow3" data-step="6">→</div>
+
+                    <div class="agent-node" id="reactDecide" data-step="7">
+                        <div class="icon">❓</div>
+                        <h4>判断</h4>
+                        <p>完成?</p>
+                    </div>
+
+                    <div class="loop-back-arrow" id="reactLoopArrow" data-step="8" style="bottom: 60px; right: 100px; font-size: 2.5em;">↻</div>
+                </div>
+
+                <div class="step-indicator">
+                    当前步骤: <span class="current-step" id="reactStepDisplay">0</span>
+                </div>
+
+                <button class="demo-btn" id="runReactBtn" onclick="runReActDemo()">▶️ 运行 ReAct 演示</button>
+            </div>
+
+            <div class="highlight-box" style="background: rgba(34, 197, 94, 0.15); border-left-color: #22c55e;">
+                <h3 style="color: #22c55e;">💡 ReAct 的优势</h3>
+                <p>
+                    <strong>Reasoning + Acting</strong> 结合推理和行动<br><br>
+                    1. <strong>思考</strong>：分析问题，规划行动<br>
+                    2. <strong>行动</strong>：执行具体工具<br>
+                    3. <strong>观察</strong>：查看工具结果<br>
+                    4. <strong>迭代</strong>：基于结果继续思考<br><br>
+                    这种循环让 Agent 可以逐步解决问题，而不是一次性给出答案！
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景 4: 工具使用 -->
+        <div class="scene" id="scene4">
+            <h2 class="scene-title">Agent 工具箱</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a78bfa; margin-bottom: 30px; font-size: 1.5em;">可用工具</h3>
+
+                <div class="tool-list">
+                    <div class="tool-item" data-delay="0">
+                        <div class="tool-icon">🔢</div>
+                        <div class="tool-name">计算器</div>
+                    </div>
+
+                    <div class="tool-item" data-delay="100">
+                        <div class="tool-icon">🔍</div>
+                        <div class="tool-name">搜索</div>
+                    </div>
+
+                    <div class="tool-item" data-delay="200">
+                        <div class="tool-icon">🌤️</div>
+                        <div class="tool-name">天气</div>
+                    </div>
+
+                    <div class="tool-item" data-delay="300">
+                        <div class="tool-icon">💾</div>
+                        <div class="tool-name">数据库</div>
+                    </div>
+
+                    <div class="tool-item" data-delay="400">
+                        <div class="tool-icon">📝</div>
+                        <div class="tool-name">笔记</div>
+                    </div>
+                </div>
+
+                <div class="conversation-box" id="toolConversation">
+                    <strong style="color: #a78bfa;">演示对话：</strong>
+                    <div id="conversationContent"></div>
+                </div>
+
+                <button class="demo-btn" id="toolDemoBtn" onclick="runToolDemo()">▶️ 运行工具演示</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 核心代码：工具定义和使用</span><br><br>
+                <span class="keyword">from</span> langchain_core.tools <span class="keyword">import</span> tool<br><br>
+                <span class="keyword">@tool</span><br>
+                <span class="keyword">def</span> <span class="function">calculator</span>(expression: str) -> str:<br>
+                &nbsp;&nbsp;<span class="string">"""执行数学计算"""</span><br>
+                &nbsp;&nbsp;result = eval(expression)<br>
+                &nbsp;&nbsp;<span class="keyword">return</span> f<span class="string">"计算结果: {result}"</span><br><br>
+                <span class="comment"># Agent 可以自主决定何时使用这个工具</span>
+            </div>
+        </div>
+
+        <!-- 场景 5: 预构建 Agent -->
+        <div class="scene" id="scene5">
+            <h2 class="scene-title">快速创建 Agent</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a78bfa; margin-bottom: 30px; font-size: 1.5em;">使用预构建组件</h3>
+
+                <div class="feature-grid">
+                    <div class="feature-card" data-delay="0">
+                        <div class="feature-icon">⚡</div>
+                        <h4>一行代码</h4>
+                        <p>create_react_agent(llm, tools)</p>
+                    </div>
+
+                    <div class="feature-card" data-delay="100">
+                        <div class="feature-icon">🔧</div>
+                        <h4>ToolNode</h4>
+                        <p>自动执行工具调用</p>
+                    </div>
+
+                    <div class="feature-card" data-delay="200">
+                        <div class="feature-icon">🔄</div>
+                        <h4>自动循环</h4>
+                        <p>处理 ReAct 循环</p>
+                    </div>
+
+                    <div class="feature-card" data-delay="300">
+                        <div class="feature-icon">📝</div>
+                        <h4>自动提示</h4>
+                        <p>构建提示词模板</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 使用预构建 Agent（推荐）</span><br><br>
+                <span class="keyword">from</span> langgraph.prebuilt <span class="keyword">import</span> create_react_agent<br><br>
+                <span class="comment"># 定义工具</span><br>
+                tools = [calculator, search, weather]<br><br>
+                <span class="comment"># 创建 Agent（一行代码！）</span><br>
+                agent = create_react_agent(llm, tools)<br><br>
+                <span class="comment"># 执行</span><br>
+                response = agent.invoke({<br>
+                &nbsp;&nbsp;<span class="string">"messages"</span>: [(<span class="string">"user"</span>, <span class="string">"计算 2+2"</span>)]<br>
+                })
+            </div>
+
+            <div class="highlight-box">
+                <h3>🚀 下一步学习</h3>
+                <p>
+                    恭喜你掌握了 LangGraph Agent！<br><br>
+                    📚 <strong>建议实践：</strong><br>
+                    1. 使用预构建 Agent 创建简单助手<br>
+                    2. 添加自定义工具扩展能力<br>
+                    3. 观察 ReAct 循环的执行过程<br>
+                    4. 尝试多步推理任务<br><br>
+                    现在你已经掌握了 LangGraph 的核心概念：<br>
+                    ✅ 图结构（Graph）<br>
+                    ✅ 循环（Loops）<br>
+                    ✅ 智能体（Agent）<br><br>
+                    可以开始构建自己的 AI 应用了！
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景指示器 -->
+        <div class="scene-indicators">
+            <div class="indicator active" data-scene="1"></div>
+            <div class="indicator" data-scene="2"></div>
+            <div class="indicator" data-scene="3"></div>
+            <div class="indicator" data-scene="4"></div>
+            <div class="indicator" data-scene="5"></div>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <button class="nav-btn" id="prevBtn" disabled>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                上一节
+            </button>
+            <a href="../langchain/index.html" class="nav-btn back-to-list">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                </svg>
+                课程列表
+            </a>
+            <button class="nav-btn next" id="nextBtn">
+                下一节
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 场景数据
+        const totalScenes = 5;
+        let currentScene = 1;
+
+        // DOM 元素
+        const progressBar = document.getElementById('progressBar');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const indicators = document.querySelectorAll('.indicator');
+
+        // 初始化
+        function init() {
+            setupEventListeners();
+            updateScene();
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            prevBtn.addEventListener('click', () => {
+                if (currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                }
+            });
+
+            indicators.forEach(indicator => {
+                indicator.addEventListener('click', () => {
+                    currentScene = parseInt(indicator.dataset.scene);
+                    updateScene();
+                });
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' && currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                } else if (e.key === 'ArrowLeft' && currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+        }
+
+        // 更新场景
+        function updateScene() {
+            const progress = ((currentScene - 1) / (totalScenes - 1)) * 100;
+            progressBar.style.width = progress + '%';
+
+            document.querySelectorAll('.scene').forEach((scene, index) => {
+                if (index + 1 === currentScene) {
+                    scene.classList.add('active');
+                } else {
+                    scene.classList.remove('active');
+                }
+            });
+
+            indicators.forEach((indicator, index) => {
+                if (index + 1 === currentScene) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+
+            prevBtn.disabled = currentScene === 1;
+            nextBtn.disabled = currentScene === totalScenes;
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            document.querySelectorAll('.feature-card, .agent-node, .agent-arrow, .tool-item, .loop-back-arrow').forEach(el => {
+                el.classList.remove('visible');
+            });
+
+            setTimeout(() => {
+                animateSceneElements();
+            }, 100);
+        }
+
+        // 动画显示场景元素
+        function animateSceneElements() {
+            const currentSceneEl = document.querySelector(`#scene${currentScene}`);
+
+            currentSceneEl.querySelectorAll('.feature-card').forEach((card, index) => {
+                const delay = parseInt(card.dataset.delay) || index * 100;
+                setTimeout(() => {
+                    card.classList.add('visible');
+                }, delay);
+            });
+
+            currentSceneEl.querySelectorAll('.agent-node').forEach((node, index) => {
+                const delay = parseInt(node.dataset.delay) || index * 200;
+                setTimeout(() => {
+                    node.classList.add('visible');
+                }, delay);
+            });
+
+            currentSceneEl.querySelectorAll('.agent-arrow').forEach((arrow, index) => {
+                const delay = parseInt(arrow.dataset.delay) || index * 200;
+                setTimeout(() => {
+                    arrow.classList.add('visible');
+                }, delay);
+            });
+
+            currentSceneEl.querySelectorAll('.tool-item').forEach((item, index) => {
+                const delay = parseInt(item.dataset.delay) || index * 100;
+                setTimeout(() => {
+                    item.classList.add('visible');
+                }, delay);
+            });
+        }
+
+        // 场景 2: 对比演示
+        async function animateComparison() {
+            const btn = document.getElementById('compareBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            // 重置所有元素
+            const chainNodes = ['chain1', 'chain2', 'chain3'].map(id => document.getElementById(id));
+            const chainArrows = ['arrow1', 'arrow2'].map(id => document.getElementById(id));
+            const agentNodes = ['agentThink', 'agentAct'].map(id => document.getElementById(id));
+            const agentArrows = ['arrow3', 'arrow4'].map(id => document.getElementById(id));
+            const agentLoopPath = document.getElementById('agentLoopPath');
+
+            // 清除所有状态
+            [...chainNodes, ...agentNodes].forEach(el => {
+                el.classList.remove('visible', 'active', 'deciding');
+            });
+            [...chainArrows, ...agentArrows].forEach(el => {
+                el.classList.remove('visible', 'flow');
+            });
+            agentLoopPath.classList.remove('visible');
+
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            // ============ Chain 演示 ============
+            // 显示 Chain 按顺序执行
+            for (let i = 0; i < 3; i++) {
+                chainNodes[i].classList.add('visible', 'active');
+                if (i > 0) chainArrows[i-1].classList.add('visible');
+
+                await new Promise(resolve => setTimeout(resolve, 900));
+                chainNodes[i].classList.remove('active');
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 800));
+
+            // ============ Agent 演示 ============
+            // 清除 Chain 的可见性
+            chainNodes.forEach(el => el.classList.remove('visible'));
+            chainArrows.forEach(el => el.classList.remove('visible'));
+
+            await new Promise(resolve => setTimeout(resolve, 400));
+
+            // Agent 循环演示 - 显示智能决策
+            for (let cycle = 0; cycle < 2; cycle++) {
+                // 1. 思考阶段
+                agentNodes[0].classList.add('visible', 'active', 'deciding');
+                await new Promise(resolve => setTimeout(resolve, 1200));
+                agentNodes[0].classList.remove('deciding');
+
+                // 2. 箭头流向
+                agentArrows[0].classList.add('visible', 'flow');
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // 3. 行动阶段
+                agentNodes[0].classList.remove('active');
+                agentNodes[1].classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 900));
+                agentNodes[1].classList.remove('active');
+
+                // 4. 循环回箭头
+                if (cycle < 1) {
+                    agentArrows[1].classList.add('visible');
+                    agentLoopPath.classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 800));
+
+                    // 重置行动节点,回到思考
+                    agentNodes[1].classList.remove('visible');
+                    agentArrows[0].classList.remove('flow');
+                } else {
+                    // 最后一个循环完成
+                    agentNodes[0].classList.add('active');
+                    agentNodes[0].querySelector('p').textContent = '完成!';
+                    await new Promise(resolve => setTimeout(resolve, 600));
+                    agentNodes[0].classList.remove('active');
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 恢复初始文本
+            document.getElementById('agentThink').querySelector('p').textContent = '决策';
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 场景 3: ReAct 演示
+        async function runReActDemo() {
+            const btn = document.getElementById('runReactBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 运行中...';
+
+            const nodes = {
+                think: document.getElementById('reactThink'),
+                act: document.getElementById('reactAct'),
+                observe: document.getElementById('reactObserve'),
+                decide: document.getElementById('reactDecide')
+            };
+
+            const arrows = {
+                t2a: document.getElementById('reactArrow1'),
+                a2o: document.getElementById('reactArrow2'),
+                o2d: document.getElementById('reactArrow3')
+            };
+
+            const loopArrow = document.getElementById('reactLoopArrow');
+            const loopPath = document.getElementById('reactLoopPath');
+            const stepDisplay = document.getElementById('reactStepDisplay');
+
+            // 重置所有状态
+            Object.values(nodes).forEach(el => {
+                el.classList.remove('active', 'visible', 'deciding');
+            });
+            Object.values(arrows).forEach(el => {
+                el.classList.remove('visible', 'flow');
+            });
+            loopArrow.classList.remove('visible');
+            loopPath.classList.remove('visible');
+
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            // ============ ReAct 循环演示 ============
+            const maxCycles = 3;
+
+            for (let cycle = 1; cycle <= maxCycles; cycle++) {
+                stepDisplay.textContent = `循环 ${cycle}/${maxCycles}`;
+
+                // 步骤 1: 思考 (Thought)
+                nodes.think.classList.add('visible', 'active', 'deciding');
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                nodes.think.classList.remove('deciding');
+
+                // 箭头: 思考 → 行动
+                arrows.t2a.classList.add('visible', 'flow');
+                await new Promise(resolve => setTimeout(resolve, 600));
+
+                // 步骤 2: 行动 (Action)
+                nodes.think.classList.remove('active');
+                nodes.act.classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 1200));
+
+                // 箭头: 行动 → 观察
+                arrows.a2o.classList.add('visible', 'flow');
+                await new Promise(resolve => setTimeout(resolve, 600));
+
+                // 步骤 3: 观察 (Observation)
+                nodes.act.classList.remove('active');
+                nodes.observe.classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 1200));
+
+                // 箭头: 观察 → 判断
+                arrows.o2d.classList.add('visible', 'flow');
+                await new Promise(resolve => setTimeout(resolve, 600));
+
+                // 步骤 4: 判断 (Decide)
+                nodes.observe.classList.remove('active');
+                nodes.decide.classList.add('visible', 'active');
+
+                if (cycle < maxCycles) {
+                    // 未完成 - 继续循环
+                    nodes.decide.querySelector('p').textContent = '继续...';
+                    await new Promise(resolve => setTimeout(resolve, 800));
+
+                    // 显示循环路径
+                    loopArrow.classList.add('visible');
+                    loopPath.classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+
+                    // 重置,回到思考阶段
+                    nodes.decide.classList.remove('active');
+                    nodes.act.classList.remove('visible');
+                    nodes.observe.classList.remove('visible');
+                    arrows.t2a.classList.remove('flow');
+                    arrows.a2o.classList.remove('flow');
+                    arrows.o2d.classList.remove('flow');
+
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                } else {
+                    // 完成!
+                    nodes.decide.querySelector('p').textContent = '完成!';
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 恢复初始状态
+            nodes.decide.querySelector('p').textContent = '完成?';
+            Object.values(nodes).forEach(el => el.classList.remove('active'));
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新运行';
+        }
+
+        // 场景 4: 工具演示
+        async function runToolDemo() {
+            const btn = document.getElementById('toolDemoBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 运行中...';
+
+            const content = document.getElementById('conversationContent');
+            content.innerHTML = '';
+
+            const tools = document.querySelectorAll('.tool-item');
+            tools.forEach(tool => tool.classList.remove('active'));
+
+            const messages = [
+                {
+                    type: 'user',
+                    text: '用户: 计算 25 + 17',
+                    delay: 800
+                },
+                {
+                    type: 'agent',
+                    text: 'Agent: 收到请求,正在分析...',
+                    action: 'thinking',
+                    delay: 1000
+                },
+                {
+                    type: 'agent',
+                    text: 'Agent: 我需要使用计算器工具',
+                    action: 'deciding',
+                    delay: 900
+                },
+                {
+                    type: 'tool',
+                    text: '🔢 工具调用: calculator("25 + 17")',
+                    toolIndex: 0,
+                    delay: 700
+                },
+                {
+                    type: 'tool',
+                    text: '🔢 执行中... 正在计算...',
+                    delay: 600
+                },
+                {
+                    type: 'tool',
+                    text: '✅ 工具返回: 42',
+                    delay: 500
+                },
+                {
+                    type: 'agent',
+                    text: 'Agent: 计算结果是 42',
+                    delay: 800
+                }
+            ];
+
+            for (let i = 0; i < messages.length; i++) {
+                const msg = messages[i];
+
+                // 如果指定了工具激活,则激活对应工具
+                if (msg.toolIndex !== undefined) {
+                    tools[msg.toolIndex].classList.add('active');
+                }
+
+                // 如果指定了特殊动作,添加对应的类
+                if (msg.action === 'thinking') {
+                    // 可以添加思考的视觉提示
+                }
+
+                // 创建消息行
+                const line = document.createElement('div');
+                line.className = 'conversation-line';
+                line.classList.add(msg.type + '-msg');
+                line.textContent = msg.text;
+                line.style.animationDelay = '0s';
+                content.appendChild(line);
+
+                // 滚动到底部
+                line.scrollIntoView({ behavior: 'smooth', block: 'end' });
+
+                await new Promise(resolve => setTimeout(resolve, msg.delay));
+            }
+
+            await new Promise(resolve => setTimeout(resolve, 600));
+
+            // 清除工具激活状态
+            tools.forEach(tool => tool.classList.remove('active'));
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新运行';
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

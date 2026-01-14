@@ -1,0 +1,1857 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangGraph 条件边 - LangChain 学习 13</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 浮动光球 */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(217, 70, 239, 0.3) 0%, rgba(168, 85, 247, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(236, 72, 153, 0.2) 0%, rgba(244, 114, 182, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -30px) scale(1.1); }
+            50% { transform: translate(-20px, 20px) scale(0.9); }
+            75% { transform: translate(-30px, -20px) scale(1.05); }
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 头部 */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #d946ef 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(217, 70, 239, 0.3);
+        }
+
+        .header p {
+            font-size: 1.3em;
+            color: rgba(226, 232, 240, 0.8);
+        }
+
+        /* 进度条 */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #d946ef 0%, #a855f7 50%, #8b5cf6 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* 场景容器 */
+        .scene {
+            display: none;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .scene.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 场景标题 */
+        .scene-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #d946ef 0%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 动画画布 */
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 决策树可视化 */
+        .decision-tree {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 40px;
+            padding: 20px;
+        }
+
+        .tree-level {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .decision-node {
+            background: rgba(217, 70, 239, 0.2);
+            border: 3px solid rgba(217, 70, 239, 0.5);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            min-width: 150px;
+            transition: all 0.6s;
+            transform: scale(0.8);
+            opacity: 0;
+            position: relative;
+        }
+
+        .decision-node.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .decision-node.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: rgba(34, 197, 94, 0.7);
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+            transform: scale(1.15);
+        }
+
+        .decision-node.condition {
+            background: rgba(251, 191, 36, 0.2);
+            border-color: rgba(251, 191, 36, 0.5);
+        }
+
+        .decision-node.condition.active {
+            background: rgba(251, 191, 36, 0.4);
+            border-color: rgba(251, 191, 36, 0.8);
+            box-shadow: 0 0 40px rgba(251, 191, 36, 0.6);
+        }
+
+        .decision-node .icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .decision-node h4 {
+            color: #d946ef;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .decision-node p {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.85em;
+        }
+
+        /* 连接线 */
+        .connection-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .connection-line {
+            stroke: rgba(217, 70, 239, 0.3);
+            stroke-width: 3;
+            fill: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        .connection-line.visible {
+            opacity: 1;
+        }
+
+        .connection-line.active {
+            stroke: rgba(34, 197, 94, 0.6);
+            stroke-width: 4;
+        }
+
+        /* 特性卡片 */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-card:hover {
+            background: rgba(217, 70, 239, 0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px rgba(217, 70, 239, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h4 {
+            color: #d946ef;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+
+        .feature-card p {
+            color: rgba(226, 232, 240, 0.7);
+            line-height: 1.6;
+        }
+
+        /* 代码片段 */
+        .code-snippet {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .keyword { color: #c792ea; font-weight: bold; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .function { color: #82aaff; }
+
+        /* 高亮框 */
+        .highlight-box {
+            background: rgba(217, 70, 239, 0.15);
+            border-left: 5px solid #d946ef;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+            animation: slideInRight 0.8s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .highlight-box h3 {
+            color: #d946ef;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .highlight-box p {
+            line-height: 1.8;
+            color: rgba(226, 232, 240, 0.9);
+        }
+
+        /* 演示按钮 */
+        .demo-btn {
+            background: linear-gradient(135deg, #d946ef 0%, #a855f7 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(217, 70, 239, 0.4);
+            margin: 20px auto;
+            display: block;
+        }
+
+        .demo-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(217, 70, 239, 0.6);
+        }
+
+        .demo-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(217, 70, 239, 0.2);
+            border: 2px solid rgba(217, 70, 239, 0.5);
+            border-radius: 12px;
+            color: #d946ef;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(217, 70, 239, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(217, 70, 239, 0.4);
+        }
+
+        /* 针对 a 标签的导航按钮样式 */
+        .nav-btn.back-to-list {
+            text-decoration: none;
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+        }
+
+        .nav-btn.back-to-list:hover {
+            background: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 5px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-btn.next {
+            margin-left: auto;
+        }
+
+        /* 场景指示器 */
+        .scene-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 40px 0;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            background: #d946ef;
+            transform: scale(1.3);
+        }
+
+        .indicator:hover {
+            transform: scale(1.2);
+        }
+
+        /* 分支框 */
+        .branch-box {
+            background: linear-gradient(135deg, rgba(217, 70, 239, 0.15), rgba(168, 85, 247, 0.15));
+            border: 2px solid rgba(217, 70, 239, 0.3);
+            padding: 20px;
+            border-radius: 12px;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .branch-box h4 {
+            color: #d946ef;
+            margin-bottom: 10px;
+        }
+
+        /* 表格样式 */
+        .comparison-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 30px 0;
+            overflow: hidden;
+            border-radius: 15px;
+        }
+
+        .comparison-table thead {
+            background: rgba(217, 70, 239, 0.3);
+        }
+
+        .comparison-table th {
+            padding: 20px;
+            text-align: left;
+            font-weight: bold;
+            color: #d946ef;
+            font-size: 1.1em;
+        }
+
+        .comparison-table td {
+            padding: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .comparison-table tr:hover td {
+            background: rgba(217, 70, 239, 0.1);
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .tree-level {
+                flex-direction: column;
+            }
+        }
+    
+        /* 标准导航样式 */
+        .nav-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-card a {
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-card a:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 顶部导航卡片 */
+        .top-nav-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .top-nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .top-nav-left,
+        .top-nav-center,
+        .top-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .top-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #9ca3af;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .top-nav-link:hover {
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .top-nav-link.home {
+            color: #4ade80;
+        }
+
+        .top-nav-link.home:hover {
+            color: #86efac;
+        }
+
+        .top-nav-link svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .top-nav-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .top-nav-text {
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+
+        .top-nav-progress {
+            color: #9ca3af;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+</style>
+</head>
+<body>
+    <!-- 浮动光球 -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>    <!-- 顶部导航 - 跨模块 -->
+    <div class="top-nav-card">
+        <div class="top-nav-container">
+            <div class="top-nav-left">
+                <a href="index.html" class="top-nav-link home">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回LangGraph目录
+                </a>
+            </div>
+            <div class="top-nav-center">
+                <a href="12-langgraph-state-demo.html" class="top-nav-link">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一课
+                </a>
+                <div class="top-nav-divider"></div>
+                <a href="14-langgraph-loops-demo.html" class="top-nav-link">
+                    下一课
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="top-nav-right">
+                <span class="top-nav-progress">课程 13 / 20</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>LangGraph 条件边</h1>
+            <p>根据状态动态决定下一个节点</p>
+        </div>
+
+        <!-- 场景 1: 什么是条件边 -->
+        <div class="scene active" id="scene1">
+            <h2 class="scene-title">什么是条件边？</h2>
+
+            <div class="highlight-box">
+                <h3>💡 核心概念</h3>
+                <p>
+                    条件边允许根据<strong>当前状态动态决定</strong>下一个要执行的节点。<br><br>
+                    <strong>想象一下：</strong><br>
+                    普通边就像<strong>单行道</strong>，只能按固定路线行驶<br>
+                    条件边就像<strong>智能导航</strong>，可以根据实时情况选择不同路线<br><br>
+                    <strong>这样就能实现：</strong><br>
+                    ✅ 分支流程（if-else）<br>
+                    ✅ 多路径选择（switch-case）<br>
+                    ✅ 循环和迭代<br>
+                    ✅ 复杂的决策树
+                </p>
+            </div>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #d946ef; margin-bottom: 30px; font-size: 1.5em;">条件分支演示</h3>
+
+                <!-- 状态显示面板 -->
+                <div class="state-display" id="simpleStateDisplay" style="margin-bottom: 30px; display: none;">
+                    <div style="color: #a78bfa; font-weight: bold; margin-bottom: 8px;">📊 当前状态</div>
+                    <div id="simpleStateContent" style="font-size: 1.3em; color: #60a5fa; font-weight: bold; font-family: monospace;">
+                        { score: ? }
+                    </div>
+                </div>
+
+                <!-- 步骤描述 -->
+                <div id="simpleStepDesc" style="text-align: center; min-height: 80px; padding: 20px; background: rgba(217, 70, 239, 0.1); border-radius: 10px; margin-bottom: 30px; color: #e2e8f0; font-size: 1.1em; line-height: 1.6;">
+                    点击按钮开始演示条件分支流程
+                </div>
+
+                <div class="decision-tree" id="simpleDecisionTree">
+                    <div class="tree-level">
+                        <div class="decision-node" data-step="1">
+                            <div class="icon">🔄</div>
+                            <h4>条件节点</h4>
+                            <p>检查状态</p>
+                        </div>
+                    </div>
+
+                    <div class="tree-level">
+                        <div class="decision-node condition" data-step="2">
+                            <div class="icon">❓</div>
+                            <h4>判断条件</h4>
+                            <p>score >= 60?</p>
+                        </div>
+                    </div>
+
+                    <div class="tree-level">
+                        <div class="decision-node" data-step="3">
+                            <div class="icon">✅</div>
+                            <h4>通过节点</h4>
+                            <p>score >= 60</p>
+                        </div>
+
+                        <div class="decision-node" data-step="4">
+                            <div class="icon">❌</div>
+                            <h4>失败节点</h4>
+                            <p>score < 60</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="runDecisionBtn" onclick="runSimpleDecision()">▶️ 播放条件分支动画</button>
+            </div>
+        </div>
+
+        <!-- 场景 2: 简单条件分支 -->
+        <div class="scene" id="scene2">
+            <h2 class="scene-title">简单条件分支</h2>
+
+            <div class="branch-box">
+                <h4>🎯 二分支逻辑（if-else）</h4>
+                <p>根据分数决定是通过还是失败</p>
+            </div>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #d946ef; margin-bottom: 30px; font-size: 1.5em;">if-else 二分支动画演示</h3>
+
+                <!-- 状态显示面板 -->
+                <div class="state-display" id="branchStateDisplay" style="margin-bottom: 30px; display: none;">
+                    <div style="color: #a78bfa; font-weight: bold; margin-bottom: 8px;">📊 当前状态</div>
+                    <div id="branchStateContent" style="font-size: 1.3em; color: #60a5fa; font-weight: bold; font-family: monospace;">
+                        { score: ? }
+                    </div>
+                </div>
+
+                <!-- 步骤描述 -->
+                <div id="branchStepDesc" style="text-align: center; min-height: 100px; padding: 20px; background: rgba(217, 70, 239, 0.1); border-radius: 10px; margin-bottom: 30px; color: #e2e8f0; font-size: 1.1em; line-height: 1.6;">
+                    点击按钮开始演示 if-else 二分支流程
+                </div>
+
+                <!-- if-else 决策树可视化 -->
+                <div class="decision-tree" id="branchDecisionTree">
+                    <!-- 第1层: 输入节点 -->
+                    <div class="tree-level">
+                        <div class="decision-node" id="branch-input-node">
+                            <div class="icon">📥</div>
+                            <h4>输入状态</h4>
+                            <p>{ score: ? }</p>
+                        </div>
+                    </div>
+
+                    <!-- 第2层: 条件判断节点 -->
+                    <div class="tree-level">
+                        <div class="decision-node condition" id="branch-condition-node">
+                            <div class="icon">❓</div>
+                            <h4>条件判断</h4>
+                            <p>score >= 60?</p>
+                        </div>
+                    </div>
+
+                    <!-- 第3层: 两个分支 -->
+                    <div class="tree-level">
+                        <div class="decision-node" id="branch-true-node">
+                            <div class="icon">✅</div>
+                            <h4>True 分支</h4>
+                            <p>pass_node</p>
+                            <div style="margin-top: 8px; font-size: 0.8em; color: #94a3b8;">通过节点</div>
+                        </div>
+
+                        <div class="decision-node" id="branch-false-node">
+                            <div class="icon">❌</div>
+                            <h4>False 分支</h4>
+                            <p>fail_node</p>
+                            <div style="margin-top: 8px; font-size: 0.8em; color: #94a3b8;">失败节点</div>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="runBranchBtn" onclick="runBranchDecision()">▶️ 播放 if-else 二分支动画</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 1️⃣ 定义条件函数：返回下一个节点名称</span><br>
+                <span class="keyword">def</span> <span class="function">route_condition</span>(state):<br>
+                &nbsp;&nbsp;<span class="keyword">if</span> state[<span class="string">"score"</span>] >= 60:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"pass_node"</span>  <span class="comment"># 去往通过节点</span><br>
+                &nbsp;&nbsp;<span class="keyword">else</span>:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"fail_node"</span>   <span class="comment"># 去往失败节点</span><br><br>
+                <span class="comment"># 2️⃣ 添加条件边</span><br>
+                graph.add_conditional_edges(<br>
+                &nbsp;&nbsp;<span class="string">"grade"</span>,  <span class="comment"># 源节点</span><br>
+                &nbsp;&nbsp;route_condition,  <span class="comment"># 条件函数</span><br>
+                &nbsp;&nbsp;{  <span class="comment"># 映射返回值到节点</span><br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"pass_node"</span>: <span class="string">"pass_node"</span>,<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"fail_node"</span>: <span class="string">"fail_node"</span><br>
+                &nbsp;&nbsp;}<br>
+                )
+            </div>
+
+            <div class="feature-grid" style="margin-top: 40px;">
+                <div class="feature-card" data-delay="0">
+                    <div class="feature-icon">📊</div>
+                    <h4>定义状态</h4>
+                    <p>包含用于判断的字段（如 score）</p>
+                </div>
+
+                <div class="feature-card" data-delay="100">
+                    <div class="feature-icon">🔍</div>
+                    <h4>条件函数</h4>
+                    <p>返回下一个节点的名称</p>
+                </div>
+
+                <div class="feature-card" data-delay="200">
+                    <div class="feature-icon">🔗</div>
+                    <h4>添加条件边</h4>
+                    <p>使用 add_conditional_edges()</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景 3: 多分支条件 -->
+        <div class="scene" id="scene3">
+            <h2 class="scene-title">多分支条件</h2>
+
+            <div class="highlight-box" style="background: rgba(168, 85, 247, 0.15); border-left-color: #a855f7;">
+                <h3 style="color: #a855f7;">🎯 多路径选择（switch-case）</h3>
+                <p>
+                    根据天气类型选择不同的活动<br><br>
+                    <strong>关键点：</strong><br>
+                    ✅ 条件函数可以返回多个可能的值<br>
+                    ✅ 每个返回值对应一个分支<br>
+                    ✅ 使用 Literal 类型可以检查错误
+                </p>
+            </div>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a855f7; margin-bottom: 30px; font-size: 1.5em;">天气决策树</h3>
+
+                <!-- 状态显示面板 -->
+                <div class="state-display" id="weatherStateDisplay" style="margin-bottom: 30px; display: none;">
+                    <div style="color: #a78bfa; font-weight: bold; margin-bottom: 8px;">📊 当前状态</div>
+                    <div id="weatherStateContent" style="font-size: 1.3em; color: #60a5fa; font-weight: bold; font-family: monospace;">
+                        { weather: ? }
+                    </div>
+                </div>
+
+                <!-- 步骤描述 -->
+                <div id="weatherStepDesc" style="text-align: center; min-height: 80px; padding: 20px; background: rgba(168, 85, 247, 0.1); border-radius: 10px; margin-bottom: 30px; color: #e2e8f0; font-size: 1.1em; line-height: 1.6;">
+                    点击按钮开始演示天气决策流程
+                </div>
+
+                <div class="decision-tree" id="weatherTree">
+                    <div class="tree-level">
+                        <div class="decision-node">
+                            <div class="icon">🌤️</div>
+                            <h4>检查天气</h4>
+                        </div>
+                    </div>
+
+                    <div class="tree-level">
+                        <div class="decision-node condition">
+                            <div class="icon">❓</div>
+                            <h4>天气类型</h4>
+                        </div>
+                    </div>
+
+                    <div class="tree-level">
+                        <div class="decision-node">
+                            <div class="icon">☀️</div>
+                            <h4>晴天</h4>
+                            <p>野餐</p>
+                        </div>
+
+                        <div class="decision-node">
+                            <div class="icon">🌧️</div>
+                            <h4>雨天</h4>
+                            <p>看电影</p>
+                        </div>
+
+                        <div class="decision-node">
+                            <div class="icon">☁️</div>
+                            <h4>多云</h4>
+                            <p>购物</p>
+                        </div>
+
+                        <div class="decision-node">
+                            <div class="icon">❄️</div>
+                            <h4>雪天</h4>
+                            <p>堆雪人</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="runWeatherBtn" onclick="runWeatherDecision()">▶️ 播放天气决策动画</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 多分支条件函数</span><br>
+                <span class="keyword">def</span> <span class="function">route_by_weather</span>(state):<br>
+                &nbsp;&nbsp;<span class="comment"># 直接返回天气类型</span><br>
+                &nbsp;&nbsp;<span class="keyword">return</span> state[<span class="string">"weather"</span>]  <span class="comment"># "sunny" | "rainy" | "cloudy" | "snowy"</span><br><br>
+                <span class="comment"># 添加多分支条件边</span><br>
+                graph.add_conditional_edges(<br>
+                &nbsp;&nbsp;<span class="string">"check_weather"</span>,<br>
+                &nbsp;&nbsp;route_by_weather,<br>
+                &nbsp;&nbsp;{<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"sunny"</span>: <span class="string">"sunny"</span>,<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"rainy"</span>: <span class="string">"rainy"</span>,<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"cloudy"</span>: <span class="string">"cloudy"</span>,<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="string">"snowy"</span>: <span class="string">"snowy"</span><br>
+                &nbsp;&nbsp;}<br>
+                )
+            </div>
+        </div>
+
+        <!-- 场景 4: 意图路由 -->
+        <div class="scene" id="scene4">
+            <h2 class="scene-title">基于意图的条件路由</h2>
+
+            <div class="highlight-box" style="background: rgba(236, 72, 153, 0.15); border-left-color: #ec4899;">
+                <h3 style="color: #ec4899;">🤖 AI 应用场景：意图识别</h3>
+                <p>
+                    在实际应用中，条件边常用于<strong>意图识别和路由</strong>。<br><br>
+                    <strong>典型流程：</strong><br>
+                    1️⃣ 用户输入消息<br>
+                    2️⃣ 分类器识别意图（天气/时间/计算/通用）<br>
+                    3️⃣ 条件边路由到对应的处理器<br>
+                    4️⃣ 专门的处理器生成响应
+                </p>
+            </div>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #ec4899; margin-bottom: 30px; font-size: 1.5em;">意图路由流程</h3>
+
+                <!-- 用户消息显示 -->
+                <div class="state-display" id="intentMessageDisplay" style="margin-bottom: 30px; display: none;">
+                    <div style="color: #ec4899; font-weight: bold; margin-bottom: 8px;">💬 用户消息</div>
+                    <div id="intentMessageContent" style="font-size: 1.2em; color: #e2e8f0; font-style: italic; padding: 10px; background: rgba(236, 72, 153, 0.1); border-radius: 8px; border-left: 3px solid #ec4899;">
+                        "?"
+                    </div>
+                </div>
+
+                <!-- 步骤描述 -->
+                <div id="intentStepDesc" style="text-align: center; min-height: 80px; padding: 20px; background: rgba(236, 72, 153, 0.1); border-radius: 10px; margin-bottom: 30px; color: #e2e8f0; font-size: 1.1em; line-height: 1.6;">
+                    点击按钮开始演示意图路由流程
+                </div>
+
+                <div class="decision-tree" id="intentTree">
+                    <div class="tree-level">
+                        <div class="decision-node">
+                            <div class="icon">💬</div>
+                            <h4>用户输入</h4>
+                        </div>
+                    </div>
+
+                    <div class="tree-level">
+                        <div class="decision-node">
+                            <div class="icon">🔍</div>
+                            <h4>意图分类</h4>
+                            <p>识别用户需求</p>
+                        </div>
+                    </div>
+
+                    <div class="tree-level">
+                        <div class="decision-node">
+                            <div class="icon">🌤️</div>
+                            <h4>天气</h4>
+                        </div>
+
+                        <div class="decision-node">
+                            <div class="icon">🕐</div>
+                            <h4>时间</h4>
+                        </div>
+
+                        <div class="decision-node">
+                            <div class="icon">🔢</div>
+                            <h4>计算</h4>
+                        </div>
+
+                        <div class="decision-node">
+                            <div class="icon">💬</div>
+                            <h4>通用</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="runIntentBtn" onclick="runIntentDecision()">▶️ 播放意图路由动画</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 意图分类函数</span><br>
+                <span class="keyword">def</span> <span class="function">classify_intent</span>(state):<br>
+                &nbsp;&nbsp;user_input = state[<span class="string">"messages"</span>][-1].lower()<br><br>
+                &nbsp;&nbsp;<span class="keyword">if</span> <span class="string">"天气"</span> <span class="keyword">in</span> user_input:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"weather"</span><br>
+                &nbsp;&nbsp;<span class="keyword">elif</span> <span class="string">"时间"</span> <span class="keyword">in</span> user_input:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"time"</span><br>
+                &nbsp;&nbsp;<span class="keyword">elif</span> <span class="string">"计算"</span> <span class="keyword">in</span> user_input:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"calculator"</span><br>
+                &nbsp;&nbsp;<span class="keyword">else</span>:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"general"</span>
+            </div>
+        </div>
+
+        <!-- 场景 5: 多级决策树 -->
+        <div class="scene" id="scene5">
+            <h2 class="scene-title">多级决策树</h2>
+
+            <div class="highlight-box" style="background: rgba(139, 92, 246, 0.15); border-left-color: #8b5cf6;">
+                <h3 style="color: #8b5cf6;">🌲 复杂场景：级联条件判断</h3>
+                <p>
+                    多个条件边可以<strong>级联</strong>使用，形成复杂的决策树。<br><br>
+                    <strong>实际应用：客户服务路由</strong><br>
+                    第一层：客户类型（VIP/普通）<br>
+                    第二层：问题类型（技术/账单/通用）<br>
+                    第三层：优先级（紧急/高/正常）<br>
+                    → 最终路由到合适的处理团队
+                </p>
+            </div>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #8b5cf6; margin-bottom: 30px; font-size: 1.5em;">客户服务决策树</h3>
+
+                <!-- 状态显示面板 -->
+                <div class="state-display" id="serviceStateDisplay" style="margin-bottom: 30px; display: none;">
+                    <div style="color: #a78bfa; font-weight: bold; margin-bottom: 8px;">📊 当前状态</div>
+                    <div id="serviceStateContent" style="font-size: 1.1em; color: #60a5fa; font-weight: bold; font-family: monospace;">
+                        { customer_type: ?, issue_type: ? }
+                    </div>
+                </div>
+
+                <!-- 步骤描述 -->
+                <div id="serviceStepDesc" style="text-align: center; min-height: 80px; padding: 20px; background: rgba(139, 92, 246, 0.1); border-radius: 10px; margin-bottom: 30px; color: #e2e8f0; font-size: 1.1em; line-height: 1.6;">
+                    点击按钮开始演示多级决策流程
+                </div>
+
+                <div class="decision-tree" id="serviceTree" style="font-size: 0.9em;">
+                    <div class="tree-level">
+                        <div class="decision-node">
+                            <div class="icon">👤</div>
+                            <h4>客户分类</h4>
+                        </div>
+                    </div>
+
+                    <div class="tree-level">
+                        <div class="decision-node">
+                            <div class="icon">⭐</div>
+                            <h4>VIP客户</h4>
+                        </div>
+
+                        <div class="decision-node">
+                            <div class="icon">👥</div>
+                            <h4>普通客户</h4>
+                        </div>
+                    </div>
+
+                    <div class="tree-level">
+                        <div class="decision-node condition">
+                            <div class="icon">❓</div>
+                            <h4>问题类型</h4>
+                        </div>
+
+                        <div class="decision-node condition">
+                            <div class="icon">❓</div>
+                            <h4>问题类型</h4>
+                        </div>
+                    </div>
+
+                    <div class="tree-level">
+                        <div class="decision-node">
+                            <div class="icon">💎</div>
+                            <h4>VIP团队</h4>
+                        </div>
+
+                        <div class="decision-node">
+                            <div class="icon">👥</div>
+                            <h4>普通团队</h4>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="demo-btn" id="runServiceBtn" onclick="runServiceDecision()">▶️ 播放客户服务路由动画</button>
+            </div>
+        </div>
+
+        <!-- 场景 6: 总结 -->
+        <div class="scene" id="scene6">
+            <h2 class="scene-title">条件边使用模式</h2>
+
+            <div class="feature-grid">
+                <div class="feature-card" data-delay="0">
+                    <div class="feature-icon">🔀</div>
+                    <h4>简单二分支</h4>
+                    <p>if-else 逻辑，根据条件选择两个路径之一</p>
+                </div>
+
+                <div class="feature-card" data-delay="100">
+                    <div class="feature-icon">🔀</div>
+                    <h4>多分支</h4>
+                    <p>switch-case 逻辑，在多个路径中选择</p>
+                </div>
+
+                <div class="feature-card" data-delay="200">
+                    <div class="feature-icon">🌲</div>
+                    <h4>级联条件</h4>
+                    <p>多层决策树，逐步细化判断</p>
+                </div>
+
+                <div class="feature-card" data-delay="300">
+                    <div class="feature-icon">🤖</div>
+                    <h4>基于模型输出</h4>
+                    <p>LLM 分类结果决定路由</p>
+                </div>
+            </div>
+
+            <div class="highlight-box" style="background: rgba(34, 197, 94, 0.15); border-left-color: #22c55e;">
+                <h3 style="color: #22c55e;">🎯 最佳实践</h3>
+                <p>
+                    ✅ <strong>条件函数要简单明确</strong> - 避免复杂逻辑<br>
+                    ✅ <strong>使用 Literal 类型注解</strong> - 可以检查错误<br>
+                    ✅ <strong>确保每个返回值都有对应节点</strong> - 避免路径缺失<br>
+                    ✅ <strong>考虑添加默认分支</strong> - 处理未知情况<br>
+                    ✅ <strong>条件函数命名清晰</strong> - 如 route_by_xxx
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🚀 下一步学习</h3>
+                <p>
+                    恭喜你掌握了 LangGraph 的条件边！<br><br>
+                    📚 <strong>建议实践：</strong><br>
+                    1. 创建一个简单的二分支条件边<br>
+                    2. 实现多分支的条件路由<br>
+                    3. 尝试构建多级决策树<br><br>
+                    下一节我们将深入学习 <strong>LangGraph 的高级特性</strong>，<br>
+                    包括循环、并行执行和人工干预等！
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景指示器 -->
+        <div class="scene-indicators">
+            <div class="indicator active" data-scene="1"></div>
+            <div class="indicator" data-scene="2"></div>
+            <div class="indicator" data-scene="3"></div>
+            <div class="indicator" data-scene="4"></div>
+            <div class="indicator" data-scene="5"></div>
+            <div class="indicator" data-scene="6"></div>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <button class="nav-btn" id="prevBtn" disabled>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                上一节
+            </button>
+            <a href="../langchain/index.html" class="nav-btn back-to-list">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                </svg>
+                课程列表
+            </a>
+            <button class="nav-btn next" id="nextBtn">
+                下一节
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 场景数据
+        const totalScenes = 6;
+        let currentScene = 1;
+
+        // DOM 元素
+        const progressBar = document.getElementById('progressBar');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const indicators = document.querySelectorAll('.indicator');
+
+        // 初始化
+        function init() {
+            setupEventListeners();
+            updateScene();
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            // 导航按钮
+            prevBtn.addEventListener('click', () => {
+                if (currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                }
+            });
+
+            // 指示器
+            indicators.forEach(indicator => {
+                indicator.addEventListener('click', () => {
+                    currentScene = parseInt(indicator.dataset.scene);
+                    updateScene();
+                });
+            });
+
+            // 键盘导航
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' && currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                } else if (e.key === 'ArrowLeft' && currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+        }
+
+        // 更新场景
+        function updateScene() {
+            // 更新进度条
+            const progress = ((currentScene - 1) / (totalScenes - 1)) * 100;
+            progressBar.style.width = progress + '%';
+
+            // 更新场景显示
+            document.querySelectorAll('.scene').forEach((scene, index) => {
+                if (index + 1 === currentScene) {
+                    scene.classList.add('active');
+                } else {
+                    scene.classList.remove('active');
+                }
+            });
+
+            // 更新指示器
+            indicators.forEach((indicator, index) => {
+                if (index + 1 === currentScene) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+
+            // 更新按钮状态
+            prevBtn.disabled = currentScene === 1;
+            nextBtn.disabled = currentScene === totalScenes;
+
+            // 滚动到顶部
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            // 重置所有动画元素
+            document.querySelectorAll('.feature-card, .decision-node').forEach(el => {
+                el.classList.remove('visible');
+            });
+
+            // 动画显示元素
+            setTimeout(() => {
+                animateSceneElements();
+            }, 100);
+        }
+
+        // 动画显示场景元素
+        function animateSceneElements() {
+            const currentSceneEl = document.querySelector(`#scene${currentScene}`);
+
+            // 特性卡片动画
+            currentSceneEl.querySelectorAll('.feature-card').forEach((card, index) => {
+                const delay = parseInt(card.dataset.delay) || index * 100;
+                setTimeout(() => {
+                    card.classList.add('visible');
+                }, delay);
+            });
+
+            // 决策节点动画
+            currentSceneEl.querySelectorAll('.decision-node').forEach((node, index) => {
+                const delay = parseInt(node.dataset.delay) || index * 200;
+                setTimeout(() => {
+                    node.classList.add('visible');
+                }, delay);
+            });
+        }
+
+        // 场景 2: if-else 二分支逻辑动画
+        async function runBranchDecision() {
+            const btn = document.getElementById('runBranchBtn');
+            const stateDisplay = document.getElementById('branchStateDisplay');
+            const stateContent = document.getElementById('branchStateContent');
+            const stepDesc = document.getElementById('branchStepDesc');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            // 显示状态面板
+            stateDisplay.style.display = 'block';
+
+            // 重置所有节点
+            const inputNode = document.getElementById('branch-input-node');
+            const conditionNode = document.getElementById('branch-condition-node');
+            const trueNode = document.getElementById('branch-true-node');
+            const falseNode = document.getElementById('branch-false-node');
+
+            [inputNode, conditionNode, trueNode, falseNode].forEach(node => {
+                node.classList.remove('visible', 'active');
+                node.style.borderColor = '';
+                node.style.background = '';
+            });
+
+            stateContent.textContent = '{ score: ? }';
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 生成随机分数 (更接近60,增加悬念)
+            const score = Math.floor(Math.random() * 60) + 30; // 30-89之间
+            const isPass = score >= 60;
+
+            // 第1步: 初始化状态
+            stepDesc.innerHTML = '<strong>步骤 1/5：</strong>📥 <strong style="color: #d946ef;">初始化状态</strong> - 系统生成一个随机分数';
+            inputNode.classList.add('visible', 'active');
+            inputNode.querySelector('p').textContent = `{ score: ${score} }`;
+            animateStateUpdate(stateContent, `{ score: ${score} }`);
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            inputNode.classList.remove('active');
+
+            // 第2步: 条件函数接收状态
+            stepDesc.innerHTML = `<strong>步骤 2/5：</strong>🔄 <strong style="color: #d946ef;">条件函数接收状态</strong><br>route_condition(state) 被调用，读取 score 值: <span style="color: #60a5fa; font-family: monospace; font-weight: bold;">${score}</span>`;
+            conditionNode.classList.add('visible', 'active');
+            conditionNode.querySelector('p').innerHTML = `检查: <span style="color: #60a5fa;">${score}</span> >= 60?`;
+            await new Promise(resolve => setTimeout(resolve, 1800));
+            conditionNode.classList.remove('active');
+
+            // 第3步: 执行条件判断
+            const result = isPass ? 'True' : 'False';
+            const resultColor = isPass ? '#22c55e' : '#ef4444';
+            const resultEmoji = isPass ? '✅' : '❌';
+
+            stepDesc.innerHTML = `<strong>步骤 3/5：</strong>🔍 <strong style="color: #d946ef;">执行条件判断</strong><br>if ${score} >= 60: → 结果 = <span style="color: ${resultColor}; font-size: 1.3em; font-weight: bold;">${result}</span>`;
+            conditionNode.classList.add('active');
+            conditionNode.style.borderColor = resultColor;
+            conditionNode.style.background = isPass ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)';
+            conditionNode.querySelector('p').innerHTML = `${resultEmoji} <strong style="color: ${resultColor};">${result}</strong>`;
+            await new Promise(resolve => setTimeout(resolve, 1800));
+            conditionNode.classList.remove('active');
+
+            // 第4步: 根据结果选择分支
+            if (isPass) {
+                // True 分支
+                stepDesc.innerHTML = `<strong>步骤 4/5：</strong>✅ <strong style="color: #22c55e;">条件为 True，进入 if 分支</strong><br>return "pass_node" → 路由到 <strong style="color: #22c55e;">pass_node</strong>`;
+                trueNode.classList.add('visible', 'active');
+                trueNode.style.borderColor = '#22c55e';
+                trueNode.style.background = 'rgba(34, 197, 94, 0.3)';
+
+                // 高亮显示false节点但不激活(展示对比)
+                falseNode.classList.add('visible');
+                falseNode.style.opacity = '0.3';
+
+                await new Promise(resolve => setTimeout(resolve, 1800));
+                trueNode.classList.remove('active');
+            } else {
+                // False 分支
+                stepDesc.innerHTML = `<strong>步骤 4/5：</strong>❌ <strong style="color: #ef4444;">条件为 False，进入 else 分支</strong><br>return "fail_node" → 路由到 <strong style="color: #ef4444;">fail_node</strong>`;
+                falseNode.classList.add('visible', 'active');
+                falseNode.style.borderColor = '#ef4444';
+                falseNode.style.background = 'rgba(239, 68, 68, 0.3)';
+
+                // 高亮显示true节点但不激活(展示对比)
+                trueNode.classList.add('visible');
+                trueNode.style.opacity = '0.3';
+
+                await new Promise(resolve => setTimeout(resolve, 1800));
+                falseNode.classList.remove('active');
+            }
+
+            // 第5步: 最终总结
+            const nodeName = isPass ? 'pass_node (通过节点)' : 'fail_node (失败节点)';
+            const explanation = isPass
+                ? '✓ 因为 <code>score >= 60</code> 为 True，所以执行 <strong>if</strong> 分支'
+                : '✗ 因为 <code>score >= 60</code> 为 False，所以执行 <strong>else</strong> 分支';
+
+            stepDesc.innerHTML = `
+                <strong>步骤 5/5：</strong>🎉 <strong style="color: #22c55e;">完成！二分支逻辑演示</strong><br><br>
+                <div style="text-align: left; max-width: 600px; margin: 0 auto; line-height: 1.8;">
+                    📊 <strong>状态值：</strong><code style="color: #60a5fa;">{ score: ${score} }</code><br>
+                    🔍 <strong>条件判断：</strong><code>if ${score} >= 60</code><br>
+                    ${explanation}<br>
+                    🎯 <strong>最终路由到：</strong><span style="color: ${resultColor}; font-weight: bold;">${nodeName}</span>
+                </div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1); color: #94a3b8; font-size: 0.95em;">
+                    💡 <strong>核心概念：</strong>条件边根据状态自动选择路径，实现 if-else 逻辑！
+                </div>
+            `;
+
+            // 恢复按钮
+            await new Promise(resolve => setTimeout(resolve, 500));
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示 if-else';
+        }
+
+        // 场景 1: 简单决策树
+        async function runSimpleDecision() {
+            const btn = document.getElementById('runDecisionBtn');
+            const stateDisplay = document.getElementById('simpleStateDisplay');
+            const stateContent = document.getElementById('simpleStateContent');
+            const stepDesc = document.getElementById('simpleStepDesc');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            // 显示状态面板
+            stateDisplay.style.display = 'block';
+
+            // 重置
+            document.querySelectorAll('#simpleDecisionTree .decision-node').forEach(el => {
+                el.classList.remove('visible', 'active');
+                el.style.borderColor = '';
+                el.style.background = '';
+                // 重置节点文本
+                if (el.querySelector('p')) {
+                    const originalText = el.querySelector('p').getAttribute('data-original-text');
+                    if (originalText) {
+                        el.querySelector('p').textContent = originalText;
+                    }
+                }
+            });
+
+            stateContent.textContent = '{ score: ? }';
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 生成随机分数
+            const score = Math.floor(Math.random() * 100) + 1;
+            const isPass = score >= 60;
+
+            // 获取节点
+            const nodes = document.querySelectorAll('#simpleDecisionTree .decision-node');
+            const conditionNode = nodes[0]; // 条件节点
+            const judgeNode = nodes[1]; // 判断节点
+            const passNode = nodes[2]; // 通过节点
+            const failNode = nodes[3]; // 失败节点
+
+            // 保存原始文本
+            if (!conditionNode.querySelector('p').getAttribute('data-original-text')) {
+                conditionNode.querySelector('p').setAttribute('data-original-text', conditionNode.querySelector('p').textContent);
+            }
+
+            // 第1步：初始化状态
+            stepDesc.innerHTML = '<strong>步骤 1：</strong>📥 初始化状态 - 系统生成一个随机分数';
+            animateStateUpdate(stateContent, `{ score: ${score} }`);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            // 第2步：条件节点处理
+            stepDesc.innerHTML = `<strong>步骤 2：</strong>🔄 条件节点执行 - 读取状态中的分数值：<strong style="color: #60a5fa;">${score}</strong>`;
+            conditionNode.classList.add('visible', 'active');
+            conditionNode.querySelector('p').textContent = `分数: ${score}`;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            conditionNode.classList.remove('active');
+
+            // 第3步：条件判断
+            stepDesc.innerHTML = `<strong>步骤 3：</strong>🔍 条件判断 - 检查条件：<span style="color: #fbbf24; font-family: monospace;">${score} >= 60</span>`;
+            judgeNode.classList.add('visible', 'active');
+            judgeNode.querySelector('p').textContent = `${score} >= 60?`;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            judgeNode.classList.remove('active');
+
+            // 第4步：根据分数选择路径
+            if (isPass) {
+                // 通过路径
+                stepDesc.innerHTML = `<strong>步骤 4：</strong>✅ 条件满足 - <span style="color: #22c55e;">${score} >= 60</span>，路由到<strong style="color: #22c55e;">通过节点</strong>`;
+                passNode.classList.add('visible', 'active');
+                passNode.querySelector('p').textContent = `✓ ${score} >= 60`;
+                passNode.style.borderColor = '#22c55e';
+                passNode.style.background = 'rgba(34, 197, 94, 0.3)';
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                passNode.classList.remove('active');
+
+                // 最终总结
+                stepDesc.innerHTML = `
+                    <strong>完成！</strong> 🎉<br>
+                    条件边根据状态 <span style="color: #60a5fa; font-family: monospace;">{ score: ${score} }</span> 自动选择了<strong style="color: #22c55e;">通过</strong>路径<br>
+                    <span style="color: #94a3b8; font-size: 0.9em;">这就是条件边的核心：根据状态动态决定下一步！</span>
+                `;
+            } else {
+                // 失败路径
+                stepDesc.innerHTML = `<strong>步骤 4：</strong>❌ 条件不满足 - <span style="color: #ef4444;">${score} < 60</span>，路由到<strong style="color: #ef4444;">失败节点</strong>`;
+                failNode.classList.add('visible', 'active');
+                failNode.querySelector('p').textContent = `✗ ${score} < 60`;
+                failNode.style.borderColor = '#ef4444';
+                failNode.style.background = 'rgba(239, 68, 68, 0.3)';
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                failNode.classList.remove('active');
+
+                // 最终总结
+                stepDesc.innerHTML = `
+                    <strong>完成！</strong> 🎉<br>
+                    条件边根据状态 <span style="color: #60a5fa; font-family: monospace;">{ score: ${score} }</span> 自动选择了<strong style="color: #ef4444;">失败</strong>路径<br>
+                    <span style="color: #94a3b8; font-size: 0.9em;">这就是条件边的核心：根据状态动态决定下一步！</span>
+                `;
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 状态更新动画函数
+        function animateStateUpdate(element, newValue) {
+            element.style.transform = 'scale(1.15)';
+            element.style.color = '#22c55e';
+            element.style.transition = 'all 0.15s ease-out';
+
+            setTimeout(() => {
+                element.textContent = newValue;
+                element.style.transform = 'scale(1)';
+                element.style.color = '#60a5fa';
+            }, 150);
+        }
+
+        // 场景 3: 天气决策树
+        async function runWeatherDecision() {
+            const btn = document.getElementById('runWeatherBtn');
+            const stateDisplay = document.getElementById('weatherStateDisplay');
+            const stateContent = document.getElementById('weatherStateContent');
+            const stepDesc = document.getElementById('weatherStepDesc');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            // 显示状态面板
+            stateDisplay.style.display = 'block';
+
+            // 重置
+            document.querySelectorAll('#weatherTree .decision-node').forEach(el => {
+                el.classList.remove('visible', 'active');
+                el.style.borderColor = '';
+                el.style.background = '';
+            });
+
+            stateContent.textContent = '{ weather: ? }';
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 天气类型
+            const weatherTypes = [
+                { name: 'sunny', label: '晴天', icon: '☀️', activity: '野餐' },
+                { name: 'rainy', label: '雨天', icon: '🌧️', activity: '看电影' },
+                { name: 'cloudy', label: '多云', icon: '☁️', activity: '购物' },
+                { name: 'snowy', label: '雪天', icon: '❄️', activity: '堆雪人' }
+            ];
+
+            // 随机选择一种天气
+            const selectedWeather = weatherTypes[Math.floor(Math.random() * weatherTypes.length)];
+
+            // 获取节点
+            const nodes = document.querySelectorAll('#weatherTree .decision-node');
+            const checkNode = nodes[0]; // 检查天气
+            const judgeNode = nodes[1]; // 天气类型
+            const weatherNodes = Array.from(nodes).slice(2); // 四种天气节点
+
+            // 第1步：初始化状态
+            stepDesc.innerHTML = '<strong>步骤 1：</strong>📥 初始化状态 - 系统随机选择一种天气';
+            animateStateUpdate(stateContent, `{ weather: "${selectedWeather.name}" }`);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            // 第2步：检查天气节点
+            stepDesc.innerHTML = `<strong>步骤 2：</strong>🌤️ 检查天气节点 - 读取状态：<span style="color: #a855f7;">${selectedWeather.icon} ${selectedWeather.label}</span>`;
+            checkNode.classList.add('visible', 'active');
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            checkNode.classList.remove('active');
+
+            // 第3步：条件判断
+            stepDesc.innerHTML = `<strong>步骤 3：</strong>🔍 条件判断 - 检查天气类型：<span style="color: #fbbf24; font-family: monospace;">"${selectedWeather.name}"</span>`;
+            judgeNode.classList.add('visible', 'active');
+            judgeNode.querySelector('h4').textContent = `${selectedWeather.icon} ${selectedWeather.label}`;
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            judgeNode.classList.remove('active');
+
+            // 第4步：显示所有天气节点（先全部显示）
+            weatherNodes.forEach(node => {
+                node.classList.add('visible');
+            });
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 第5步：路由到匹配的节点
+            stepDesc.innerHTML = `<strong>步骤 4：</strong>✅ 路由匹配 - 天气类型 <span style="color: #a855f7;">"${selectedWeather.name}"</span> 对应<strong style="color: #22c55e;">${selectedWeather.icon} ${selectedWeather.label}</strong>节点`;
+            const selectedNode = weatherNodes.find(node =>
+                node.querySelector('h4').textContent === selectedWeather.label
+            );
+
+            if (selectedNode) {
+                selectedNode.classList.add('active');
+                selectedNode.style.borderColor = '#22c55e';
+                selectedNode.style.background = 'rgba(34, 197, 94, 0.3)';
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                selectedNode.classList.remove('active');
+            }
+
+            // 最终总结
+            stepDesc.innerHTML = `
+                <strong>完成！</strong> 🎉<br>
+                条件边根据状态 <span style="color: #60a5fa; font-family: monospace;">{ weather: "${selectedWeather.name}" }</span> 自动路由到<strong style="color: #22c55e;">${selectedWeather.icon} ${selectedWeather.label}</strong>节点<br>
+                <span style="color: #94a3b8; font-size: 0.9em;">多分支条件就像 switch-case，根据状态值选择对应的路径！</span>
+            `;
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 场景 4: 意图路由
+        async function runIntentDecision() {
+            const btn = document.getElementById('runIntentBtn');
+            const messageDisplay = document.getElementById('intentMessageDisplay');
+            const messageContent = document.getElementById('intentMessageContent');
+            const stepDesc = document.getElementById('intentStepDesc');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            // 显示消息面板
+            messageDisplay.style.display = 'block';
+
+            // 重置
+            document.querySelectorAll('#intentTree .decision-node').forEach(el => {
+                el.classList.remove('visible', 'active');
+                el.style.borderColor = '';
+                el.style.background = '';
+            });
+
+            messageContent.textContent = '?';
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 意图类型
+            const intents = [
+                { name: 'weather', label: '天气', icon: '🌤️', example: '今天天气怎么样？' },
+                { name: 'time', label: '时间', icon: '🕐', example: '现在几点了？' },
+                { name: 'calculator', label: '计算', icon: '🔢', example: '计算 2+2' },
+                { name: 'general', label: '通用', icon: '💬', example: '你好' }
+            ];
+
+            // 随机选择一个意图
+            const selectedIntent = intents[Math.floor(Math.random() * intents.length)];
+
+            // 获取节点
+            const nodes = document.querySelectorAll('#intentTree .decision-node');
+            const inputNode = nodes[0]; // 用户输入
+            const classifyNode = nodes[1]; // 意图分类
+            const intentNodes = Array.from(nodes).slice(2); // 四个意图节点
+
+            // 第1步：用户输入消息
+            stepDesc.innerHTML = '<strong>步骤 1：</strong>💬 用户输入 - 系统接收到用户消息';
+            messageContent.textContent = `"${selectedIntent.example}"`;
+            messageContent.style.transform = 'scale(1.05)';
+            setTimeout(() => {
+                messageContent.style.transform = 'scale(1)';
+            }, 200);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            // 第2步：显示用户输入节点
+            stepDesc.innerHTML = `<strong>步骤 2：</strong>📥 读取消息 - 状态包含用户输入：<span style="color: #ec4899;">"${selectedIntent.example}"</span>`;
+            inputNode.classList.add('visible', 'active');
+            if (inputNode.querySelector('p')) {
+                inputNode.querySelector('p').textContent = selectedIntent.example;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            inputNode.classList.remove('active');
+
+            // 第3步：意图分类
+            stepDesc.innerHTML = `<strong>步骤 3：</strong>🤖 意图分类 - AI 识别消息意图为：<span style="color: #fbbf24; font-weight: bold;">"${selectedIntent.name}"</span>`;
+            classifyNode.classList.add('visible', 'active');
+            if (classifyNode.querySelector('p')) {
+                classifyNode.querySelector('p').textContent = `识别为: ${selectedIntent.label}`;
+            }
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            classifyNode.classList.remove('active');
+
+            // 第4步：显示所有意图节点（先全部显示）
+            intentNodes.forEach(node => {
+                node.classList.add('visible');
+            });
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 第5步：路由到匹配的意图处理器
+            stepDesc.innerHTML = `<strong>步骤 4：</strong>✅ 路由匹配 - 意图 <span style="color: #ec4899;">"${selectedIntent.name}"</span> 路由到<strong style="color: #ec4899;">${selectedIntent.icon} ${selectedIntent.label}</strong>处理器`;
+            const selectedNode = intentNodes.find(node =>
+                node.querySelector('h4').textContent === selectedIntent.label
+            );
+
+            if (selectedNode) {
+                selectedNode.classList.add('active');
+                selectedNode.style.borderColor = '#ec4899';
+                selectedNode.style.background = 'rgba(236, 72, 153, 0.3)';
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                selectedNode.classList.remove('active');
+            }
+
+            // 最终总结
+            stepDesc.innerHTML = `
+                <strong>完成！</strong> 🎉<br>
+                AI 识别用户消息意图为 <span style="color: #ec4899; font-family: monospace;">"${selectedIntent.name}"</span>，自动路由到<strong style="color: #ec4899;">${selectedIntent.icon} ${selectedIntent.label}</strong>处理器<br>
+                <span style="color: #94a3b8; font-size: 0.9em;">这就是智能客服的核心：根据意图自动路由到专门的处理器！</span>
+            `;
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 场景 5: 客户服务路由
+        async function runServiceDecision() {
+            const btn = document.getElementById('runServiceBtn');
+            const stateDisplay = document.getElementById('serviceStateDisplay');
+            const stateContent = document.getElementById('serviceStateContent');
+            const stepDesc = document.getElementById('serviceStepDesc');
+
+            btn.disabled = true;
+            btn.textContent = '⏳ 演示中...';
+
+            // 显示状态面板
+            stateDisplay.style.display = 'block';
+
+            // 重置
+            document.querySelectorAll('#serviceTree .decision-node').forEach(el => {
+                el.classList.remove('visible', 'active');
+                el.style.borderColor = '';
+                el.style.background = '';
+                // 恢复原始文本
+                const p = el.querySelector('p');
+                if (p) {
+                    const h4 = el.querySelector('h4');
+                    if (h4.textContent === 'VIP客户') {
+                        p.textContent = '';
+                    } else if (h4.textContent === '普通客户') {
+                        p.textContent = '';
+                    } else if (h4.textContent === 'VIP团队') {
+                        p.textContent = '';
+                    } else if (h4.textContent === '普通团队') {
+                        p.textContent = '';
+                    }
+                }
+            });
+
+            stateContent.textContent = '{ customer_type: ?, issue_type: ? }';
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 随机选择客户类型
+            const isVIP = Math.random() > 0.5;
+
+            // 获取节点
+            const nodes = document.querySelectorAll('#serviceTree .decision-node');
+            const classifyNode = nodes[0]; // 客户分类
+            const vipNode = nodes[1]; // VIP客户
+            const normalNode = nodes[2]; // 普通客户
+            const vipConditionNode = nodes[3]; // VIP问题类型
+            const normalConditionNode = nodes[4]; // 普通问题类型
+            const vipTeamNode = nodes[5]; // VIP团队
+            const normalTeamNode = nodes[6]; // 普通团队
+
+            // 第1步：初始化客户类型状态
+            const customerType = isVIP ? 'VIP' : '普通';
+            stepDesc.innerHTML = `<strong>步骤 1：</strong>📥 初始化状态 - 系统随机选择客户类型：<span style="color: #8b5cf6; font-weight: bold;">${customerType}客户</span>`;
+            animateStateUpdate(stateContent, `{ customer_type: "${customerType}", issue_type: ? }`);
+            await new Promise(resolve => setTimeout(resolve, 1200));
+
+            // 第2步：显示客户分类节点
+            stepDesc.innerHTML = `<strong>步骤 2：</strong>👤 客户分类节点 - 读取状态中的客户类型：<span style="color: #8b5cf6;">${customerType}</span>`;
+            classifyNode.classList.add('visible', 'active');
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            classifyNode.classList.remove('active');
+
+            // 第3步：显示两个客户类型节点
+            vipNode.classList.add('visible');
+            normalNode.classList.add('visible');
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            // 第4步：根据客户类型选择路径（第一层条件判断）
+            if (isVIP) {
+                // VIP路径
+                stepDesc.innerHTML = `<strong>步骤 3：</strong>⭐ 第一层判断 - 客户类型为 <span style="color: #fbbf24;">VIP</span>，进入VIP服务流程`;
+                vipNode.classList.add('active');
+                vipNode.style.borderColor = '#fbbf24';
+                vipNode.style.background = 'rgba(251, 191, 36, 0.3)';
+                await new Promise(resolve => setTimeout(resolve, 1200));
+                vipNode.classList.remove('active');
+
+                // 显示VIP条件节点
+                stepDesc.innerHTML = `<strong>步骤 4：</strong>🔍 第二层判断 - 检查VIP客户的问题类型`;
+                vipConditionNode.classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 1200));
+                vipConditionNode.classList.remove('active');
+
+                // 显示VIP团队节点
+                vipTeamNode.classList.add('visible', 'active');
+                vipTeamNode.style.borderColor = '#22c55e';
+                vipTeamNode.style.background = 'rgba(34, 197, 94, 0.3)';
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                vipTeamNode.classList.remove('active');
+
+                // VIP最终总结
+                stepDesc.innerHTML = `
+                    <strong>完成！</strong> 🎉<br>
+                    经过<span style="color: #fbbf24;">两层条件判断</span>，VIP客户被路由到<strong style="color: #22c55e;">💎 VIP专属团队</strong><br>
+                    <span style="color: #94a3b8; font-size: 0.9em;">多级决策树可以处理复杂的业务逻辑，实现精准路由！</span>
+                `;
+            } else {
+                // 普通客户路径
+                stepDesc.innerHTML = `<strong>步骤 3：</strong>👥 第一层判断 - 客户类型为 <span style="color: #8b5cf6;">普通</span>，进入普通服务流程`;
+                normalNode.classList.add('active');
+                normalNode.style.borderColor = '#8b5cf6';
+                normalNode.style.background = 'rgba(139, 92, 246, 0.3)';
+                await new Promise(resolve => setTimeout(resolve, 1200));
+                normalNode.classList.remove('active');
+
+                // 显示普通条件节点
+                stepDesc.innerHTML = `<strong>步骤 4：</strong>🔍 第二层判断 - 检查普通客户的问题类型`;
+                normalConditionNode.classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 1200));
+                normalConditionNode.classList.remove('active');
+
+                // 显示普通团队节点
+                normalTeamNode.classList.add('visible', 'active');
+                normalTeamNode.style.borderColor = '#22c55e';
+                normalTeamNode.style.background = 'rgba(34, 197, 94, 0.3)';
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                normalTeamNode.classList.remove('active');
+
+                // 普通客户最终总结
+                stepDesc.innerHTML = `
+                    <strong>完成！</strong> 🎉<br>
+                    经过<span style="color: #8b5cf6;">两层条件判断</span>，普通客户被路由到<strong style="color: #22c55e;">👥 普通服务团队</strong><br>
+                    <span style="color: #94a3b8; font-size: 0.9em;">多级决策树可以处理复杂的业务逻辑，实现精准路由！</span>
+                `;
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新演示';
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

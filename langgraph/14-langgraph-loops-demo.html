@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LangGraph 循环 - LangChain 学习 14</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* 浮动光球 */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(236, 72, 153, 0.2) 0%, rgba(168, 85, 247, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            25% { transform: translate(30px, -30px) scale(1.1); }
+            50% { transform: translate(-20px, 20px) scale(0.9); }
+            75% { transform: translate(-30px, -20px) scale(1.05); }
+        }
+
+        /* 主容器 */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 头部 */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 1s ease-out;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header h1 {
+            font-size: 3.5em;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(167, 139, 250, 0.3);
+        }
+
+        .header p {
+            font-size: 1.3em;
+            color: rgba(226, 232, 240, 0.8);
+        }
+
+        /* 进度条 */
+        .progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #8b5cf6 0%, #a855f7 50%, #d946ef 100%);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        /* 场景容器 */
+        .scene {
+            display: none;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .scene.active {
+            display: block;
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* 场景标题 */
+        .scene-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-align: center;
+            background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeIn 1s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* 动画画布 */
+        .canvas-container {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 循环可视化 */
+        .loop-visualization {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding: 40px 20px;
+            flex-wrap: wrap;
+            position: relative;
+        }
+
+        .loop-node {
+            background: rgba(139, 92, 246, 0.2);
+            border: 3px solid rgba(139, 92, 246, 0.5);
+            border-radius: 20px;
+            padding: 25px;
+            text-align: center;
+            min-width: 140px;
+            transition: all 0.5s;
+            transform: scale(0.8);
+            opacity: 0;
+            position: relative;
+        }
+
+        .loop-node.visible {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .loop-node.active {
+            background: rgba(34, 197, 94, 0.3);
+            border-color: rgba(34, 197, 94, 0.7);
+            box-shadow: 0 0 40px rgba(34, 197, 94, 0.6);
+            transform: scale(1.2);
+        }
+
+        .loop-node .icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .loop-node h4 {
+            color: #a78bfa;
+            margin-bottom: 5px;
+            font-size: 1.1em;
+        }
+
+        .loop-node p {
+            color: rgba(226, 232, 240, 0.7);
+            font-size: 0.85em;
+        }
+
+        .loop-arrow {
+            font-size: 2.5em;
+            color: #8b5cf6;
+            opacity: 0;
+            transition: all 0.5s;
+        }
+
+        .loop-arrow.visible {
+            opacity: 1;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        /* 循环箭头 */
+        .loop-back-arrow {
+            position: absolute;
+            font-size: 3em;
+            color: #d946ef;
+            opacity: 0;
+            transition: all 0.5s;
+        }
+
+        .loop-back-arrow.visible {
+            opacity: 1;
+            animation: loopPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes loopPulse {
+            0%, 100% { transform: scale(1); opacity: 0.3; }
+            50% { transform: scale(1.3); opacity: 1; }
+        }
+
+        /* 迭代计数器 */
+        .iteration-counter {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: rgba(217, 70, 239, 0.15);
+            border: 2px solid rgba(217, 70, 239, 0.3);
+            border-radius: 15px;
+            font-size: 1.2em;
+            font-weight: 600;
+        }
+
+        .iteration-number {
+            font-size: 2em;
+            color: #d946ef;
+            font-weight: bold;
+        }
+
+        /* 特性卡片 */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            margin: 30px 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            transform: translateY(30px);
+            opacity: 0;
+            transition: all 0.6s;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .feature-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .feature-card:hover {
+            background: rgba(139, 92, 246, 0.15);
+            transform: translateY(-8px);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 4em;
+            margin-bottom: 15px;
+        }
+
+        .feature-card h4 {
+            color: #a78bfa;
+            margin-bottom: 12px;
+            font-size: 1.3em;
+        }
+
+        .feature-card p {
+            color: rgba(226, 232, 240, 0.7);
+            line-height: 1.6;
+        }
+
+        /* 代码片段 */
+        .code-snippet {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .keyword { color: #c792ea; font-weight: bold; }
+        .string { color: #c3e88d; }
+        .comment { color: #546e7a; font-style: italic; }
+        .function { color: #82aaff; }
+
+        /* 高亮框 */
+        .highlight-box {
+            background: rgba(139, 92, 246, 0.15);
+            border-left: 5px solid #8b5cf6;
+            padding: 25px;
+            border-radius: 12px;
+            margin: 30px 0;
+            animation: slideInRight 0.8s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .highlight-box h3 {
+            color: #a78bfa;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .highlight-box p {
+            line-height: 1.8;
+            color: rgba(226, 232, 240, 0.9);
+        }
+
+        /* 演示按钮 */
+        .demo-btn {
+            background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+            margin: 20px auto;
+            display: block;
+        }
+
+        .demo-btn:hover:not(:disabled) {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(139, 92, 246, 0.6);
+        }
+
+        .demo-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* 导航按钮 */
+        .nav-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 60px;
+            gap: 20px;
+        }
+
+        .nav-btn {
+            padding: 15px 40px;
+            background: rgba(139, 92, 246, 0.2);
+            border: 2px solid rgba(139, 92, 246, 0.5);
+            border-radius: 12px;
+            color: #a78bfa;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: rgba(139, 92, 246, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(139, 92, 246, 0.4);
+        }
+
+        /* 针对 a 标签的导航按钮样式 */
+        .nav-btn.back-to-list {
+            text-decoration: none;
+            background: rgba(59, 130, 246, 0.2);
+            border-color: rgba(59, 130, 246, 0.5);
+            color: #60a5fa;
+        }
+
+        .nav-btn.back-to-list:hover {
+            background: rgba(59, 130, 246, 0.4);
+            box-shadow: 0 5px 20px rgba(59, 130, 246, 0.4);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .nav-btn.next {
+            margin-left: auto;
+        }
+
+        /* 场景指示器 */
+        .scene-indicators {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 40px 0;
+        }
+
+        .indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .indicator.active {
+            background: #8b5cf6;
+            transform: scale(1.3);
+        }
+
+        .indicator:hover {
+            transform: scale(1.2);
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+
+            .loop-visualization {
+                flex-direction: column;
+            }
+
+            .loop-arrow {
+                transform: rotate(90deg);
+            }
+        }
+    
+        /* 标准导航样式 */
+        .nav-card {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin-bottom: 32px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-card a {
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+        .nav-card a:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 顶部导航卡片 */
+        .top-nav-card {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 16px 24px;
+            margin: 20px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .top-nav-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .top-nav-left,
+        .top-nav-center,
+        .top-nav-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .top-nav-link {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #9ca3af;
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            font-size: 0.95em;
+        }
+
+        .top-nav-link:hover {
+            color: #e5e7eb;
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .top-nav-link.home {
+            color: #4ade80;
+        }
+
+        .top-nav-link.home:hover {
+            color: #86efac;
+        }
+
+        .top-nav-link svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .top-nav-divider {
+            width: 1px;
+            height: 24px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .top-nav-text {
+            color: #6b7280;
+            font-size: 0.9em;
+        }
+
+        .top-nav-progress {
+            color: #9ca3af;
+            font-size: 0.9em;
+            font-weight: 500;
+        }
+</style>
+</head>
+<body>
+    <!-- 浮动光球 -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>    <!-- 顶部导航 - 跨模块 -->
+    <div class="top-nav-card">
+        <div class="top-nav-container">
+            <div class="top-nav-left">
+                <a href="index.html" class="top-nav-link home">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回LangGraph目录
+                </a>
+            </div>
+            <div class="top-nav-center">
+                <a href="13-langgraph-conditional-demo.html" class="top-nav-link">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一课
+                </a>
+                <div class="top-nav-divider"></div>
+                <a href="15-langgraph-agent-demo.html" class="top-nav-link">
+                    下一课
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+            </div>
+            <div class="top-nav-right">
+                <span class="top-nav-progress">课程 14 / 20</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度条 -->
+    <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>LangGraph 循环</h1>
+            <p>在图中创建循环执行 - Loops</p>
+        </div>
+
+        <!-- 场景 1: 什么是循环 -->
+        <div class="scene active" id="scene1">
+            <h2 class="scene-title">什么是循环？</h2>
+
+            <div class="highlight-box">
+                <h3>🔄 核心概念</h3>
+                <p>
+                    在 LangGraph 中，<strong>循环是通过条件边（Conditional Edges）</strong>实现的。<br><br>
+                    条件函数返回源节点名称就形成循环，返回其他节点就退出循环。<br><br>
+                    <strong>关键点：</strong><br>
+                    • 条件函数决定是继续循环还是退出<br>
+                    • 可以设置最大迭代次数防止无限循环<br>
+                    • 在状态中跟踪迭代历史<br>
+                    • 循环让 Agent 可以进行多步推理
+                </p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card" data-delay="0">
+                    <div class="feature-icon">🔢</div>
+                    <h4>计数循环</h4>
+                    <p>达到目标值时停止</p>
+                </div>
+
+                <div class="feature-card" data-delay="100">
+                    <div class="feature-icon">✅</div>
+                    <h4>条件循环</h4>
+                    <p>满足条件时停止</p>
+                </div>
+
+                <div class="feature-card" data-delay="200">
+                    <div class="feature-icon">📦</div>
+                    <h4>累积循环</h4>
+                    <p>收集多个结果</p>
+                </div>
+
+                <div class="feature-card" data-delay="300">
+                    <div class="feature-icon">🔁</div>
+                    <h4>优化循环</h4>
+                    <p>迭代改进结果</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 场景 2: 计数循环 -->
+        <div class="scene" id="scene2">
+            <h2 class="scene-title">计数循环</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a78bfa; margin-bottom: 30px; font-size: 1.5em;">计数循环演示</h3>
+
+                <div class="loop-visualization" id="counterLoop">
+                    <div class="loop-node" data-step="1">
+                        <div class="icon">🔢</div>
+                        <h4>计数: 0</h4>
+                        <p>初始值</p>
+                    </div>
+
+                    <div class="loop-arrow" data-step="2">→</div>
+
+                    <div class="loop-node" data-step="3">
+                        <div class="icon">➕</div>
+                        <h4>递增</h4>
+                        <p>+1</p>
+                    </div>
+
+                    <div class="loop-arrow" data-step="4">→</div>
+
+                    <div class="loop-node" data-step="5">
+                        <div class="icon">❓</div>
+                        <h4>判断</h4>
+                        <p>&lt; 5?</p>
+                    </div>
+
+                    <div class="loop-back-arrow" data-step="6" style="bottom: 60px; right: 140px;">↻</div>
+                </div>
+
+                <div class="iteration-counter">
+                    当前迭代: <span class="iteration-number" id="counterValue">0</span> / 5
+                </div>
+
+                <button class="demo-btn" id="runCounterBtn" onclick="runCounterLoop()">▶️ 运行计数循环</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 核心代码：条件边实现循环</span><br><br>
+                <span class="keyword">def</span> <span class="function">should_continue</span>(state):<br>
+                &nbsp;&nbsp;<span class="keyword">if</span> state[<span class="string">"count"</span>] &lt; state[<span class="string">"target"</span>]:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"continue"</span>  <span class="comment"># 继续循环</span><br>
+                &nbsp;&nbsp;<span class="keyword">else</span>:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"end"</span>  <span class="comment"># 退出循环</span><br><br>
+                graph.add_conditional_edges(<br>
+                &nbsp;&nbsp;<span class="string">"increment"</span>,<br>
+                &nbsp;&nbsp;should_continue,<br>
+                &nbsp;&nbsp;{<span class="string">"continue"</span>: <span class="string">"increment"</span>, <span class="string">"end"</span>: END}<br>
+                )
+            </div>
+        </div>
+
+        <!-- 场景 3: 安全限制循环 -->
+        <div class="scene" id="scene3">
+            <h2 class="scene-title">带安全限制的循环</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a78bfa; margin-bottom: 30px; font-size: 1.5em;">重试机制演示</h3>
+
+                <div class="loop-visualization" id="retryLoop">
+                    <div class="loop-node" data-step="1">
+                        <div class="icon">🔄</div>
+                        <h4>尝试</h4>
+                        <p>执行操作</p>
+                    </div>
+
+                    <div class="loop-arrow" data-step="2">→</div>
+
+                    <div class="loop-node" data-step="3">
+                        <div class="icon">✅/❌</div>
+                        <h4>判断</h4>
+                        <p>成功?</p>
+                    </div>
+
+                    <div class="loop-arrow" data-step="4">→</div>
+
+                    <div class="loop-node" data-step="5">
+                        <div class="icon">🎯</div>
+                        <h4>成功</h4>
+                        <p>完成</p>
+                    </div>
+
+                    <div class="loop-node" data-step="6" style="margin-left: 20px;">
+                        <div class="icon">⏹️</div>
+                        <h4>放弃</h4>
+                        <p>达到上限</p>
+                    </div>
+
+                    <div class="loop-back-arrow" data-step="7" style="bottom: 60px; right: 160px;">↻</div>
+                </div>
+
+                <div class="iteration-counter">
+                    尝试次数: <span class="iteration-number" id="retryCount">0</span> / 5
+                </div>
+
+                <button class="demo-btn" id="runRetryBtn" onclick="runRetryLoop()">▶️ 运行重试循环</button>
+            </div>
+
+            <div class="code-snippet">
+                <span class="comment"># 三分支条件：重试、成功、放弃</span><br><br>
+                <span class="keyword">def</span> <span class="function">should_retry</span>(state):<br>
+                &nbsp;&nbsp;<span class="keyword">if</span> state[<span class="string">"success"</span>]:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"success"</span><br>
+                &nbsp;&nbsp;<span class="keyword">elif</span> state[<span class="string">"attempts"</span>] &lt; state[<span class="string">"max_attempts"</span>]:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"retry"</span><br>
+                &nbsp;&nbsp;<span class="keyword">else</span>:<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"give_up"</span>
+            </div>
+        </div>
+
+        <!-- 场景 4: ReAct 循环 -->
+        <div class="scene" id="scene4">
+            <h2 class="scene-title">ReAct 循环</h2>
+
+            <div class="canvas-container">
+                <h3 style="text-align: center; color: #a78bfa; margin-bottom: 30px; font-size: 1.5em;">ReAct 循环演示</h3>
+
+                <div class="loop-visualization" id="reactLoop">
+                    <div class="loop-node" data-step="1">
+                        <div class="icon">🤔</div>
+                        <h4>思考</h4>
+                        <p>Thought</p>
+                    </div>
+
+                    <div class="loop-arrow" data-step="2">→</div>
+
+                    <div class="loop-node" data-step="3">
+                        <div class="icon">🔧</div>
+                        <h4>行动</h4>
+                        <p>Action</p>
+                    </div>
+
+                    <div class="loop-arrow" data-step="4">→</div>
+
+                    <div class="loop-node" data-step="5">
+                        <div class="icon">👁️</div>
+                        <h4>观察</h4>
+                        <p>Observation</p>
+                    </div>
+
+                    <div class="loop-arrow" data-step="6">→</div>
+
+                    <div class="loop-node" data-step="7">
+                        <div class="icon">❓</div>
+                        <h4>判断</h4>
+                        <p>完成?</p>
+                    </div>
+
+                    <div class="loop-back-arrow" data-step="8" style="bottom: 60px; right: 100px;">↻</div>
+                </div>
+
+                <div class="iteration-counter">
+                    推理步骤: <span class="iteration-number" id="reactStep">0</span> / 3
+                </div>
+
+                <button class="demo-btn" id="runReactBtn" onclick="runReactLoop()">▶️ 运行 ReAct 循环</button>
+            </div>
+
+            <div class="highlight-box" style="background: rgba(34, 197, 94, 0.15); border-left-color: #22c55e;">
+                <h3 style="color: #22c55e;">💡 ReAct 模式</h3>
+                <p>
+                    <strong>Reasoning + Acting</strong><br>
+                    这是 Agent 的核心循环模式：<br>
+                    1. <strong>思考</strong>：分析当前情况<br>
+                    2. <strong>行动</strong>：选择并执行工具<br>
+                    3. <strong>观察</strong>：查看工具结果<br>
+                    4. <strong>重复</strong>：直到得到满意答案<br><br>
+                    这种循环让 Agent 可以进行多步推理，逐步解决问题！
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景 5: 最佳实践 -->
+        <div class="scene" id="scene5">
+            <h2 class="scene-title">循环最佳实践</h2>
+
+            <div class="feature-grid">
+                <div class="feature-card" data-delay="0">
+                    <div class="feature-icon">🛡️</div>
+                    <h4>设置最大迭代次数</h4>
+                    <p>防止无限循环消耗资源</p>
+                </div>
+
+                <div class="feature-card" data-delay="100">
+                    <div class="feature-icon">📊</div>
+                    <h4>跟踪迭代历史</h4>
+                    <p>在状态中记录每一步</p>
+                </div>
+
+                <div class="feature-card" data-delay="200">
+                    <div class="feature-icon">🎯</div>
+                    <h4>明确退出条件</h4>
+                    <p>提供清晰的结束条件</p>
+                </div>
+
+                <div class="feature-card" data-delay="300">
+                    <div class="feature-icon">💰</div>
+                    <h4>控制 LLM 调用</h4>
+                    <p>API 调用很昂贵</p>
+                </div>
+
+                <div class="feature-card" data-delay="400">
+                    <div class="feature-icon">🐛</div>
+                    <h4>添加日志输出</h4>
+                    <p>方便调试和监控</p>
+                </div>
+
+                <div class="feature-card" data-delay="500">
+                    <div class="feature-icon">⚡</div>
+                    <h4>提前退出优化</h4>
+                    <p>满足条件立即结束</p>
+                </div>
+            </div>
+
+            <div class="highlight-box">
+                <h3>🚀 下一步学习</h3>
+                <p>
+                    恭喜你掌握了 LangGraph 循环！<br><br>
+                    📚 <strong>建议实践：</strong><br>
+                    1. 尝试创建计数循环，累加到目标值<br>
+                    2. 实现带重试机制的安全循环<br>
+                    3. 构建 ReAct 循环，体验多步推理<br><br>
+                    下一节我们将深入学习 <strong>LangGraph Agent</strong>，构建真正的智能体！
+                </p>
+            </div>
+        </div>
+
+        <!-- 场景指示器 -->
+        <div class="scene-indicators">
+            <div class="indicator active" data-scene="1"></div>
+            <div class="indicator" data-scene="2"></div>
+            <div class="indicator" data-scene="3"></div>
+            <div class="indicator" data-scene="4"></div>
+            <div class="indicator" data-scene="5"></div>
+        </div>
+
+        <!-- 导航按钮 -->
+        <div class="nav-buttons">
+            <button class="nav-btn" id="prevBtn" disabled>
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                上一节
+            </button>
+            <a href="../langchain/index.html" class="nav-btn back-to-list">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7"/>
+                </svg>
+                课程列表
+            </a>
+            <button class="nav-btn next" id="nextBtn">
+                下一节
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // 场景数据
+        const totalScenes = 5;
+        let currentScene = 1;
+
+        // DOM 元素
+        const progressBar = document.getElementById('progressBar');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const indicators = document.querySelectorAll('.indicator');
+
+        // 初始化
+        function init() {
+            setupEventListeners();
+            updateScene();
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            prevBtn.addEventListener('click', () => {
+                if (currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                }
+            });
+
+            indicators.forEach(indicator => {
+                indicator.addEventListener('click', () => {
+                    currentScene = parseInt(indicator.dataset.scene);
+                    updateScene();
+                });
+            });
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight' && currentScene < totalScenes) {
+                    currentScene++;
+                    updateScene();
+                } else if (e.key === 'ArrowLeft' && currentScene > 1) {
+                    currentScene--;
+                    updateScene();
+                }
+            });
+        }
+
+        // 更新场景
+        function updateScene() {
+            const progress = ((currentScene - 1) / (totalScenes - 1)) * 100;
+            progressBar.style.width = progress + '%';
+
+            document.querySelectorAll('.scene').forEach((scene, index) => {
+                if (index + 1 === currentScene) {
+                    scene.classList.add('active');
+                } else {
+                    scene.classList.remove('active');
+                }
+            });
+
+            indicators.forEach((indicator, index) => {
+                if (index + 1 === currentScene) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.remove('active');
+                }
+            });
+
+            prevBtn.disabled = currentScene === 1;
+            nextBtn.disabled = currentScene === totalScenes;
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            document.querySelectorAll('.feature-card, .loop-node, .loop-arrow, .loop-back-arrow').forEach(el => {
+                el.classList.remove('visible');
+            });
+
+            setTimeout(() => {
+                animateSceneElements();
+            }, 100);
+        }
+
+        // 动画显示场景元素
+        function animateSceneElements() {
+            const currentSceneEl = document.querySelector(`#scene${currentScene}`);
+
+            currentSceneEl.querySelectorAll('.feature-card').forEach((card, index) => {
+                const delay = parseInt(card.dataset.delay) || index * 100;
+                setTimeout(() => {
+                    card.classList.add('visible');
+                }, delay);
+            });
+        }
+
+        // 场景 2: 计数循环
+        async function runCounterLoop() {
+            const btn = document.getElementById('runCounterBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 运行中...';
+
+            document.querySelectorAll('#counterLoop .loop-node, #counterLoop .loop-arrow, #counterLoop .loop-back-arrow').forEach(el => {
+                el.classList.remove('visible', 'active');
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            for (let i = 0; i <= 5; i++) {
+                const counterValue = document.getElementById('counterValue');
+                counterValue.textContent = i;
+
+                const nodes = document.querySelectorAll('#counterLoop .loop-node');
+                nodes.forEach(node => node.classList.remove('active'));
+
+                nodes[0].querySelector('h4').textContent = `计数: ${i}`;
+                nodes[0].classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                if (i < 5) {
+                    document.querySelectorAll('#counterLoop .loop-arrow')[0].classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 400));
+
+                    nodes[1].classList.add('visible', 'active');
+                    await new Promise(resolve => setTimeout(resolve, 800));
+
+                    document.querySelectorAll('#counterLoop .loop-arrow')[1].classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 400));
+
+                    nodes[2].classList.add('visible', 'active');
+                    await new Promise(resolve => setTimeout(resolve, 800));
+
+                    document.querySelector('#counterLoop .loop-back-arrow').classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 600));
+
+                    nodes.forEach(node => node.classList.remove('active'));
+                } else {
+                    document.querySelectorAll('#counterLoop .loop-arrow')[1].classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 400));
+
+                    nodes[2].classList.add('visible', 'active');
+                    nodes[2].querySelector('p').textContent = '完成!';
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新运行';
+        }
+
+        // 场景 3: 重试循环
+        async function runRetryLoop() {
+            const btn = document.getElementById('runRetryBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 运行中...';
+
+            document.querySelectorAll('#retryLoop .loop-node, #retryLoop .loop-arrow, #retryLoop .loop-back-arrow').forEach(el => {
+                el.classList.remove('visible', 'active');
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const nodes = document.querySelectorAll('#retryLoop .loop-node');
+            const retryCount = document.getElementById('retryCount');
+
+            for (let i = 1; i <= 3; i++) {
+                retryCount.textContent = i;
+
+                nodes.forEach(node => node.classList.remove('active'));
+
+                nodes[0].classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                document.querySelectorAll('#retryLoop .loop-arrow')[0].classList.add('visible');
+                await new Promise(resolve => setTimeout(resolve, 400));
+
+                nodes[1].classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 800));
+
+                if (i === 3) {
+                    document.querySelectorAll('#retryLoop .loop-arrow')[1].classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 400));
+
+                    nodes[2].classList.add('visible', 'active');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    break;
+                } else {
+                    document.querySelector('#retryLoop .loop-back-arrow').classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 600));
+
+                    nodes[1].querySelector('p').textContent = '失败';
+                    await new Promise(resolve => setTimeout(resolve, 400));
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新运行';
+        }
+
+        // 场景 4: ReAct 循环
+        async function runReactLoop() {
+            const btn = document.getElementById('runReactBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ 运行中...';
+
+            document.querySelectorAll('#reactLoop .loop-node, #reactLoop .loop-arrow, #reactLoop .loop-back-arrow').forEach(el => {
+                el.classList.remove('visible', 'active');
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const nodes = document.querySelectorAll('#reactLoop .loop-node');
+            const reactStep = document.getElementById('reactStep');
+
+            for (let i = 1; i <= 3; i++) {
+                reactStep.textContent = i;
+
+                nodes.forEach(node => node.classList.remove('active'));
+
+                nodes[0].classList.add('visible', 'active');
+                nodes[0].querySelector('p').textContent = `步骤 ${i}`;
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                document.querySelectorAll('#reactLoop .loop-arrow')[0].classList.add('visible');
+                await new Promise(resolve => setTimeout(resolve, 400));
+
+                nodes[1].classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                document.querySelectorAll('#reactLoop .loop-arrow')[1].classList.add('visible');
+                await new Promise(resolve => setTimeout(resolve, 400));
+
+                nodes[2].classList.add('visible', 'active');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                if (i < 3) {
+                    document.querySelectorAll('#reactLoop .loop-arrow')[2].classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 400));
+
+                    nodes[3].classList.add('visible', 'active');
+                    nodes[3].querySelector('p').textContent = '继续';
+                    await new Promise(resolve => setTimeout(resolve, 800));
+
+                    document.querySelector('#reactLoop .loop-back-arrow').classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 600));
+                } else {
+                    document.querySelectorAll('#reactLoop .loop-arrow')[2].classList.add('visible');
+                    await new Promise(resolve => setTimeout(resolve, 400));
+
+                    nodes[3].classList.add('visible', 'active');
+                    nodes[3].querySelector('p').textContent = '完成!';
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            btn.disabled = false;
+            btn.textContent = '🔄 重新运行';
+        }
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

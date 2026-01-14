@@ -1,0 +1,1665 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块24: RDF和语义网基础 - 知识图谱学习平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+            overflow-x: hidden;
+        }
+
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            z-index: 0;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .orb-1 {
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(34, 197, 94, 0.3) 0%, rgba(59, 130, 246, 0.1) 50%, transparent 70%);
+            top: -200px;
+            right: -200px;
+        }
+
+        .orb-2 {
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.2) 0%, rgba(236, 72, 153, 0.1) 50%, transparent 70%);
+            bottom: -150px;
+            left: -150px;
+            animation-delay: -10s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(30px, -30px) scale(1.1); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .nav-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .section-title {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subsection-title {
+            font-size: 1.8em;
+            margin: 30px 0 20px 0;
+            color: #60a5fa;
+        }
+
+        .concept-card {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .highlight-box {
+            background: rgba(34, 197, 94, 0.1);
+            border-left: 4px solid #22c55e;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .animation-container {
+            background: rgba(0, 0, 0, 0.3);
+            border: 2px solid rgba(59, 130, 246, 0.3);
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+        }
+
+        .animation-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .animation-canvas {
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 10px;
+            min-height: 400px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+            font-size: 0.9em;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #e2e8f0;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .info-panel {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 0.9em;
+        }
+
+        .code-block {
+            background: rgba(0, 0, 0, 0.4);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+
+        .code-block code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            color: #e2e8f0;
+        }
+
+        .keyword { color: #f472b6; }
+        .string { color: #a5f3fc; }
+        .comment { color: #94a3b8; }
+        .function { color: #fbbf24; }
+        .uri { color: #60a5fa; }
+
+        @media (max-width: 768px) {
+            .section-title {
+                font-size: 2em;
+            }
+            .glass-card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background orbs -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+
+    <div class="container">
+        <!-- Navigation -->
+        <div class="nav-card">
+            <div class="flex items-center justify-between flex-wrap gap-4">
+                <a href="index.html" class="text-green-400 hover:text-green-300 transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    返回课程目录
+                </a>
+                <div class="flex items-center gap-4">
+                <a href="23-graph-modeling.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                    上一模块
+                </a>
+                <a href="25-ontology-modeling.html" class="text-gray-400 hover:text-white transition-colors flex items-center gap-2">
+                    下一模块
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </a>
+                </div>
+                <div class="text-gray-400 text-sm">模块 24 / 33</div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <h1 class="text-5xl md:text-6xl font-bold mb-6" style="background: linear-gradient(135deg, #4ade80 0%, #3b82f6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                模块 24: RDF 和语义网基础
+            </h1>
+            <p class="text-xl text-gray-400 mb-8">掌握资源描述框架(RDF)和语义网核心技术</p>
+            <div class="flex flex-wrap gap-4 justify-center text-sm">
+                <span class="px-4 py-2 bg-yellow-500/20 text-yellow-400 rounded-full border border-yellow-500/30">进阶级别</span>
+                <span class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-full border border-blue-500/30">~50 分钟</span>
+                <span class="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-full border border-purple-500/30">3 个交互动画</span>
+            </div>
+        </div>
+
+        <!-- Chapter 1: RDF简介 -->
+        <div class="glass-card">
+            <h2 class="section-title">1. RDF (资源描述框架)简介</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是RDF?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>RDF (Resource Description Framework)</strong> 是W3C制定的用于表示信息的标准模型。
+                    它是语义网的核心技术,提供了一种通用的方式来描述资源。
+                </p>
+                <p class="text-gray-400">
+                    RDF使用<strong>三元组(Triple)</strong>作为基本单位,每个三元组由<strong>主语(Subject)</strong>、
+                    <strong>谓语(Predicate)</strong>和<strong>宾语(Object)</strong>组成。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">RDF的核心概念</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🔵</div>
+                        <div class="font-bold text-blue-400 mb-2">URI/IRI</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 统一资源标识符</li>
+                            <li>• 唯一标识资源</li>
+                            <li>• 例如: http://example.org/person/alice</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🔗</div>
+                        <div class="font-bold text-green-400 mb-2">三元组</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• Subject - 资源</li>
+                            <li>• Predicate - 属性/关系</li>
+                            <li>• Object - 值/资源</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">📝</div>
+                        <div class="font-bold text-purple-400 mb-2">字面量</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 字符串、数字、日期</li>
+                            <li>• 带有数据类型</li>
+                            <li>• 例如: "Alice"^^xsd:string</li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg">
+                        <div class="text-2xl mb-2">🌐</div>
+                        <div class="font-bold text-pink-400 mb-2">空白节点</div>
+                        <ul class="text-gray-300 text-sm space-y-1">
+                            <li>• 匿名资源</li>
+                            <li>• 没有URI标识</li>
+                            <li>• 用于复杂结构</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 动画1: RDF三元组可视化 -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                    动画: RDF三元组可视化
+                </div>
+                <div id="rdf-triple-animation" class="animation-canvas"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playRDFTripleAnimation()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="resetRDFTripleAnimation()">↺ 重置</button>
+                </div>
+                <div id="rdf-info" class="info-panel">
+                    <div class="text-blue-400 font-bold mb-2">RDF三元组结构:</div>
+                    <ul class="text-gray-300 space-y-1 text-sm">
+                        <li><span class="text-blue-400">Subject (主语)</span>: 被描述的资源(URI或空白节点)</li>
+                        <li><span class="text-green-400">Predicate (谓语)</span>: 属性或关系(URI)</li>
+                        <li><span class="text-purple-400">Object (宾语)</span>: 属性值或相关资源</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 1.5: 深入理解URI、IRI和URL -->
+        <div class="glass-card">
+            <h2 class="section-title">1.5 深入理解URI、IRI和URL</h2>
+
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">🤔 生活中的例子</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    想象一下，我们如何<strong>标识和定位</strong>一个人？
+                </p>
+                <div class="grid md:grid-cols-3 gap-4 mb-4">
+                    <div class="bg-blue-500/20 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="font-bold text-blue-400 mb-2 text-center">🆔 身份证号</div>
+                        <p class="text-gray-300 text-sm text-center">唯一标识一个人<br>即使搬家，身份证号不变</p>
+                        <p class="text-blue-400 text-xs mt-2 text-center font-bold">类似 URI</p>
+                    </div>
+                    <div class="bg-green-500/20 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2 text-center">📱 手机号码</div>
+                        <p class="text-gray-300 text-sm text-center">可以找到并联系这个人<br>能拨打就能定位</p>
+                        <p class="text-green-400 text-xs mt-2 text-center font-bold">类似 URL</p>
+                    </div>
+                    <div class="bg-purple-500/20 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2 text-center">🏠 家庭地址</div>
+                        <p class="text-gray-300 text-sm text-center">知道在哪，可以直接上门<br>包含位置信息</p>
+                        <p class="text-purple-400 text-xs mt-2 text-center font-bold">类似 URN + URL</p>
+                    </div>
+                </div>
+                <p class="text-gray-400">
+                    在互联网世界，URI、IRI、URL就是类似的<strong>地址系统</strong>，用来标识和定位网络资源。
+                </p>
+            </div>
+
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-green-300 mb-4">💡 一句话理解</h3>
+                <div class="space-y-3">
+                    <div class="bg-blue-500/10 p-3 rounded-lg">
+                        <span class="text-blue-400 font-bold">URI</span> = "你是谁" (身份证号，唯一标识)
+                    </div>
+                    <div class="text-center text-2xl">⊂</div>
+                    <div class="grid md:grid-cols-2 gap-3">
+                        <div class="bg-purple-500/10 p-3 rounded-lg">
+                            <span class="text-purple-400 font-bold">URL</span> = "你在哪 + 怎么找你" (地址 + 电话)
+                        </div>
+                        <div class="bg-pink-500/10 p-3 rounded-lg">
+                            <span class="text-pink-400 font-bold">URN</span> = "你的名字" (永久名称，不随位置改变)
+                        </div>
+                    </div>
+                    <div class="bg-green-500/10 p-3 rounded-lg">
+                        <span class="text-green-400 font-bold">IRI</span> = URI的国际化版本 (可以用中文、日文等)
+                    </div>
+                </div>
+            </div>
+
+            <!-- 对照表 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-green-300 mb-4">URI vs IRI vs URL 对照表</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-white/20">
+                                <th class="p-3 text-blue-400">概念</th>
+                                <th class="p-3 text-green-400">全称</th>
+                                <th class="p-3 text-purple-400">标准</th>
+                                <th class="p-3 text-pink-400">字符集</th>
+                                <th class="p-3 text-yellow-400">用途</th>
+                                <th class="p-3 text-orange-400">示例</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold text-blue-400">URI</td>
+                                <td class="p-3">Uniform Resource Identifier<br>统一资源标识符</td>
+                                <td class="p-3">RFC 3986</td>
+                                <td class="p-3">仅ASCII字符</td>
+                                <td class="p-3">标识资源(唯一ID)</td>
+                                <td class="p-3 font-mono text-sm">http://example.org/person</td>
+                            </tr>
+                            <tr class="border-b border-white/10 bg-white/5">
+                                <td class="p-3 font-bold text-green-400">IRI</td>
+                                <td class="p-3">Internationalized Resource Identifier<br>国际化资源标识符</td>
+                                <td class="p-3">RFC 3987</td>
+                                <td class="p-3">支持Unicode字符</td>
+                                <td class="p-3">国际化资源标识</td>
+                                <td class="p-3 font-mono text-sm">http://例子.ORG/人</td>
+                            </tr>
+                            <tr class="border-b border-white/10">
+                                <td class="p-3 font-bold text-purple-400">URL</td>
+                                <td class="p-3">Uniform Resource Locator<br>统一资源定位符</td>
+                                <td class="p-3">RFC 3986</td>
+                                <td class="p-3">ASCII字符</td>
+                                <td class="p-3">定位资源(包含位置)</td>
+                                <td class="p-3 font-mono text-sm">http://example.org/page?id=123</td>
+                            </tr>
+                            <tr class="bg-white/5">
+                                <td class="p-3 font-bold text-pink-400">URN</td>
+                                <td class="p-3">Uniform Resource Name<br>统一资源名称</td>
+                                <td class="p-3">RFC 8141</td>
+                                <td class="p-3">ASCII字符</td>
+                                <td class="p-3">永久名称(与位置无关)</td>
+                                <td class="p-3 font-mono text-sm">urn:isbn:978-0-123456-47-2</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 深入解释 -->
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <!-- URI深入 -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-300 mb-3">URI - 统一资源标识符</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="font-bold text-gray-300 mb-1">什么是URI?</div>
+                            <p class="text-gray-400 text-sm">
+                                URI是资源的<strong>唯一标识符</strong>,就像身份证号。它告诉你"这个东西是什么",
+                                但不一定告诉你"它在哪里"。
+                            </p>
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-300 mb-1">URI的组成</div>
+                            <div class="code-block text-sm">
+<code>scheme:[//authority]path[?query][#fragment]</code>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-300 mb-1">在RDF中的使用</div>
+                            <p class="text-gray-400 text-sm">
+                                - RDF 1.0只支持URI<br>
+                                - 标识类、属性、实例<br>
+                                - 必须全局唯一
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IRI深入 -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-300 mb-3">IRI - 国际化资源标识符</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="font-bold text-gray-300 mb-1">什么是IRI?</div>
+                            <p class="text-gray-400 text-sm">
+                                IRI是URI的扩展,支持<strong>Unicode字符</strong>。让你可以用中文、阿拉伯文等
+                                非ASCII字符标识资源。
+                            </p>
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-300 mb-1">IRI vs URI的关系</div>
+                            <p class="text-gray-400 text-sm">
+                                - IRI是URI的超集<br>
+                                - 任何URI都是IRI<br>
+                                - IRI可以转换为URI(百分号编码)
+                            </p>
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-300 mb-1">在RDF中的使用</div>
+                            <p class="text-gray-400 text-sm">
+                                - RDF 1.1默认使用IRI<br>
+                                - 支持国际化标签<br>
+                                - 更好的本地化支持
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- URL深入 -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-purple-300 mb-3">URL - 统一资源定位符</h3>
+                    <div class="space-y-3">
+                        <div>
+                            <div class="font-bold text-gray-300 mb-1">什么是URL?</div>
+                            <p class="text-gray-400 text-sm">
+                                URL是URI的子集,不仅标识资源,还提供<strong>访问方式</strong>和<strong>位置</strong>。
+                                它告诉你"如何找到这个东西"。
+                            </p>
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-300 mb-1">URL的特点</div>
+                            <p class="text-gray-400 text-sm">
+                                - 包含协议(http/https/ftp等)<br>
+                                - 包含网络位置(domain/IP)<br>
+                                - 可直接访问资源
+                            </p>
+                        </div>
+                        <div>
+                            <div class="font-bold text-gray-300 mb-1">与URI的关系</div>
+                            <p class="text-gray-400 text-sm">
+                                - URL ⊂ URI<br>
+                                - 所有URL都是URI<br>
+                                - 但不是所有URI都是URL
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 实际应用 -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-yellow-300 mb-3">选择标准:何时用哪个?</h3>
+                    <div class="space-y-3">
+                        <div class="bg-blue-500/20 p-3 rounded-lg border-l-4 border-blue-500">
+                            <div class="font-bold text-blue-300 mb-1">场景1: 需要国际化</div>
+                            <p class="text-gray-400 text-sm">
+                                ✅ 使用IRI<br>
+                                例如: 中文章节、多语言本体
+                            </p>
+                        </div>
+                        <div class="bg-green-500/20 p-3 rounded-lg border-l-4 border-green-500">
+                            <div class="font-bold text-green-300 mb-1">场景2: 只需英文标识</div>
+                            <p class="text-gray-400 text-sm">
+                                ✅ 使用URI<br>
+                                例如: 技术术语、标准属性名
+                            </p>
+                        </div>
+                        <div class="bg-purple-500/20 p-3 rounded-lg border-l-4 border-purple-500">
+                            <div class="font-bold text-purple-300 mb-1">场景3: 需要访问资源</div>
+                            <p class="text-gray-400 text-sm">
+                                ✅ 使用URL<br>
+                                例如: 可解析的HTTP URI
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 常见错误 -->
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-red-300 mb-3">⚠️ 常见错误</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <span class="text-red-400 text-xl">❌</span>
+                        <div>
+                            <div class="font-bold text-gray-300">混淆URL和URI</div>
+                            <p class="text-gray-400 text-sm">不是所有URI都是URL。URN(如ISBN号)是URI但不是URL。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-red-400 text-xl">❌</span>
+                        <div>
+                            <div class="font-bold text-gray-300">在RDF 1.1中过度使用URI</div>
+                            <p class="text-gray-400 text-sm">RDF 1.1默认使用IRI,应该充分利用国际化支持。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 text-xl">✅</span>
+                        <div>
+                            <div class="font-bold text-gray-300">最佳实践</div>
+                            <p class="text-gray-400 text-sm">在RDF中使用<strong>可解析的HTTP URI</strong>(既是URI也是URL),既可标识也可访问资源。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 1.6: 空白节点深入 -->
+        <div class="glass-card">
+            <h2 class="section-title">1.6 空白节点深入解析</h2>
+
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是空白节点?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>空白节点(Blank Node)</strong>是在RDF图中<strong>没有明确URI标识的节点</strong>。
+                    它们就像"匿名对象",只能在所属的RDF图中使用。
+                </p>
+                <p class="text-gray-400">
+                    空白节点的标识作用域局限于所在的RDF图,不能跨图引用。
+                </p>
+            </div>
+
+            <!-- 为什么需要空白节点 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">为什么需要空白节点?</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-blue-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">1. 建模复杂结构</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            当一个实体的属性本身也是一个复杂结构时,使用空白节点作为中间节点。
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 人的地址是一个复杂结构</span>
+<span class="uri">ex:alice</span> <span class="uri">ex:address</span> [
+    <span class="uri">ex:street</span> <span class="string">"123 Main St"</span> ;
+    <span class="uri">ex:city</span> <span class="string">"Boston"</span> ;
+    <span class="uri">ex:country</span> <span class="string">"USA"</span>
+] .</code>
+                        </div>
+                    </div>
+                    <div class="bg-green-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">2. 避免URI爆炸</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            不是所有临时对象都需要全局URI。空白节点可以避免URI命名空间爆炸。
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 订单中的商品项(临时对象)</span>
+<span class="uri">ex:order123</span> <span class="uri">ex:item</span> [
+    <span class="uri">ex:product</span> <span class="uri">ex:laptop</span> ;
+    <span class="uri">ex:quantity</span> <span class="string">"2"</span>^^xsd:integer
+] .</code>
+                        </div>
+                    </div>
+                    <div class="bg-purple-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">3. 匿名实体</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            当实体身份不重要或需要保密时,使用空白节点。
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 匿名举报者</span>
+<span class="uri">ex:report123</span> <span class="uri">ex:reportedBy</span> [
+    <span class="uri">rdf:type</span> <span class="uri">ex:Whistleblower</span>
+] .</code>
+                        </div>
+                    </div>
+                    <div class="bg-pink-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-pink-400 mb-2">4. 简化建模</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            某些情况下,给每个对象分配URI会让模型过于复杂。
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment"># RDF集合的内部表示</span>
+<span class="uri">ex:team</span> <span class="uri">ex:member</span> (
+    <span class="uri">ex:alice</span> <span class="uri">ex:bob</span> <span class="uri">ex:carol</span>
+) .</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 空白节点的限制 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-red-300 mb-3">空白节点的限制</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-red-500/10 p-4 rounded-lg border-l-4 border-red-500">
+                        <div class="font-bold text-red-400 mb-2">❌ 不能跨图引用</div>
+                        <p class="text-gray-300 text-sm">
+                            空白节点的标识只在单个RDF图中有效,不能在其他图中引用同一个空白节点。
+                        </p>
+                    </div>
+                    <div class="bg-red-500/10 p-4 rounded-lg border-l-4 border-red-500">
+                        <div class="font-bold text-red-400 mb-2">❌ SPARQL查询限制</div>
+                        <p class="text-gray-300 text-sm">
+                            不能在SPARQL查询中直接使用空白节点作为三元组的主语(需要使用变量或属性路径)。
+                        </p>
+                    </div>
+                    <div class="bg-orange-500/10 p-4 rounded-lg border-l-4 border-orange-500">
+                        <div class="font-bold text-orange-400 mb-2">⚠️ 不可持久化引用</div>
+                        <p class="text-gray-300 text-sm">
+                            如果需要长期保存或在其他上下文中引用,应该使用URI而不是空白节点。
+                        </p>
+                    </div>
+                    <div class="bg-yellow-500/10 p-4 rounded-lg border-l-4 border-yellow-500">
+                        <div class="font-bold text-yellow-400 mb-2">⚠️ 推理受限</div>
+                        <p class="text-gray-300 text-sm">
+                            某些推理机对空白节点的推理能力有限,需要额外配置。
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 何时使用空白节点 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">决策指南: 何时使用空白节点?</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <span class="text-green-400 text-xl">✅</span>
+                        <div class="flex-1">
+                            <div class="font-bold text-gray-300">使用空白节点的情况</div>
+                            <ul class="text-gray-400 text-sm mt-1 space-y-1">
+                                <li>• 对象只在当前上下文中存在</li>
+                                <li>• 建模复杂结构的中间节点(如地址)</li>
+                                <li>• 不需要跨图引用的临时对象</li>
+                                <li>• 实体身份不重要或需要匿名</li>
+                                <li>• RDF集合(RDF Collections)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <span class="text-red-400 text-xl">❌</span>
+                        <div class="flex-1">
+                            <div class="font-bold text-gray-300">使用URI的情况</div>
+                            <ul class="text-gray-400 text-sm mt-1 space-y-1">
+                                <li>• 需要全局唯一标识</li>
+                                <li>• 需要在多个图中引用</li>
+                                <li>• 需要长期持久化</li>
+                                <li>• 实体是领域中的核心对象</li>
+                                <li>• 需要外部系统访问</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 空白节点的表示方法 -->
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-purple-300 mb-3">空白节点的表示方法</h3>
+                <div class="grid md:grid-cols-3 gap-4">
+                    <div>
+                        <div class="font-bold text-blue-400 mb-2">Turtle中</div>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 方式1: 方括号语法</span>
+<span class="uri">ex:alice</span> <span class="uri">ex:address</span> [
+    <span class="uri">ex:city</span> <span class="string">"Boston"</span>
+] .
+
+<span class="comment"># 方式2: 前缀_加标识符</span>
+<span class="uri">ex:alice</span> <span class="uri">ex:address</span> <span class="uri">_:addr1</span> .
+<span class="uri">_:addr1</span> <span class="uri">ex:city</span> <span class="string">"Boston"</span> .</code>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-green-400 mb-2">N-Triples中</div>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 自动生成的空白节点标识</span>
+<span class="uri">_:b1</span> <span class="uri">&lt;http://example.org/city&gt;</span> <span class="string">"Boston"</span> .
+<span class="uri">_:b2</span> <span class="uri">&lt;http://example.org/city&gt;</span> <span class="string">"Boston"</span> .
+
+<span class="comment"># 注意: _:b1和_:b2是不同的节点!</span></code>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-purple-400 mb-2">SPARQL中</div>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 使用变量匹配空白节点</span>
+SELECT ?address WHERE {
+    <span class="uri">ex:alice</span> <span class="uri">ex:address</span> ?address .
+}
+
+<span class="comment"># 注意: 无法直接用_:b1查询</span></code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 2: RDF序列化格式 -->
+        <div class="glass-card">
+            <h2 class="section-title">2. RDF序列化格式</h2>
+
+            <p class="text-gray-300 mb-6">
+                RDF数据可以序列化为多种格式,每种格式都有其适用场景。
+            </p>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Turtle -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-300 mb-3">Turtle (Terse RDF Triple Language)</h3>
+                    <p class="text-gray-400 text-sm mb-3">最易读的RDF格式,推荐用于编辑和存储</p>
+                    <div class="code-block">
+<code><span class="comment"># Turtle示例</span>
+<span class="keyword">@prefix</span> ex: <span class="uri">&lt;http://example.org/&gt;</span> .
+<span class="keyword">@prefix</span> rdf: <span class="uri">&lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;</span> .
+<span class="keyword">@prefix</span> rdfs: <span class="uri">&lt;http://www.w3.org/2000/01/rdf-schema#&gt;</span> .
+<span class="keyword">@prefix</span> xsd: <span class="uri">&lt;http://www.w3.org/2001/XMLSchema#&gt;</span> .
+
+<span class="uri">ex:Alice</span>
+    <span class="uri">rdf:type</span> <span class="uri">ex:Person</span> ;
+    <span class="uri">ex:name</span> <span class="string">"Alice"</span> ;
+    <span class="uri">ex:age</span> <span class="string">"30"</span>^^xsd:integer ;
+    <span class="uri">ex:knows</span> <span class="uri">ex:Bob</span> .</code>
+                    </div>
+                </div>
+
+                <!-- N-Triples -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-300 mb-3">N-Triples</h3>
+                    <p class="text-gray-400 text-sm mb-3">基于行的格式,每行一个三元组</p>
+                    <div class="code-block">
+<code><span class="comment"># N-Triples示例</span>
+&lt;http://example.org/Alice&gt; &lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#type&gt; &lt;http://example.org/Person&gt; .
+&lt;http://example.org/Alice&gt; &lt;http://example.org/name&gt; "Alice" .
+&lt;http://example.org/Alice&gt; &lt;http://example.org/age&gt; "30"^^&lt;http://www.w3.org/2001/XMLSchema#integer&gt; .
+&lt;http://example.org/Alice&gt; &lt;http://example.org/knows&gt; &lt;http://example.org/Bob&gt; .</code>
+                    </div>
+                </div>
+
+                <!-- RDF/XML -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-purple-300 mb-3">RDF/XML</h3>
+                    <p class="text-gray-400 text-sm mb-3">XML格式,早期标准,现在较少使用</p>
+                    <div class="code-block">
+<code><span class="comment">&lt;!-- RDF/XML示例 --&gt;</span>
+<span class="keyword">&lt;rdf:RDF</span> xmlns:rdf=<span class="string">"http://www.w3.org/1999/02/22-rdf-syntax-ns#"</span>
+         xmlns:ex=<span class="string">"http://example.org/"</span><span class="keyword">&gt;</span>
+  <span class="keyword">&lt;rdf:Description</span> rdf:about=<span class="string">"http://example.org/Alice"</span><span class="keyword">&gt;</span>
+    <span class="keyword">&lt;ex:name&gt;</span>Alice<span class="keyword">&lt;/ex:name&gt;</span>
+    <span class="keyword">&lt;ex:age&gt;</span>30<span class="keyword">&lt;/ex:age&gt;</span>
+  <span class="keyword">&lt;/rdf:Description&gt;</span>
+<span class="keyword">&lt;/rdf:RDF&gt;</span></code>
+                    </div>
+                </div>
+
+                <!-- JSON-LD -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-pink-300 mb-3">JSON-LD</h3>
+                    <p class="text-gray-400 text-sm mb-3">JSON格式的RDF,适合Web应用</p>
+                    <div class="code-block">
+<code><span class="comment">// JSON-LD示例</span>
+{
+  <span class="string">"@context"</span>: <span class="string">"http://example.org/"</span>,
+  <span class="string">"@id"</span>: <span class="string">"http://example.org/Alice"</span>,
+  <span class="string">"@type"</span>: <span class="string">"Person"</span>,
+  <span class="string">"name"</span>: <span class="string">"Alice"</span>,
+  <span class="string">"age"</span>: {
+    <span class="string">"@value"</span>: <span class="string">"30"</span>,
+    <span class="string">"@type"</span>: <span class="string">"http://www.w3.org/2001/XMLSchema#integer"</span>
+  }
+}</code>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box mt-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">格式对比</h3>
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-gray-600">
+                            <th class="text-left py-3 px-4 text-blue-400">格式</th>
+                            <th class="text-left py-3 px-4 text-green-400">可读性</th>
+                            <th class="text-left py-3 px-4 text-purple-400">适用场景</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-300">
+                        <tr class="border-b border-gray-700">
+                            <td class="py-3 px-4">Turtle</td>
+                            <td class="py-3 px-4">⭐⭐⭐⭐⭐</td>
+                            <td class="py-3 px-4">开发、调试、存储</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-3 px-4">N-Triples</td>
+                            <td class="py-3 px-4">⭐⭐⭐</td>
+                            <td class="py-3 px-4">数据交换、流处理</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="py-3 px-4">JSON-LD</td>
+                            <td class="py-3 px-4">⭐⭐⭐⭐</td>
+                            <td class="py-3 px-4">Web应用、API</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4">RDF/XML</td>
+                            <td class="py-3 px-4">⭐⭐</td>
+                            <td class="py-3 px-4">遗留系统</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Chapter 3: 语义网和Linked Data -->
+        <div class="glass-card">
+            <h2 class="section-title">3. 语义网和Linked Data</h2>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是语义网?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>语义网(Semantic Web)</strong>是Tim Berners-Lee提出的概念,旨在让Web上的数据机器可读。
+                    它不仅仅是显示给人看的网页,更是机器可以理解和处理的数据网络。
+                </p>
+                <p class="text-gray-400">
+                    RDF、RDFS、OWL等标准构成了语义网的技术栈,让数据具有明确的语义。
+                </p>
+            </div>
+
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-green-300 mb-3">Linked Data原则</h3>
+                <div class="space-y-4">
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="flex items-start gap-3">
+                            <span class="text-blue-400 text-2xl font-bold">1</span>
+                            <div>
+                                <div class="font-bold text-blue-300 mb-1">使用URI标识事物</div>
+                                <p class="text-gray-300 text-sm">不仅仅是文档,还包括现实世界的实体</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="flex items-start gap-3">
+                            <span class="text-green-400 text-2xl font-bold">2</span>
+                            <div>
+                                <div class="font-bold text-green-300 mb-1">使用HTTP URI</div>
+                                <p class="text-gray-300 text-sm">让人们可以查找这些URI</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="flex items-start gap-3">
+                            <span class="text-purple-400 text-2xl font-bold">3</span>
+                            <div>
+                                <div class="font-bold text-purple-300 mb-1">提供有用的信息</div>
+                                <p class="text-gray-300 text-sm">当URI被访问时,使用标准格式(RDF)提供相关信息</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-black/30 p-4 rounded-lg border-l-4 border-pink-500">
+                        <div class="flex items-start gap-3">
+                            <span class="text-pink-400 text-2xl font-bold">4</span>
+                            <div>
+                                <div class="font-bold text-pink-300 mb-1">包含指向其他URI的链接</div>
+                                <p class="text-gray-300 text-sm">让数据可以互联,形成数据网络</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 动画2: Linked Data云 -->
+            <div class="animation-container">
+                <div class="animation-title">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064"/>
+                    </svg>
+                    动画: Linked Data云
+                </div>
+                <div id="linked-data-animation" class="animation-canvas" style="min-height: 500px;"></div>
+                <div class="controls">
+                    <button class="btn btn-primary" onclick="playLinkedDataAnimation()">▶ 播放动画</button>
+                    <button class="btn btn-secondary" onclick="resetLinkedDataAnimation()">↺ 重置</button>
+                    <button class="btn btn-secondary" onclick="addLink()">+ 添加链接</button>
+                </div>
+                <div id="linked-data-info" class="info-panel">
+                    <div class="text-green-400 font-bold mb-2">著名的数据集:</div>
+                    <ul class="text-gray-300 space-y-1 text-sm">
+                        <li>• <span class="text-blue-400">DBpedia</span>: 从维基百科抽取的结构化数据</li>
+                        <li>• <span class="text-green-400">Wikidata</span>: 维基数据项目,包含数千亿条目</li>
+                        <li>• <span class="text-purple-400">LinkedMDB</span>: 电影数据库</li>
+                        <li>• <span class="text-pink-400">GeoNames</span>: 地理数据库</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 3.5: RDF命名图(Named Graphs) -->
+        <div class="glass-card">
+            <h2 class="section-title">3.5 RDF命名图(Named Graphs)</h2>
+
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">什么是RDF命名图?</h3>
+                <p class="text-gray-300 leading-relaxed mb-3">
+                    <strong>RDF命名图(Named Graph)</strong>是给RDF图分配一个URI标识,使其可以被引用。
+                    这允许我们在<strong>三元组层面</strong>添加元数据(来源、时间、版本等)。
+                </p>
+                <p class="text-gray-400">
+                    普通RDF图是三元组的集合,而命名图是<strong>四元组的集合</strong>:(图名, 主语, 谓语, 宾语)
+                </p>
+            </div>
+
+            <!-- 为什么需要命名图 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-green-300 mb-3">为什么需要命名图?</h3>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div class="bg-blue-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-blue-400 mb-2">1. 数据来源追溯</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            记录每条三元组来自哪个数据源,便于数据质量评估和信任度计算。
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 这个三元组来自DBpedia</span>
+:graph1 {
+    <span class="uri">ex:alice</span> <span class="uri">ex:name</span> <span class="string">"Alice"</span> .
+}
+
+<span class="comment"># 这个三元组来自Wikidata</span>
+:graph2 {
+    <span class="uri">ex:alice</span> <span class="uri">ex:name</span> <span class="string">"Alice Smith"</span> .
+}</code>
+                        </div>
+                    </div>
+                    <div class="bg-green-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-green-400 mb-2">2. 版本管理</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            同一数据的不同版本可以共存,便于历史查询和对比。
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 2023版数据</span>
+:data-2023 {
+    <span class="uri">ex:company</span> <span class="uri">ex:employeeCount</span> <span class="string">"100"</span> .
+}
+
+<span class="comment"># 2024版数据</span>
+:data-2024 {
+    <span class="uri">ex:company</span> <span class="uri">ex:employeeCount</span> <span class="string">"150"</span> .
+}</code>
+                        </div>
+                    </div>
+                    <div class="bg-purple-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-purple-400 mb-2">3. 访问控制</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            不同图可以有不同的访问权限,实现细粒度的安全控制。
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 公开数据</span>
+:public {
+    <span class="uri">ex:product</span> <span class="uri">ex:name</span> <span class="string">"Laptop"</span> .
+}
+
+<span class="comment"># 内部数据(受限访问)</span>
+:internal {
+    <span class="uri">ex:product</span> <span class="uri">ex:cost</span> <span class="string">"500"</span> .
+}</code>
+                        </div>
+                    </div>
+                    <div class="bg-pink-500/20 p-4 rounded-lg">
+                        <div class="font-bold text-pink-400 mb-2">4. 数据融合</div>
+                        <p class="text-gray-300 text-sm mb-2">
+                            合并多个数据源但保留来源信息,便于冲突检测和解决。
+                        </p>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 融合DBpedia和Wikidata</span>
+<span class="comment"># 但保留来源信息以便处理冲突</span>
+:DBpedia { ... }
+:Wikidata { ... }</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 四元组模型 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-purple-300 mb-3">四元组模型(Quad)</h3>
+                <p class="text-gray-300 mb-4">
+                    命名图引入了<strong>四元组(Quad)</strong>的概念,即在三元组基础上增加图名:
+                </p>
+                <div class="bg-black/40 p-4 rounded-lg mb-4">
+                    <div class="font-mono text-center text-lg">
+                        <span class="text-blue-400">(G, S, P, O)</span>
+                        <span class="text-gray-400 mx-2">=</span>
+                        <span class="text-green-400">(图名, 主语, 谓语, 宾语)</span>
+                    </div>
+                </div>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <div class="font-bold text-blue-400 mb-2">三元组(Triple)</div>
+                        <div class="code-block text-sm">
+<code><span class="uri">ex:alice</span> <span class="uri">ex:name</span> <span class="string">"Alice"</span> .</code>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-green-400 mb-2">四元组(Quad)</div>
+                        <div class="code-block text-sm">
+<code>:graph1 {
+    <span class="uri">ex:alice</span> <span class="uri">ex:name</span> <span class="string">"Alice"</span> .
+}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TriG语法 -->
+            <div class="concept-card mb-6">
+                <h3 class="text-xl font-bold text-yellow-300 mb-3">TriG: 命名图的序列化格式</h3>
+                <p class="text-gray-300 mb-4">
+                    TriG是Turtle的扩展,专门用于表示多个命名图。它使用花括号{}来包围每个图的三元组。
+                </p>
+                <div class="code-block">
+<code><span class="keyword">@prefix</span> ex: <span class="uri">&lt;http://example.org/&gt;</span> .
+<span class="keyword">@prefix</span> rdf: <span class="uri">&lt;http://www.w3.org/1999/02/22-rdf-syntax-ns#&gt;</span> .
+
+<span class="comment"># 图1: 默认图(没有名称)</span>
+{
+    <span class="uri">ex:alice</span> <span class="uri">ex:knows</span> <span class="uri">ex:bob</span> .
+}
+
+<span class="comment"># 图2: 命名图</span>
+:graph1 {
+    <span class="uri">ex:bob</span> <span class="uri">ex:age</span> <span class="string">"30"</span>^^xsd:integer .
+}
+
+<span class="comment"># 图3: 另一个命名图</span>
+:graph2 {
+    <span class="uri">ex:bob</span> <span class="uri">ex:age</span> <span class="string">"31"</span>^^xsd:integer .
+}</code>
+                </div>
+            </div>
+
+            <!-- SPARQL查询命名图 -->
+            <div class="highlight-box mb-6">
+                <h3 class="text-xl font-bold text-orange-300 mb-3">SPARQL中的命名图查询</h3>
+                <p class="text-gray-300 mb-4">
+                    SPARQL提供了GRAPH关键字来查询特定命名图或遍历所有图。
+                </p>
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <div class="font-bold text-blue-400 mb-2">查询特定图</div>
+                        <div class="code-block text-sm">
+<code><span class="keyword">SELECT</span> ?s ?o ?g
+<span class="keyword">WHERE</span> {
+  <span class="keyword">GRAPH</span> :graph1 {
+    ?s <span class="uri">ex:p</span> ?o .
+  }
+}</code>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-green-400 mb-2">查询所有图</div>
+                        <div class="code-block text-sm">
+<code><span class="keyword">SELECT</span> ?g ?s ?o
+<span class="keyword">WHERE</span> {
+  <span class="keyword">GRAPH</span> ?g {
+    ?s <span class="uri">ex:p</span> ?o .
+  }
+}</code>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-purple-400 mb-2">默认图 + 命名图</div>
+                        <div class="code-block text-sm">
+<code><span class="keyword">SELECT</span> ?s ?p ?o
+<span class="keyword">WHERE</span> {
+  <span class="comment"># 从默认图匹配</span>
+  ?s <span class="uri">ex:p</span> ?o .
+
+  <span class="keyword">UNION</span>
+
+  <span class="comment"># 从所有命名图匹配</span>
+  <span class="keyword">GRAPH</span> ?g {
+    ?s <span class="uri">ex:p</span> ?o .
+  }
+}</code>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="font-bold text-pink-400 mb-2">添加元数据</div>
+                        <div class="code-block text-sm">
+<code><span class="comment"># 描述图的来源</span>
+:graph1 <span class="uri">prov:wasDerivedFrom</span>
+         <span class="uri">&lt;http://data.source.org&gt;</span> .
+
+:graph1 <span class="uri">dct:created</span>
+         <span class="string">"2024-01-01"</span>^^xsd:date .</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 命名图的应用场景 -->
+            <div class="highlight-box">
+                <h3 class="text-xl font-bold text-cyan-300 mb-3">命名图的实际应用场景</h3>
+                <div class="space-y-4">
+                    <div class="bg-blue-500/10 p-4 rounded-lg border-l-4 border-blue-500">
+                        <div class="font-bold text-blue-400 mb-2">数据 provenance(数据溯源)</div>
+                        <p class="text-gray-300 text-sm">
+                            在科学数据管理中,记录数据的来源、处理过程和变更历史。命名图可以保存每个版本的数据,
+                            并附加prov(Provenance)本体元数据。
+                        </p>
+                    </div>
+                    <div class="bg-green-500/10 p-4 rounded-lg border-l-4 border-green-500">
+                        <div class="font-bold text-green-400 mb-2">多租户系统</div>
+                        <p class="text-gray-300 text-sm">
+                            在SaaS系统中,每个租户的数据存储在独立的命名图中,实现数据隔离和访问控制。
+                            查询时可以限定特定租户的图,确保数据安全。
+                        </p>
+                    </div>
+                    <div class="bg-purple-500/10 p-4 rounded-lg border-l-4 border-purple-500">
+                        <div class="font-bold text-purple-400 mb-2">数据融合与冲突解决</div>
+                        <p class="text-gray-300 text-sm">
+                            当从多个来源融合数据时,保留每个来源的原始数据在独立命名图中。
+                            可以通过元数据(信任度、更新时间等)决定使用哪个来源的数据。
+                        </p>
+                    </div>
+                    <div class="bg-pink-500/10 p-4 rounded-lg border-l-4 border-pink-500">
+                        <div class="font-bold text-pink-400 mb-2">动态数据集</div>
+                        <p class="text-gray-300 text-sm">
+                            在实时系统中,定期创建新的命名图存储最新数据(如每小时一个图),
+                            便于时间范围查询和数据归档。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chapter 4: 使用rdflib处理RDF -->
+        <div class="glass-card">
+            <h2 class="section-title">4. 使用rdflib处理RDF (Python)</h2>
+
+            <p class="text-gray-300 mb-6">
+                rdflib是Python中最流行的RDF处理库,提供完整的RDF操作功能。
+            </p>
+
+            <div class="concept-card">
+                <h3 class="text-xl font-bold text-blue-300 mb-3">安装rdflib</h3>
+                <div class="code-block">
+<code>pip install rdflib</code>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- 创建RDF图 -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-300 mb-3">创建RDF图</h3>
+                    <div class="code-block">
+<code><span class="keyword">from</span> rdflib <span class="keyword">import</span> Graph, Namespace, Literal, RDF, RDFS, XSD
+
+<span class="comment"># 创建图</span>
+g = Graph()
+
+<span class="comment"># 定义命名空间</span>
+ex = Namespace(<span class="string">"http://example.org/"</span>)
+
+<span class="comment"># 添加三元组</span>
+alice = ex.Alice
+g.add((alice, RDF.type, ex.Person))
+g.add((alice, ex.name, Literal(<span class="string">"Alice"</span>)))
+g.add((alice, ex.age, Literal(<span class="string">30</span>, datatype=XSD.integer)))
+
+<span class="comment"># 序列化为Turtle</span>
+<span class="keyword">print</span>(g.serialize(format=<span class="string">"turtle"</span>))</code>
+                    </div>
+                </div>
+
+                <!-- 解析RDF -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-purple-300 mb-3">解析RDF文件</h3>
+                    <div class="code-block">
+<code><span class="keyword">from</span> rdflib <span class="keyword">import</span> Graph
+
+<span class="comment"># 创建图</span>
+g = Graph()
+
+<span class="comment"># 从文件解析</span>
+g.parse(data=<span class="string">"""
+    @prefix ex: <http://example.org/> .
+    ex:alice ex:name "Alice" .
+    """</span>, format=<span class="string">"turtle"</span>)
+
+<span class="comment"># 或从URL加载</span>
+g.parse(<span class="string">"http://example.org/data.rdf"</span>)
+
+<span class="keyword">print</span>(<span class="string">f"加载了 {len(g)} 个三元组"</span>)</code>
+                    </div>
+                </div>
+
+                <!-- 查询RDF -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-pink-300 mb-3">查询RDF数据</h3>
+                    <div class="code-block">
+<code><span class="comment"># 遍历所有三元组</span>
+<span class="keyword">for</span> s, p, o <span class="keyword">in</span> g:
+    <span class="keyword">print</span>(s, p, o)
+
+<span class="comment"># 查询特定模式</span>
+<span class="keyword">for</span> s <span class="keyword">in</span> g.subjects(RDF.type, ex.Person):
+    <span class="keyword">print</span>(<span class="string">f"人物: {s}"</span>)
+
+<span class="comment"># 获取对象的所有属性</span>
+<span class="keyword">for</span> p, o <span class="keyword">in</span> g.predicate_objects(alice):
+    <span class="keyword">print</span>(<span class="string">f"{p}: {o}"</span>)</code>
+                    </div>
+                </div>
+
+                <!-- SPARQL查询 -->
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-yellow-300 mb-3">使用SPARQL查询</h3>
+                    <div class="code-block">
+<code><span class="keyword">from</span> rdflib <span class="keyword">import</span> Graph
+
+g = Graph()
+g.parse(<span class="string">"data.ttl"</span>, format=<span class="string">"turtle"</span>)
+
+<span class="comment"># SPARQL查询</span>
+query = <span class="string">"""
+    PREFIX ex: <http://example.org/>
+    SELECT ?person ?name
+    WHERE {
+        ?person a ex:Person .
+        ?person ex:name ?name .
+    }
+    """</span>
+
+<span class="keyword">for</span> row <span class="keyword">in</span> g.query(query):
+    <span class="keyword">print</span>(row.person, row.name)</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="glass-card">
+            <h2 class="section-title">模块总结</h2>
+            <div class="space-y-4">
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-green-400 mb-3">核心要点</h3>
+                    <ul class="text-gray-300 space-y-2">
+                        <li>✅ <strong>RDF三元组</strong>: Subject-Predicate-Object是RDF的基本单位</li>
+                        <li>✅ <strong>URI标识</strong>: 使用URI唯一标识资源和关系</li>
+                        <li>✅ <strong>序列化格式</strong>: Turtle最易读,JSON-LD适合Web应用</li>
+                        <li>✅ <strong>Linked Data</strong>: 遵循4原则,让数据互相关联</li>
+                        <li>✅ <strong>rdflib</strong>: Python中处理RDF的标准库</li>
+                    </ul>
+                </div>
+
+                <div class="concept-card">
+                    <h3 class="text-xl font-bold text-blue-400 mb-3">下一步学习</h3>
+                    <p class="text-gray-300 mb-3">
+                        完成本模块后,建议继续学习:
+                    </p>
+                    <a href="25-ontology-modeling.html" class="text-blue-400 hover:text-blue-300 transition-colors inline-flex items-center gap-2">
+                        模块 25: 本体和语义建模 - 学习RDFS、OWL和本体设计
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center py-8 text-gray-500 text-sm">
+            <p>知识图谱学习平台 · 模块 24: RDF和语义网基础</p>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        // 动画 1: RDF三元组可视化
+        // ============================================================
+        let rdfTripleSvg;
+
+        function initRDFTripleAnimation() {
+            const container = document.getElementById("rdf-triple-animation");
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 400;
+
+            rdfTripleSvg = d3.select("#rdf-triple-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            rdfTripleSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("RDF三元组结构");
+        }
+
+        function playRDFTripleAnimation() {
+            resetRDFTripleAnimation();
+            const width = rdfTripleSvg.node().clientWidth;
+            const positions = [
+                { x: width * 0.2, y: 200, label: "Subject\n(主语)", color: "#3b82f6", desc: "资源\nURI或空白节点" },
+                { x: width * 0.5, y: 200, label: "Predicate\n(谓语)", color: "#22c55e", desc: "属性/关系\nURI" },
+                { x: width * 0.8, y: 200, label: "Object\n(宾语)", color: "#a855f7", desc: "值或资源\nURI/字面量/空白节点" }
+            ];
+
+            positions.forEach((pos, i) => {
+                setTimeout(() => {
+                    const g = rdfTripleSvg.append("g")
+                        .attr("transform", `translate(${pos.x}, ${pos.y})`)
+                        .style("opacity", 0);
+
+                    // 节点圆形
+                    g.append("circle")
+                        .attr("r", 50)
+                        .attr("fill", pos.color)
+                        .attr("opacity", 0.3)
+                        .attr("stroke", pos.color)
+                        .attr("stroke-width", 3);
+
+                    // 标签
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", -5)
+                        .attr("fill", "white")
+                        .attr("font-size", "12px")
+                        .attr("font-weight", "bold")
+                        .text(pos.label);
+
+                    // 描述
+                    g.append("text")
+                        .attr("text-anchor", "middle")
+                        .attr("dy", 20)
+                        .attr("fill", "#e2e8f0")
+                        .attr("font-size", "10px")
+                        .text(pos.desc);
+
+                    // 动画显示
+                    g.transition()
+                        .duration(500)
+                        .style("opacity", 1);
+
+                    // 绘制连接箭头(除了最后一个)
+                    if (i < positions.length - 1) {
+                        setTimeout(() => {
+                            const nextPos = positions[i + 1];
+                            const line = rdfTripleSvg.insert("line", ":first-child")
+                                .attr("x1", pos.x + 50)
+                                .attr("y1", pos.y)
+                                .attr("x2", pos.x + 50)
+                                .attr("y2", pos.y)
+                                .attr("stroke", "#22c55e")
+                                .attr("stroke-width", 3)
+                                .attr("marker-end", "url(#arrow)");
+
+                            line.transition()
+                                .duration(800)
+                                .attr("x2", nextPos.x - 50)
+                                .attr("y2", nextPos.y);
+                        }, 500);
+                    }
+                }, i * 1000);
+            });
+
+            // 添加箭头定义
+            rdfTripleSvg.append("defs")
+                .append("marker")
+                .attr("id", "arrow")
+                .attr("viewBox", "0 0 10 10")
+                .attr("refX", 8)
+                .attr("refY", 5)
+                .attr("markerWidth", 6)
+                .attr("markerHeight", 6)
+                .attr("orient", "auto")
+                .append("path")
+                .attr("d", "M 0 0 L 10 5 L 0 10 z")
+                .attr("fill", "#22c55e");
+        }
+
+        function resetRDFTripleAnimation() {
+            if (rdfTripleSvg) {
+                rdfTripleSvg.selectAll("*").remove();
+                initRDFTripleAnimation();
+            }
+        }
+
+        // ============================================================
+        // 动画 2: Linked Data云
+        // ============================================================
+        let linkedDataSvg;
+        let linkedDataNodes = [];
+        let linkedDataLinks = [];
+
+        const dataSets = [
+            { name: "DBpedia", type: "dataset", color: "#3b82f6" },
+            { name: "Wikidata", type: "dataset", color: "#22c55e" },
+            { name: "LinkedMDB", type: "dataset", color: "#a855f7" },
+            { name: "GeoNames", type: "dataset", color: "#f59e0b" },
+            { name: "MusicBrainz", type: "dataset", color: "#ec4899" }
+        ];
+
+        const existingLinks = [
+            { source: "DBpedia", target: "Wikidata", relation: "owl:sameAs" },
+            { source: "DBpedia", target: "LinkedMDB", relation: "dcterms:subject" },
+            { source: "DBpedia", target: "GeoNames", relation: "geo:locatedIn" },
+            { source: "Wikidata", target: "MusicBrainz", relation: "schema:about" }
+        ];
+
+        function initLinkedDataAnimation() {
+            const container = document.getElementById("linked-data-animation");
+            if (container.children.length > 0) return;
+
+            container.innerHTML = "";
+            const width = container.clientWidth;
+            const height = 500;
+
+            linkedDataSvg = d3.select("#linked-data-animation")
+                .append("svg")
+                .attr("width", width)
+                .attr("height", height);
+
+            linkedDataSvg.append("text")
+                .attr("x", width / 2)
+                .attr("y", 30)
+                .attr("text-anchor", "middle")
+                .attr("fill", "#60a5fa")
+                .attr("font-size", "20px")
+                .attr("font-weight", "bold")
+                .text("Linked Data云 - 数据互联");
+        }
+
+        function playLinkedDataAnimation() {
+            initLinkedDataAnimation();
+            linkedDataNodes = [];
+            linkedDataLinks = [];
+
+            const width = linkedDataSvg.attr("width");
+            const height = 500;
+
+            const linkGroup = linkedDataSvg.append("g");
+            const nodeGroup = linkedDataSvg.append("g");
+
+            const simulation = d3.forceSimulation(linkedDataNodes)
+                .force("link", d3.forceLink(linkedDataLinks).id(d => d.name).distance(120))
+                .force("charge", d3.forceManyBody().strength(-500))
+                .force("center", d3.forceCenter(width / 2, height / 2));
+
+            function ticked() {
+                linkGroup.selectAll("line")
+                    .attr("x1", d => d.source.x)
+                    .attr("y1", d => d.source.y)
+                    .attr("x2", d => d.target.x)
+                    .attr("y2", d => d.target.y);
+
+                nodeGroup.selectAll("g")
+                    .attr("transform", d => `translate(${d.x},${d.y})`);
+            }
+
+            simulation.on("tick", ticked);
+
+            let step = 0;
+            function addNextDataset() {
+                if (step >= dataSets.length) {
+                    return;
+                }
+
+                const ds = dataSets[step];
+                const newNode = {
+                    name: ds.name,
+                    type: ds.type,
+                    color: ds.color,
+                    x: Math.random() * width,
+                    y: Math.random() * height
+                };
+
+                linkedDataNodes.push(newNode);
+
+                const node = nodeGroup.append("g")
+                    .datum(newNode)
+                    .style("opacity", 0);
+
+                node.append("circle")
+                    .attr("r", 40)
+                    .attr("fill", ds.color)
+                    .attr("opacity", 0.6)
+                    .attr("stroke", ds.color)
+                    .attr("stroke-width", 2);
+
+                node.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", -5)
+                    .attr("fill", "white")
+                    .attr("font-size", "11px")
+                    .attr("font-weight", "bold")
+                    .text(ds.name);
+
+                node.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", 15)
+                    .attr("fill", "white")
+                    .attr("font-size", "9px")
+                    .text("dataset");
+
+                node.transition()
+                    .duration(500)
+                    .style("opacity", 1);
+
+                // 添加相关的链接
+                const relatedLinks = existingLinks.filter(
+                    l => l.source === ds.name || l.target === ds.name
+                );
+
+                relatedLinks.forEach(link => {
+                    const sourceNode = linkedDataNodes.find(n => n.name === link.source);
+                    const targetNode = linkedDataNodes.find(n => n.name === link.target);
+
+                    if (sourceNode && targetNode) {
+                        const existing = linkedDataLinks.find(
+                            l => l.source === sourceNode && l.target === targetNode
+                        );
+
+                        if (!existing) {
+                            const newLink = { source: sourceNode, target: targetNode };
+                            linkedDataLinks.push(newLink);
+
+                            linkGroup.insert("line", ":first-child")
+                                .datum(newLink)
+                                .attr("stroke", "#22c55e")
+                                .attr("stroke-width", 2)
+                                .attr("opacity", 0)
+                                .transition()
+                                .duration(500)
+                                .attr("opacity", 0.6);
+                        }
+                    }
+                });
+
+                simulation.nodes(linkedDataNodes);
+                simulation.force("link").links(linkedDataLinks);
+                simulation.alpha(1).restart();
+
+                step++;
+                setTimeout(addNextDataset, 1200);
+            }
+
+            setTimeout(addNextDataset, 500);
+        }
+
+        function resetLinkedDataAnimation() {
+            linkedDataNodes = [];
+            linkedDataLinks = [];
+            document.getElementById("linked-data-animation").innerHTML = "";
+            initLinkedDataAnimation();
+        }
+
+        function addLink() {
+            alert("在完整版本中,这里会添加新的数据集链接!");
+        }
+
+        // ============================================================
+        // 初始化
+        // ============================================================
+        document.addEventListener("DOMContentLoaded", function() {
+            initRDFTripleAnimation();
+            initLinkedDataAnimation();
+        });
+    </script>
+</body>
+</html>
