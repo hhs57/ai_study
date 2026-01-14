@@ -59,7 +59,6 @@ ai_study/
 │   ├── index.html      # 课程主页
 │   └── ...             # 各章节 HTML 文件
 ├── CLAUDE.md           # 开发规范与最佳实践
-├── ANTIGRAVITY_RULES.md # 智能体行为准则
 └── index.html          # 项目总导航页
 ```
 
